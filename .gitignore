@@ -1,3 +1,6 @@
+# macOS
+.DS_Store
+
 # Logs
 logs
 *.log
@@ -134,3 +137,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Kilo Code agent rules
+.kilocode/rules/**
+# excluding memory bank
+!.kilocode/rules/memory-bank/
+!.kilocode/rules/memory-bank/**

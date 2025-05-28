@@ -1,0 +1,35 @@
+{
+  "name": "sync-rules",
+  "author": "Łukasz Jerciński",
+  "license": "MIT",
+  "version": "0.9.0",
+  "description": "CLI tool to synchronize AI coding assistant rule files between projects.",
+  "type": "module",
+  "bin": {
+    "sync-rules": "bin/sync-rules.ts"
+  },
+  "scripts": {
+    "start": "node bin/sync-rules.ts",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write ."
+  },
+  "keywords": [
+    "cli",
+    "sync",
+    "rules",
+    "ai-coding-assistant"
+  ],
+  "dependencies": {
+    "commander": "^14.0.0",
+    "execa": "^9.5.3",
+    "fast-glob": "^3.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "prettier": "3.5.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=23.6.0"
+  }
+}
