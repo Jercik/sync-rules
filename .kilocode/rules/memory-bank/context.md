@@ -2,7 +2,7 @@
 
 ## Current Status
 
-The `sync-rules` project is feature-complete with robust exclusion pattern functionality. Core functionality is stable and working.
+The `sync-rules` project is feature-complete with robust exclusion pattern functionality. Core functionality is stable and working. Added TypeScript import rule for native execution clarity.
 
 ## Design Philosophy
 
