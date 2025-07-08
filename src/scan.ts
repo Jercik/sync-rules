@@ -13,6 +13,8 @@ export interface FileInfo {
   absolutePath: string;
   /** The SHA-1 hash of the file's content. Undefined if hashing failed or was not performed. */
   hash?: string;
+  /** Indicates if this file is project-specific (local) and should not be synced. */
+  isLocal?: boolean;
 }
 
 /**
@@ -51,6 +53,20 @@ export interface ScanOptions {
 }
 
 /**
+ * Checks if a file path matches the local pattern (*.local.*).
+ * Local files are project-specific and should not be synced.
+ *
+ * @param filePath The file path to check (can be absolute or relative).
+ * @returns true if the file matches the local pattern, false otherwise.
+ */
+function isLocalFile(filePath: string): boolean {
+  // Get just the filename from the path
+  const filename = path.basename(filePath);
+  // Check if filename matches *.local.* pattern
+  return /\.local\./.test(filename);
+}
+
+/**
  * Scans a single base directory for files matching the provided patterns.
  *
  * @param baseDir The absolute path to the directory to scan.
@@ -73,14 +89,18 @@ async function scanDirectory(
     /[*?[\]{}!]/.test(pattern);
 
   // Transform user-provided patterns
-  // For non-glob literals, create two variants: original and recursive (e.g., dirName and dirName/**/*)
-  // For existing globs, use them as is.
-  const effectiveGlobPatterns = patterns.flatMap(
-    (p) =>
-      isGlobPattern(p)
-        ? [p] // Use existing glob as is
-        : [p, normalizePath(path.join(p, "**/*"))], // Create literal and recursive variant
-  );
+  // For non-glob literals, just use the pattern itself - fast-glob will handle both files and directories
+  // We'll check if it's a directory and add recursive pattern only if needed
+  const effectiveGlobPatterns = patterns.flatMap((p) => {
+    if (isGlobPattern(p)) {
+      return [p]; // Use existing glob as is
+    } else {
+      // For literal patterns, we want to match:
+      // 1. The literal name as a file (e.g., ".clinerules")
+      // 2. The literal name as a directory with all contents (e.g., ".clinerules/**/*")
+      return [p, `${p}/**/*`];
+    }
+  });
 
   // Process exclusion patterns for fast-glob
   // Convert literal names to glob patterns and normalize paths
@@ -119,6 +139,7 @@ async function scanDirectory(
     const fileInfo: FileInfo = {
       relativePath: normalizedRelativePath,
       absolutePath,
+      isLocal: isLocalFile(normalizedRelativePath),
     };
     filesMap.set(normalizedRelativePath, fileInfo);
   }
@@ -147,30 +168,32 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
 
   const { sourceDir, targetDir, rulePatterns, excludePatterns } = options;
 
-  // Scan source and target directories
-  // For now, we assume rulePatterns are relative to the source/target dir itself.
-  // A more complex setup might involve scanning specific subdirectories like ".clinerules"
-  // and then applying further patterns within those. The current `rulePatterns` from CLI
-  // are like `['.clinerules', '.cursorrules', 'rules/*/_*.json']`
-  // These should be treated as top-level items within src/dst to look for.
+  let sourceFiles: Map<string, FileInfo>;
+  let targetFiles: Map<string, FileInfo>;
 
-  // Pass all rulePatterns to scanDirectory directly.
-  // scanDirectory will then construct the full glob patterns relative to sourceDir/targetDir.
-  const sourceFilesPromise = scanDirectory(
-    sourceDir,
-    rulePatterns,
-    excludePatterns,
-  );
-  const targetFilesPromise = scanDirectory(
-    targetDir,
-    rulePatterns,
-    excludePatterns,
-  );
+  try {
+    // Scan source and target directories with proper error handling
+    const sourceFilesPromise = scanDirectory(
+      sourceDir,
+      rulePatterns,
+      excludePatterns,
+    );
+    const targetFilesPromise = scanDirectory(
+      targetDir,
+      rulePatterns,
+      excludePatterns,
+    );
 
-  const [sourceFiles, targetFiles] = await Promise.all([
-    sourceFilesPromise,
-    targetFilesPromise,
-  ]);
+    [sourceFiles, targetFiles] = await Promise.all([
+      sourceFilesPromise,
+      targetFilesPromise,
+    ]);
+  } catch (error) {
+    logger.error(
+      `Error during directory scanning: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    throw error;
+  }
 
   // Calculate hashes serially for simplicity
   for (const fileInfo of [...sourceFiles.values(), ...targetFiles.values()]) {

@@ -5,8 +5,13 @@ import { scan } from "./scan.ts";
 import type { ScanOptions, FileInfo } from "./scan.ts";
 import { mergeFiles } from "./merge.ts";
 import type { MergeOptions } from "./merge.ts";
+import { discoverProjects, validateProjects } from "./discovery.ts";
+import type { ProjectInfo } from "./discovery.ts";
+import { scanAllProjects, getUserConfirmations } from "./multi-sync.ts";
+import type { MultiSyncOptions, SyncAction } from "./multi-sync.ts";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { homedir } from "node:os";
 
 /**
  * Validates the source and destination directory arguments.
@@ -98,94 +103,86 @@ export async function main(argv: string[]) {
     .description(
       "CLI tool to synchronize agent coding-tool rule files between projects.",
     )
-    .argument("<src>", "Source directory path")
-    .argument("<dst>", "Destination directory path")
+    .argument(
+      "[projects...]",
+      "Project directory paths (if none provided, discovers all in base directory)",
+    )
     .option(
-      "--rulesDir <names...>",
-      "Specify rule directory names (e.g., .clinerules .cursorrules)",
+      "--base-dir <path>",
+      "Base directory for project discovery",
+      path.join(homedir(), "Developer"),
+    )
+    .option(
+      "--rules <names...>",
+      "Specify rule directory/file names (e.g., .clinerules .cursorrules)",
       [".clinerules", ".cursorrules", ".kilocode"],
     )
     .option(
       "--exclude <patterns...>",
       "Exclude patterns (directories/files to skip)",
-      ["memory-bank", "node_modules", ".git"],
+      ["memory-bank", "node_modules", ".git", ".DS_Store"],
     )
-    .option("--dry", "Perform a dry run without actual changes")
+    .option("--dry-run", "Perform a dry run without actual changes")
+    .option(
+      "--auto-confirm",
+      "Auto-confirm using newest versions (skip prompts)",
+    )
     .option("--verbose", "Enable verbose logging")
-    .action(async (src, dst, options) => {
+    .action(async (projectPaths: string[], options) => {
       logger.setVerbose(options.verbose); // Set verbosity early
 
-      logger.log("Source Directory:", src);
-      logger.log("Destination Directory:", dst);
-      if (options.verbose) {
-        logger.log("Raw Options:", options);
-      }
-
       try {
-        // Validate directories before proceeding
-        await validateDirectories(src, dst);
+        let projects: ProjectInfo[];
 
-        const scanOptions: ScanOptions = {
-          sourceDir: src,
-          targetDir: dst,
-          rulePatterns: options.rulesDir,
-          excludePatterns: options.exclude,
-        };
-
-        logger.log("Starting file synchronization process...");
-        const scanResult = await scan(scanOptions);
-
-        logger.log(
-          `Found ${scanResult.sourceFiles.size} files in source: ${scanOptions.sourceDir}`,
-        );
-        if (options.verbose) {
-          scanResult.sourceFiles.forEach((file: FileInfo) => {
-            logger.log(`  S: ${file.relativePath}`);
-          });
-        }
-
-        logger.log(
-          `Found ${scanResult.targetFiles.size} files in target: ${scanOptions.targetDir}`,
-        );
-        if (options.verbose) {
-          scanResult.targetFiles.forEach((file: FileInfo) => {
-            logger.log(`  T: ${file.relativePath}`);
-          });
-        }
-
-        const mergeOptions: MergeOptions = {
-          sourceDir: src,
-          targetDir: dst,
-          dryRun: options.dry,
-        };
-
-        const { anyConflicts } = await mergeFiles(scanResult, mergeOptions);
-
-        // Provide summary of operations
-        const totalSourceFiles = scanResult.sourceFiles.size;
-        const totalTargetFiles = scanResult.targetFiles.size;
-
-        logger.log("\n=== Synchronization Summary ===");
-        logger.log(`Source files scanned: ${totalSourceFiles}`);
-        logger.log(`Target files scanned: ${totalTargetFiles}`);
-
-        if (anyConflicts) {
-          logger.warn(
-            "\n⚠️  Synchronization complete with conflicts detected.",
+        if (projectPaths.length === 0) {
+          // Multi-project discovery mode
+          logger.log(`Discovering projects in: ${options.baseDir}`);
+          projects = await discoverProjects(
+            options.baseDir,
+            options.rules,
+            options.exclude,
           );
-          logger.warn(
-            "Please review the affected files and ensure conflicts are resolved.",
-          );
-          logger.log("\nExiting with status 1 (conflicts detected).");
-          process.exit(1);
+
+          if (projects.length === 0) {
+            logger.warn(
+              `No projects with rule files found in ${options.baseDir}`,
+            );
+            process.exit(0);
+          }
+
+          logger.log(`Found ${projects.length} projects to synchronize:`);
+          projects.forEach((project) => {
+            logger.log(`  - ${project.name} (${project.path})`);
+          });
         } else {
-          logger.log("\n✅ Synchronization completed successfully!");
-          logger.log(
-            "All files are now synchronized between source and target.",
-          );
-          logger.log("\nExiting with status 0 (success).");
-          process.exit(0);
+          // Specific projects mode
+          logger.log(`Synchronizing ${projectPaths.length} specified projects`);
+
+          // Validate all project paths
+          await validateProjects(projectPaths);
+
+          projects = projectPaths.map((projectPath) => ({
+            name: path.basename(projectPath),
+            path: path.resolve(projectPath),
+          }));
+
+          logger.log("Projects to synchronize:");
+          projects.forEach((project) => {
+            logger.log(`  - ${project.name} (${project.path})`);
+          });
         }
+
+        // Handle legacy two-project mode for backward compatibility
+        if (projectPaths.length === 2) {
+          return await handleLegacyTwoProjectMode(
+            projectPaths[0]!,
+            projectPaths[1]!,
+            options,
+          );
+        }
+
+        // Execute unified multi-project sync
+        await executeUnifiedSync(projects, options);
       } catch (processError) {
         logger.error(
           "Error during synchronization process:",
@@ -201,7 +198,7 @@ export async function main(argv: string[]) {
           logger.debug(processError.stack);
         }
         logger.error("Exiting with status 2 (error).");
-        process.exit(2); // Differentiate error exit code
+        process.exit(2);
       }
     });
 
@@ -215,5 +212,274 @@ export async function main(argv: string[]) {
       logger.error("An unexpected error occurred during command parsing.");
     }
     process.exit(1);
+  }
+}
+
+/**
+ * Executes the unified multi-project synchronization.
+ */
+async function executeUnifiedSync(
+  projects: ProjectInfo[],
+  options: any,
+): Promise<void> {
+  const multiSyncOptions: MultiSyncOptions = {
+    rulePatterns: options.rules,
+    excludePatterns: options.exclude,
+    dryRun: options.dryRun || false,
+    autoConfirm: options.autoConfirm || false,
+    baseDir: options.baseDir,
+  };
+
+  logger.log("\nStarting unified synchronization...");
+
+  // Scan all projects and build global file state
+  const globalFileStates = await scanAllProjects(projects, multiSyncOptions);
+
+  if (globalFileStates.size === 0) {
+    logger.log("No rule files found across any projects.");
+    process.exit(0);
+  }
+
+  // Get user confirmations and build sync plan
+  const syncActions = await getUserConfirmations(
+    globalFileStates,
+    multiSyncOptions,
+  );
+
+  if (syncActions.length === 0) {
+    logger.log("No synchronization needed - all files are already up to date.");
+    process.exit(0);
+  }
+
+  // Show final summary and get confirmation before executing changes
+  if (!multiSyncOptions.dryRun && !multiSyncOptions.autoConfirm) {
+    logger.log(`\n=== Planned Changes Summary ===`);
+    logger.log(`Total actions: ${syncActions.length}`);
+
+    const updates = syncActions.filter((a) => a.type === "update").length;
+    const additions = syncActions.filter((a) => a.type === "add").length;
+    const deletions = syncActions.filter((a) => a.type === "delete").length;
+
+    logger.log(`Updates: ${updates}`);
+    logger.log(`Additions: ${additions}`);
+    logger.log(`Deletions: ${deletions}`);
+
+    const { confirm } = await import("./utils/prompts.ts");
+    const proceedConfirmed = await confirm("\nProceed with these changes?");
+
+    if (!proceedConfirmed) {
+      logger.log("Synchronization cancelled by user.");
+      process.exit(0);
+    }
+  }
+
+  // Execute the sync plan
+  const result = await executeSyncActions(
+    syncActions,
+    multiSyncOptions,
+    projects,
+  );
+
+  // Report results
+  logger.log("\n=== Synchronization Summary ===");
+  logger.log(`Total actions: ${syncActions.length}`);
+  logger.log(`Updates: ${result.updates}`);
+  logger.log(`Additions: ${result.additions}`);
+  logger.log(`Deletions: ${result.deletions}`);
+  logger.log(`Skipped: ${result.skips}`);
+
+  if (result.conflicts > 0) {
+    logger.warn(
+      `\n⚠️  Synchronization complete with ${result.conflicts} conflicts detected.`,
+    );
+    logger.warn(
+      "Please review the affected files and ensure conflicts are resolved.",
+    );
+    process.exit(1);
+  } else {
+    logger.log("\n✅ Synchronization completed successfully!");
+    process.exit(0);
+  }
+}
+
+/**
+ * Handles legacy two-project mode for backward compatibility.
+ */
+async function handleLegacyTwoProjectMode(
+  src: string,
+  dst: string,
+  options: any,
+): Promise<void> {
+  logger.log("Detected two-project mode - using legacy sync method");
+  logger.log("Source Directory:", src);
+  logger.log("Destination Directory:", dst);
+
+  // Validate directories before proceeding
+  await validateDirectories(src, dst);
+
+  const scanOptions: ScanOptions = {
+    sourceDir: src,
+    targetDir: dst,
+    rulePatterns: options.rules,
+    excludePatterns: options.exclude,
+  };
+
+  logger.log("Starting file synchronization process...");
+  const scanResult = await scan(scanOptions);
+
+  const mergeOptions: MergeOptions = {
+    sourceDir: src,
+    targetDir: dst,
+    dryRun: options.dryRun || false,
+  };
+
+  const { anyConflicts } = await mergeFiles(scanResult, mergeOptions);
+
+  // Provide summary
+  logger.log("\n=== Synchronization Summary ===");
+  logger.log(`Source files scanned: ${scanResult.sourceFiles.size}`);
+  logger.log(`Target files scanned: ${scanResult.targetFiles.size}`);
+
+  if (anyConflicts) {
+    logger.warn("\n⚠️  Synchronization complete with conflicts detected.");
+    process.exit(1);
+  } else {
+    logger.log("\n✅ Synchronization completed successfully!");
+    process.exit(0);
+  }
+}
+
+/**
+ * Executes the sync actions and returns summary statistics.
+ */
+async function executeSyncActions(
+  actions: SyncAction[],
+  options: MultiSyncOptions,
+  projects: ProjectInfo[],
+): Promise<{
+  updates: number;
+  additions: number;
+  deletions: number;
+  skips: number;
+  conflicts: number;
+}> {
+  let updates = 0,
+    additions = 0,
+    deletions = 0,
+    skips = 0,
+    conflicts = 0;
+
+  // Create project lookup map
+  const projectMap = new Map(projects.map((p) => [p.name, p.path]));
+
+  for (const action of actions) {
+    try {
+      switch (action.type) {
+        case "update":
+          await executeUpdate(action, options, projectMap);
+          updates++;
+          break;
+        case "add":
+          await executeAdd(action, options, projectMap);
+          additions++;
+          break;
+        case "delete":
+          await executeDelete(action, options, projectMap);
+          deletions++;
+          break;
+        case "skip":
+          skips++;
+          break;
+      }
+    } catch (error) {
+      logger.error(
+        `Failed to execute ${action.type} for ${action.relativePath}:`,
+        error,
+      );
+      conflicts++;
+    }
+  }
+
+  return { updates, additions, deletions, skips, conflicts };
+}
+
+/**
+ * Executes an update action (file exists in both projects, source is newer).
+ */
+async function executeUpdate(
+  action: SyncAction,
+  options: MultiSyncOptions,
+  projectMap: Map<string, string>,
+): Promise<void> {
+  if (!action.sourceFile || !action.targetFile) {
+    throw new Error("Update action missing source or target file");
+  }
+
+  const targetProjectPath = projectMap.get(action.targetProject);
+  if (!targetProjectPath) {
+    throw new Error(`Project path not found for: ${action.targetProject}`);
+  }
+
+  const targetPath = path.join(targetProjectPath, action.relativePath);
+
+  logger.log(
+    `${options.dryRun ? "[DRY RUN] Would update" : "Updating"}: ${action.relativePath} in ${action.targetProject} from ${action.sourceProject}`,
+  );
+
+  if (!options.dryRun) {
+    const destDir = path.dirname(targetPath);
+    await fs.mkdir(destDir, { recursive: true });
+    await fs.copyFile(action.sourceFile.absolutePath, targetPath);
+  }
+}
+
+/**
+ * Executes an add action (file missing in target project).
+ */
+async function executeAdd(
+  action: SyncAction,
+  options: MultiSyncOptions,
+  projectMap: Map<string, string>,
+): Promise<void> {
+  if (!action.sourceFile) {
+    throw new Error("Add action missing source file");
+  }
+
+  const targetProjectPath = projectMap.get(action.targetProject);
+  if (!targetProjectPath) {
+    throw new Error(`Project path not found for: ${action.targetProject}`);
+  }
+
+  const targetPath = path.join(targetProjectPath, action.relativePath);
+
+  logger.log(
+    `${options.dryRun ? "[DRY RUN] Would add" : "Adding"}: ${action.relativePath} to ${action.targetProject} from ${action.sourceProject}`,
+  );
+
+  if (!options.dryRun) {
+    const destDir = path.dirname(targetPath);
+    await fs.mkdir(destDir, { recursive: true });
+    await fs.copyFile(action.sourceFile.absolutePath, targetPath);
+  }
+}
+
+/**
+ * Executes a delete action (file should be removed from project).
+ */
+async function executeDelete(
+  action: SyncAction,
+  options: MultiSyncOptions,
+  projectMap: Map<string, string>,
+): Promise<void> {
+  if (!action.targetFile) {
+    throw new Error("Delete action missing target file");
+  }
+
+  logger.log(
+    `${options.dryRun ? "[DRY RUN] Would delete" : "Deleting"}: ${action.relativePath} from ${action.targetProject}`,
+  );
+
+  if (!options.dryRun) {
+    await fs.unlink(action.targetFile.absolutePath);
   }
 }

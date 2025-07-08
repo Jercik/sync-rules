@@ -85,6 +85,31 @@ This example would exclude:
 
 See the "Default Patterns" section for patterns excluded by default.
 
+### Project-Specific Rules (Local Files)
+
+Files matching the `*.local.*` pattern are automatically recognized as project-specific and will not be synchronized. This allows you to maintain rules that should remain unique to each project.
+
+```bash
+# Example local files that won't be synced:
+.clinerules/custom.local.md        # Project-specific markdown rules
+.kilocode/config.local.json        # Local configuration
+.cursorrules.local                 # Local cursor rules file
+```
+
+Local files are:
+
+- Automatically detected (no configuration needed)
+- Preserved in both source and target directories
+- Reported in the synchronization summary
+- Never copied, merged, or deleted during sync
+
+This is useful for:
+
+- Environment-specific configurations
+- Project-specific coding standards
+- Temporary or experimental rules
+- Client-specific customizations
+
 ## How It Works
 
 The tool performs the following actions:

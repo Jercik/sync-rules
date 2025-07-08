@@ -2,7 +2,13 @@
 
 ## Current Status
 
-The `sync-rules` project is feature-complete with robust exclusion pattern functionality. Core functionality is stable and working. Added TypeScript import rule for native execution clarity.
+The `sync-rules` project is feature-complete with robust exclusion pattern functionality and project-specific file support. Core functionality is stable and working. Added TypeScript import rule for native execution clarity. Recently added support for local files (_.local._ pattern) that are automatically excluded from synchronization.
+
+### Recent Critical Fixes
+
+- **Interactive Confirmation Implementation**: Fixed critical bug where user confirmation was never requested, violating core design principles. Now properly prompts users for file decisions unless --auto-confirm is set.
+- **Identical File Detection**: Improved efficiency by comparing file content (SHA-1 hashes) rather than timestamps. Files with identical content across all projects are now automatically skipped.
+- **System File Exclusion**: Added `.DS_Store` to default exclusion patterns to prevent macOS system files from being synchronized.
 
 ## Design Philosophy
 
@@ -19,6 +25,7 @@ The development of `sync-rules` has been shaped by several key insights that dir
 - **Actionable Error Messaging**: Providing clear, specific error messages guides users in resolving issues.
 - **Safe File Operations**: The tool is designed to be non-destructive, for instance, by skipping symbolic links to avoid unintended side effects and by never deleting target files.
 - **Effective Default Exclusions**: Sensible default exclusions (like `node_modules`, `.git`) streamline common use cases.
+- **Project-Specific Files**: Built-in support for local files (_.local._ pattern) allows teams to maintain project-specific rules without sync conflicts.
 
 ## Performance Considerations
 

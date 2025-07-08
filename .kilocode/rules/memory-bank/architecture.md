@@ -17,8 +17,9 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
   - Early validation prevents downstream errors
   - Commander.js provides robust argument handling
   - Configurable exclusion patterns via `--exclude` option
-  - Sensible default exclusions (memory-bank, node_modules, .git)
+  - Sensible default exclusions (memory-bank, node_modules, .git, .DS_Store)
   - Clear exit codes communicate results (0=success, 1=conflicts, 2=error)
+  - Interactive confirmation prompts for user decisions
 
 ### 2. Scanning Layer (`scan.ts`)
 
@@ -38,11 +39,21 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
   - Three-way merge using temporary base files
   - Automatic fallback from `git merge-file` to VS Code
 
-### 4. Utilities (`utils/`)
+### 4. Multi-Sync Layer (`multi-sync.ts`)
+
+- **Responsibility**: Multi-project synchronization orchestration
+- **Key Patterns**:
+  - Content-based comparison using SHA-1 hashes
+  - Automatic skip for files with identical content across all projects
+  - Interactive user prompts for file decisions
+  - Support for project-specific local files (_.local._ pattern)
+
+### 5. Utilities (`utils/`)
 
 - **Core utilities** (`core.ts`): Logging, hashing, file operations
 - **Git integration** (`git.ts`): Command execution with proper error handling
 - **VS Code integration** (`vscode.ts`): Conflict resolution workflow
+- **Prompt utilities** (`prompts.ts`): Interactive user input handling (confirm, select, input)
 
 ## Data Flow
 

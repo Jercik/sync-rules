@@ -17,6 +17,7 @@ type SyncActionType =
   | "MERGE" // File exists in both source and target but has different content.
   | "SKIP_IDENTICAL" // File exists in both and has identical content.
   | "SKIP_TARGET_ONLY" // File exists only in target.
+  | "SKIP_LOCAL" // File is marked as local (project-specific) and should not be synced.
   | "ERROR"; // An error occurred related to this file.
 
 /**
@@ -60,10 +61,20 @@ function determineSyncOperations(scanResult: ScanResult): SyncOperation[] {
     ...scanResult.sourceFiles.keys(),
     ...scanResult.targetFiles.keys(),
   ]);
-
   for (const relativePath of allRelativePaths) {
     const sourceFile = scanResult.sourceFiles.get(relativePath);
     const targetFile = scanResult.targetFiles.get(relativePath);
+
+    // Check if either file is marked as local
+    if (sourceFile?.isLocal || targetFile?.isLocal) {
+      operations.push({
+        action: "SKIP_LOCAL",
+        sourceFile,
+        targetFile,
+        relativePath,
+      });
+      continue;
+    }
 
     if (sourceFile && targetFile) {
       if (!sourceFile.hash || !targetFile.hash) {
@@ -296,6 +307,9 @@ async function processSyncOperations(
           break;
         case "SKIP_TARGET_ONLY":
           logger.log(`Skipping target-only file: ${op.relativePath}`);
+          break;
+        case "SKIP_LOCAL":
+          logger.log(`Skipping local file (*.local.*): ${op.relativePath}`);
           break;
         case "ERROR":
           logger.error(
