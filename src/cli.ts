@@ -1,10 +1,7 @@
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import * as logger from "./utils/core.ts";
-import { scan } from "./scan.ts";
-import type { ScanOptions, FileInfo } from "./scan.ts";
-import { mergeFiles } from "./merge.ts";
-import type { MergeOptions } from "./merge.ts";
+import type { FileInfo } from "./scan.ts";
 import { discoverProjects, validateProjects } from "./discovery.ts";
 import type { ProjectInfo } from "./discovery.ts";
 import { scanAllProjects, getUserConfirmations } from "./multi-sync.ts";
@@ -14,84 +11,16 @@ import path from "node:path";
 import { homedir } from "node:os";
 
 /**
- * Validates the source and destination directory arguments.
- * Checks if directories exist, are accessible, and are not the same.
- *
- * @param src Source directory path
- * @param dst Destination directory path
- * @throws Error if validation fails
- */
-async function validateDirectories(src: string, dst: string): Promise<void> {
-  // Resolve to absolute paths for comparison
-  const srcAbsolute = path.resolve(src);
-  const dstAbsolute = path.resolve(dst);
-
-  // Check if source and destination are the same
-  if (srcAbsolute === dstAbsolute) {
-    throw new Error("Source and destination directories cannot be the same");
-  }
-
-  // Check if source directory exists and is a directory
-  try {
-    const srcStat = await fs.stat(srcAbsolute);
-    if (!srcStat.isDirectory()) {
-      throw new Error(`Source path "${src}" is not a directory`);
-    }
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      throw new Error(`Source directory "${src}" does not exist`);
-    }
-    throw new Error(
-      `Cannot access source directory "${src}": ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  // Check if destination directory exists, create if it doesn't
-  try {
-    const dstStat = await fs.stat(dstAbsolute);
-    if (!dstStat.isDirectory()) {
-      throw new Error(
-        `Destination path "${dst}" exists but is not a directory`,
-      );
-    }
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      // Destination doesn't exist, try to create it
-      try {
-        await fs.mkdir(dstAbsolute, { recursive: true });
-        logger.log(`Created destination directory: ${dst}`);
-      } catch (createError) {
-        throw new Error(
-          `Cannot create destination directory "${dst}": ${createError instanceof Error ? createError.message : String(createError)}`,
-        );
-      }
-    } else {
-      throw new Error(
-        `Cannot access destination directory "${dst}": ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
-  // Test write permissions on destination
-  try {
-    await fs.access(dstAbsolute, fs.constants.W_OK);
-  } catch (error) {
-    throw new Error(`No write permission for destination directory "${dst}"`);
-  }
-}
-
-/**
  * Main entry point for the `sync-rules` CLI application.
- * Parses command-line arguments, orchestrates the scanning and merging processes,
+ * Parses command-line arguments, orchestrates multi-project synchronization,
  * and handles overall application flow and error reporting.
  *
- * @param argv An array of command-line arguments, typically `process.argv.slice(2)`.
+ * @param argv An array of command-line arguments, typically `process.argv`.
  * @returns A promise that resolves when the command processing is complete.
  *          The process will exit with appropriate status codes:
- *          - 0: Success, no conflicts.
- *          - 1: Success, but with merge conflicts.
- *          - 2: Error during processing.
- *          - Commander.js also handles its own exit codes for argument errors.
+ *          - 0: Success, all files synchronized or no synchronization needed.
+ *          - 1: Partial success with errors during file operations (e.g., permission issues).
+ *          - 2: Fatal error during processing (e.g., invalid arguments, no projects found).
  */
 export async function main(argv: string[]) {
   const program = new Command();
@@ -125,7 +54,7 @@ export async function main(argv: string[]) {
     .option("--dry-run", "Perform a dry run without actual changes")
     .option(
       "--auto-confirm",
-      "Auto-confirm using newest versions (skip prompts)",
+      "Auto-confirm using newest versions (skip prompts). Automatically selects the file with the most recent modification date as the source of truth",
     )
     .option("--verbose", "Enable verbose logging")
     .action(async (projectPaths: string[], options) => {
@@ -147,7 +76,7 @@ export async function main(argv: string[]) {
             logger.warn(
               `No projects with rule files found in ${options.baseDir}`,
             );
-            process.exit(0);
+            return 0;
           }
 
           logger.log(`Found ${projects.length} projects to synchronize:`);
@@ -172,17 +101,9 @@ export async function main(argv: string[]) {
           });
         }
 
-        // Handle legacy two-project mode for backward compatibility
-        if (projectPaths.length === 2) {
-          return await handleLegacyTwoProjectMode(
-            projectPaths[0]!,
-            projectPaths[1]!,
-            options,
-          );
-        }
-
         // Execute unified multi-project sync
-        await executeUnifiedSync(projects, options);
+        const exitCode = await executeUnifiedSync(projects, options);
+        process.exit(exitCode);
       } catch (processError) {
         logger.error(
           "Error during synchronization process:",
@@ -217,11 +138,12 @@ export async function main(argv: string[]) {
 
 /**
  * Executes the unified multi-project synchronization.
+ * @returns Exit code: 0 for success, 1 for errors
  */
-async function executeUnifiedSync(
+export async function executeUnifiedSync(
   projects: ProjectInfo[],
   options: any,
-): Promise<void> {
+): Promise<number> {
   const multiSyncOptions: MultiSyncOptions = {
     rulePatterns: options.rules,
     excludePatterns: options.exclude,
@@ -232,12 +154,17 @@ async function executeUnifiedSync(
 
   logger.log("\nStarting unified synchronization...");
 
+  if (multiSyncOptions.autoConfirm) {
+    logger.log(
+      "Auto-confirm mode enabled: automatically using newest versions as source of truth.",
+    );
+  }
+
   // Scan all projects and build global file state
   const globalFileStates = await scanAllProjects(projects, multiSyncOptions);
-
   if (globalFileStates.size === 0) {
     logger.log("No rule files found across any projects.");
-    process.exit(0);
+    return 0;
   }
 
   // Get user confirmations and build sync plan
@@ -248,7 +175,7 @@ async function executeUnifiedSync(
 
   if (syncActions.length === 0) {
     logger.log("No synchronization needed - all files are already up to date.");
-    process.exit(0);
+    return 0;
   }
 
   // Show final summary and get confirmation before executing changes
@@ -266,10 +193,9 @@ async function executeUnifiedSync(
 
     const { confirm } = await import("./utils/prompts.ts");
     const proceedConfirmed = await confirm("\nProceed with these changes?");
-
     if (!proceedConfirmed) {
       logger.log("Synchronization cancelled by user.");
-      process.exit(0);
+      return 0;
     }
   }
 
@@ -287,65 +213,15 @@ async function executeUnifiedSync(
   logger.log(`Additions: ${result.additions}`);
   logger.log(`Deletions: ${result.deletions}`);
   logger.log(`Skipped: ${result.skips}`);
-
-  if (result.conflicts > 0) {
+  if (result.errors > 0) {
     logger.warn(
-      `\n⚠️  Synchronization complete with ${result.conflicts} conflicts detected.`,
+      `\n⚠️  Synchronization complete with ${result.errors} errors detected.`,
     );
-    logger.warn(
-      "Please review the affected files and ensure conflicts are resolved.",
-    );
-    process.exit(1);
+    logger.warn("Please review the affected files and resolve any issues.");
+    return 1;
   } else {
     logger.log("\n✅ Synchronization completed successfully!");
-    process.exit(0);
-  }
-}
-
-/**
- * Handles legacy two-project mode for backward compatibility.
- */
-async function handleLegacyTwoProjectMode(
-  src: string,
-  dst: string,
-  options: any,
-): Promise<void> {
-  logger.log("Detected two-project mode - using legacy sync method");
-  logger.log("Source Directory:", src);
-  logger.log("Destination Directory:", dst);
-
-  // Validate directories before proceeding
-  await validateDirectories(src, dst);
-
-  const scanOptions: ScanOptions = {
-    sourceDir: src,
-    targetDir: dst,
-    rulePatterns: options.rules,
-    excludePatterns: options.exclude,
-  };
-
-  logger.log("Starting file synchronization process...");
-  const scanResult = await scan(scanOptions);
-
-  const mergeOptions: MergeOptions = {
-    sourceDir: src,
-    targetDir: dst,
-    dryRun: options.dryRun || false,
-  };
-
-  const { anyConflicts } = await mergeFiles(scanResult, mergeOptions);
-
-  // Provide summary
-  logger.log("\n=== Synchronization Summary ===");
-  logger.log(`Source files scanned: ${scanResult.sourceFiles.size}`);
-  logger.log(`Target files scanned: ${scanResult.targetFiles.size}`);
-
-  if (anyConflicts) {
-    logger.warn("\n⚠️  Synchronization complete with conflicts detected.");
-    process.exit(1);
-  } else {
-    logger.log("\n✅ Synchronization completed successfully!");
-    process.exit(0);
+    return 0;
   }
 }
 
@@ -361,13 +237,13 @@ async function executeSyncActions(
   additions: number;
   deletions: number;
   skips: number;
-  conflicts: number;
+  errors: number;
 }> {
   let updates = 0,
     additions = 0,
     deletions = 0,
     skips = 0,
-    conflicts = 0;
+    errors = 0;
 
   // Create project lookup map
   const projectMap = new Map(projects.map((p) => [p.name, p.path]));
@@ -396,11 +272,11 @@ async function executeSyncActions(
         `Failed to execute ${action.type} for ${action.relativePath}:`,
         error,
       );
-      conflicts++;
+      errors++;
     }
   }
 
-  return { updates, additions, deletions, skips, conflicts };
+  return { updates, additions, deletions, skips, errors };
 }
 
 /**

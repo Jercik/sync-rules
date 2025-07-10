@@ -54,25 +54,3 @@ export async function select<T extends string>(
     rl.close();
   }
 }
-
-/**
- * Prompts the user to input text.
- * @param question The question to ask
- * @param defaultValue Optional default value
- * @returns Promise<string> the user's input
- */
-export async function input(
-  question: string,
-  defaultValue?: string,
-): Promise<string> {
-  const rl = createInterface({ input: stdin, output: stdout });
-  try {
-    const prompt = defaultValue
-      ? `${question} (${defaultValue}): `
-      : `${question}: `;
-    const answer = await rl.question(prompt);
-    return answer.trim() || defaultValue || "";
-  } finally {
-    rl.close();
-  }
-}

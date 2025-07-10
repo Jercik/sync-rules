@@ -1,5 +1,6 @@
 import fg from "fast-glob";
 import path from "node:path";
+import { promises as fs } from "node:fs";
 import * as logger from "./utils/core.ts";
 import { getFileHash, normalizePath } from "./utils/core.ts";
 
@@ -18,24 +19,11 @@ export interface FileInfo {
 }
 
 /**
- * Contains the results of scanning both source and target directories.
- * Files are mapped by their relative paths for easy comparison.
- */
-export interface ScanResult {
-  /** A map of {@link FileInfo} objects found in the source directory, keyed by their `relativePath`. */
-  sourceFiles: Map<string, FileInfo>;
-  /** A map of {@link FileInfo} objects found in the target directory, keyed by their `relativePath`. */
-  targetFiles: Map<string, FileInfo>;
-}
-
-/**
  * Options for configuring the directory scanning process.
  */
 export interface ScanOptions {
-  /** The absolute path to the source directory. */
-  sourceDir: string;
-  /** The absolute path to the target directory. */
-  targetDir: string;
+  /** The absolute path to the project directory to scan. */
+  projectDir: string;
   /**
    * An array of glob patterns or literal directory/file names to identify rule files.
    * These patterns are applied within both the source and target directories.
@@ -67,6 +55,24 @@ function isLocalFile(filePath: string): boolean {
 }
 
 /**
+ * Normalizes simple glob patterns to make them recursive if they appear to be basename-only globs.
+ * Patterns with path separators (/) or non-simple globs are left unchanged.
+ *
+ * @param pattern The glob pattern to normalize.
+ * @returns The normalized pattern.
+ */
+function normalizeGlob(pattern: string): string {
+  // If pattern has no path separator and is a simple glob (e.g., "*.txt" or "temp.*"), make it recursive
+  if (
+    !pattern.includes("/") &&
+    (pattern.startsWith("*.") || pattern.includes(".*"))
+  ) {
+    return "**/" + pattern;
+  }
+  return pattern;
+}
+
+/**
  * Scans a single base directory for files matching the provided patterns.
  *
  * @param baseDir The absolute path to the directory to scan.
@@ -76,7 +82,7 @@ function isLocalFile(filePath: string): boolean {
  *                 Existing glob patterns are used as-is.
  * @returns A promise that resolves to a Map of {@link FileInfo} objects, keyed by their `relativePath` from `baseDir`.
  */
-async function scanDirectory(
+export async function scanDirectory(
   baseDir: string,
   patterns: string[],
   excludePatterns: string[] = [],
@@ -88,25 +94,33 @@ async function scanDirectory(
   const isGlobPattern = (pattern: string): boolean =>
     /[*?[\]{}!]/.test(pattern);
 
-  // Transform user-provided patterns
-  // For non-glob literals, just use the pattern itself - fast-glob will handle both files and directories
-  // We'll check if it's a directory and add recursive pattern only if needed
-  const effectiveGlobPatterns = patterns.flatMap((p) => {
+  // Transform user-provided patterns into globs
+  const globPromises = patterns.map(async (p) => {
     if (isGlobPattern(p)) {
       return [p]; // Use existing glob as is
-    } else {
-      // For literal patterns, we want to match:
-      // 1. The literal name as a file (e.g., ".clinerules")
-      // 2. The literal name as a directory with all contents (e.g., ".clinerules/**/*")
-      return [p, `${p}/**/*`];
     }
+    // For literal names, check if it's a directory.
+    // If it is, search recursively. Otherwise, just match the file.
+    try {
+      const stats = await fs.stat(path.join(normalizedBaseDir, p));
+      if (stats.isDirectory()) {
+        return [p, `${p}/**/*`];
+      }
+    } catch {
+      // Path doesn't exist or other stat error. Treat as a file pattern.
+    }
+    return [p]; // It's a file or doesn't exist.
   });
+
+  let effectiveGlobPatterns = (await Promise.all(globPromises)).flat();
+  // Normalize simple globs to be recursive
+  effectiveGlobPatterns = effectiveGlobPatterns.map(normalizeGlob);
 
   // Process exclusion patterns for fast-glob
   // Convert literal names to glob patterns and normalize paths
-  const processedExcludePatterns = excludePatterns.flatMap((pattern) => {
+  let processedExcludePatterns = excludePatterns.flatMap((pattern) => {
     if (isGlobPattern(pattern)) {
-      return [pattern]; // Use glob patterns as-is
+      return [normalizeGlob(pattern)]; // Normalize simple globs
     } else {
       // For literal names, create patterns to exclude the directory and its contents
       // We need to create patterns that match against the relative paths that fast-glob will find
@@ -114,7 +128,7 @@ async function scanDirectory(
         `**/${pattern}`, // Exclude the literal name anywhere in the tree
         `**/${pattern}/**/*`, // Exclude everything inside it anywhere in the tree
         pattern, // Also exclude if it appears at the root level
-        normalizePath(path.join(pattern, "**/*")), // Exclude everything inside it at root level
+        path.join(pattern, "**/*"), // Exclude everything inside it at root level (no normalize needed for patterns)
       ];
     }
   });
@@ -128,66 +142,51 @@ async function scanDirectory(
     stats: false, // Not using stats for now
     followSymbolicLinks: false, // Skip symbolic links to avoid issues
     ignore: processedExcludePatterns, // Exclude patterns
+    deep: Infinity, // Ensure deep scanning (default is Infinity, but explicit)
   });
 
   for (const relativePath of relativeEntries) {
-    // Ensure relativePath is normalized (though fg usually returns POSIX paths)
-    const normalizedRelativePath = normalizePath(relativePath);
-    const absolutePath = normalizePath(
-      path.join(normalizedBaseDir, normalizedRelativePath),
-    );
+    // Keep relative path as-is from fast-glob (already in POSIX format)
+    // We don't normalize relative paths as that would make them absolute
+    const absolutePath = path.join(normalizedBaseDir, relativePath);
     const fileInfo: FileInfo = {
-      relativePath: normalizedRelativePath,
-      absolutePath,
-      isLocal: isLocalFile(normalizedRelativePath),
+      relativePath: relativePath,
+      absolutePath: normalizePath(absolutePath),
+      isLocal: isLocalFile(relativePath),
     };
-    filesMap.set(normalizedRelativePath, fileInfo);
+    filesMap.set(relativePath, fileInfo);
   }
   return filesMap;
 }
 
 /**
- * Scans source and target directories for rule files based on specified patterns,
+ * Scans a project directory for rule files based on specified patterns,
  * and calculates SHA-1 hashes for each found file.
  *
  * The function first uses `fast-glob` to find all files matching the `rulePatterns`
- * within both `sourceDir` and `targetDir`. It then calculates the SHA-1 hash for
- * each unique file found across both directories concurrently, respecting a concurrency limit.
+ * within the project directory. It then calculates the SHA-1 hash for
+ * each file found.
  *
- * @param options An object of type {@link ScanOptions} defining the source and target directories,
+ * @param options An object of type {@link ScanOptions} defining the project directory
  *                and the rule patterns to search for.
- * @returns A promise that resolves to a {@link ScanResult} object. This object contains
- *          two maps (`sourceFiles` and `targetFiles`), where each map's keys are
- *          relative file paths and values are {@link FileInfo} objects (including hashes).
- * @throws If there's an unrecoverable error during directory scanning (though `fast-glob` is generally robust).
+ * @returns A promise that resolves to a Map where keys are relative file paths
+ *          and values are {@link FileInfo} objects (including hashes).
+ * @throws If there's an unrecoverable error during directory scanning.
  *         Errors during individual file hashing are logged as warnings, and the `hash` property
  *         for that file will be `undefined` in the result.
  */
-export async function scan(options: ScanOptions): Promise<ScanResult> {
+export async function scan(
+  options: ScanOptions,
+): Promise<Map<string, FileInfo>> {
   logger.log("Starting scan phase...");
 
-  const { sourceDir, targetDir, rulePatterns, excludePatterns } = options;
+  const { projectDir, rulePatterns, excludePatterns } = options;
 
-  let sourceFiles: Map<string, FileInfo>;
-  let targetFiles: Map<string, FileInfo>;
+  let files: Map<string, FileInfo>;
 
   try {
-    // Scan source and target directories with proper error handling
-    const sourceFilesPromise = scanDirectory(
-      sourceDir,
-      rulePatterns,
-      excludePatterns,
-    );
-    const targetFilesPromise = scanDirectory(
-      targetDir,
-      rulePatterns,
-      excludePatterns,
-    );
-
-    [sourceFiles, targetFiles] = await Promise.all([
-      sourceFilesPromise,
-      targetFilesPromise,
-    ]);
+    // Scan the project directory
+    files = await scanDirectory(projectDir, rulePatterns, excludePatterns);
   } catch (error) {
     logger.error(
       `Error during directory scanning: ${error instanceof Error ? error.message : String(error)}`,
@@ -196,7 +195,7 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
   }
 
   // Calculate hashes serially for simplicity
-  for (const fileInfo of [...sourceFiles.values(), ...targetFiles.values()]) {
+  for (const fileInfo of files.values()) {
     try {
       fileInfo.hash = await getFileHash(fileInfo.absolutePath);
     } catch (error) {
@@ -211,11 +210,8 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
     }
   }
   logger.log(
-    `Scan and hash calculation complete. Found ${sourceFiles.size} source items and ${targetFiles.size} target items.`,
+    `Scan and hash calculation complete. Found ${files.size} rule files.`,
   );
 
-  return {
-    sourceFiles,
-    targetFiles,
-  };
+  return files;
 }

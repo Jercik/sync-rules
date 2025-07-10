@@ -4,6 +4,15 @@
 
 The `sync-rules` project is feature-complete with robust exclusion pattern functionality and project-specific file support. Core functionality is stable and working. Added TypeScript import rule for native execution clarity. Recently added support for local files (_.local._ pattern) that are automatically excluded from synchronization.
 
+### Recent Major Refactoring
+
+- **Simplified Scanning Module**: Removed redundant source/target directory model from `scan.ts`. The module now works with a single project directory, eliminating the confusing `ScanResult` interface with identical `sourceFiles` and `targetFiles`.
+- **Code Cleanup**: Removed unused functions and interfaces including `validateDirectories`, `createTemporaryFile`, `DeletionInfo`, `SyncPlan`, and the `input` prompt function.
+- **Improved Naming**: Renamed `conflicts` to `errors` in the CLI execution results for clarity, as the tool doesn't handle merge conflicts but rather general file operation errors.
+- **Delete All Functionality**: Added user option to delete a file from all projects when it's missing from at least one project.
+- **Simplified Entry Point**: Removed redundant error handling from bin file as main() already handles all errors.
+- **Precise Timestamps**: Enhanced formatTime() to show exact timestamps for file decision contexts while maintaining backward compatibility.
+
 ### Recent Critical Fixes
 
 - **Interactive Confirmation Implementation**: Fixed critical bug where user confirmation was never requested, violating core design principles. Now properly prompts users for file decisions unless --auto-confirm is set.
@@ -15,7 +24,8 @@ The `sync-rules` project is feature-complete with robust exclusion pattern funct
 1.  **Simplicity Over Features**: Prioritizing ease of use over advanced configuration options.
 2.  **VS Code Integration**: Using VS Code as the primary conflict resolution tool.
 3.  **Conservative File Handling**: Never delete files from the target directory; always preserve user work.
-4.  **Native TypeScript**: Leveraging Node.js 23.6+ for native TypeScript execution, enabling a zero build step.
+4.  **Deterministic Auto-Confirmation**: In non-interactive mode (`--auto-confirm`), the tool predictably uses the file with the newest modification date as the source of truth.
+5.  **Native TypeScript**: Leveraging Node.js 23.6+ for native TypeScript execution, enabling a zero build step.
 
 ## Key Design Drivers
 
@@ -46,5 +56,5 @@ The following are areas where `sync-rules` could be extended in the future. Comm
 ### Design Decisions (Not Planned)
 
 - **Multiple Merge Tools**: VS Code strategy works well, no need for alternatives.
-- **File Deletion**: Preserving target files is a core safety feature.
+- **File Deletion**: The tool now supports an explicit "delete from all" action, initiated by the user, when a file is missing from one or more projects. This provides a clear, intentional path for removing rules across the ecosystem, while still preventing accidental data loss.
 - **Complex Configuration**: Simplicity is a key design goal.

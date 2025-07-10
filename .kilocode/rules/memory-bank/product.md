@@ -1,4 +1,4 @@
-# Product Context: sync-agent-rules
+# Product Context: sync-rules
 
 ## Problem Statement
 
@@ -20,11 +20,11 @@ Developers using AI coding assistants face a common challenge: keeping rule conf
 
 ## Value Proposition
 
-`sync-agent-rules` transforms rule synchronization from a manual, error-prone process into an automated, reliable workflow. Users can confidently propagate rule improvements across their entire project ecosystem with a single command.
+`sync-rules` transforms rule synchronization from a manual, error-prone process into an automated, reliable workflow. Users can confidently propagate rule improvements across their entire project ecosystem with a single command.
 
 ## User Experience Vision
 
-- **One Command**: `sync-rules source target` should handle 90% of use cases
-- **Safe by Default**: Never lose work - preview changes and handle conflicts gracefully
-- **Immediate Feedback**: Clear progress indicators and actionable error messages
-- **Familiar Tools**: Leverage existing developer tools (Git, VS Code) for conflict resolution
+- **One Command**: `sync-rules [projects...]` should handle 90% of use cases.
+- **Safe by Default**: Never lose work. Preview changes and handle conflicts gracefully through interactive prompts, or use the deterministic `--auto-confirm` flag to automatically sync to the newest version of a file.
+- **Immediate Feedback**: Clear progress indicators and actionable error messages.
+- **Familiar Tools**: Leverages the command line for all interactions.

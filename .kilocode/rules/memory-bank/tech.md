@@ -1,4 +1,4 @@
-# Technical Context: sync-agent-rules
+# Technical Context: sync-rules
 
 ## Runtime Requirements
 
@@ -8,22 +8,11 @@
 - **ES Modules**: Full support for modern JavaScript module system
 - **Built-in APIs**: Leverages native `crypto`, `fs/promises`, `os`, `path` modules
 
-### Git 2.37+
-
-- **Merge Operations**: Required for `git merge-file` conflict resolution
-- **System PATH**: Must be accessible from command line
-
-### VS Code
-
-- **Conflict Resolution**: Primary tool for interactive merge operations
-- **CLI Access**: Requires `code` command available in PATH
-
 ## Dependencies
 
-### Core Dependencies (3 total)
+### Core Dependencies (2 total)
 
 - **commander**: CLI argument parsing and help generation
-- **execa**: Robust external process execution with better error handling
 - **fast-glob**: Efficient file pattern matching with glob support
 
 ### Node.js Built-ins
@@ -68,8 +57,6 @@
 ### External Process Integration
 
 - **Error Handling**: Distinguish between command failures and expected non-zero exits
-- **Exit Codes**: Proper handling of Git command exit codes (0=success, 1=conflicts, >1=error)
-- **Process Isolation**: Use `execa` for better error handling than native `child_process`
 
 ## Platform Considerations
 
@@ -90,11 +77,8 @@
 ### Adoption Constraints
 
 - **Node.js Version**: Requires 23.6+ which may limit adoption in environments with older Node.js versions
-- **VS Code Dependency**: Conflict resolution requires VS Code CLI (`code` command) available in PATH
-- **Git Dependency**: Merge operations require Git installation and accessibility from command line
 
 ### Operational Considerations
 
 - **Version Compatibility**: The Node.js 23.6+ requirement may prevent usage in legacy environments
-- **Tool Dependencies**: Both VS Code and Git must be properly installed and configured for full functionality
 - **Platform Limitations**: While cross-platform compatible, external tool dependencies may vary by platform

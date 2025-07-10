@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import fg from "fast-glob";
 import path from "node:path";
 import { homedir } from "node:os";
 import * as logger from "./utils/core.ts";
@@ -44,10 +45,67 @@ export async function discoverProjects(
     const entries = await fs.readdir(normalizedBaseDir, {
       withFileTypes: true,
     });
-    const subdirs = entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .filter((name) => !excludePatterns.includes(name));
+
+    // Filter subdirectories based on exclude patterns
+    const subdirs: string[] = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const dirName = entry.name;
+
+      // Check if this directory should be excluded
+      let shouldExclude = false;
+
+      for (const pattern of excludePatterns) {
+        // Check exact matches
+        if (pattern === dirName) {
+          shouldExclude = true;
+          break;
+        }
+
+        // For glob patterns, we need to check if the directory name matches
+        if (fg.isDynamicPattern(pattern)) {
+          // Create a temporary list with just this directory name
+          // and see if it matches the pattern
+          const matches = await fg([pattern], {
+            cwd: normalizedBaseDir,
+            onlyDirectories: true,
+            dot: true,
+            absolute: false,
+          });
+
+          // Check if our directory name is in the matches
+          if (matches.includes(dirName)) {
+            shouldExclude = true;
+            break;
+          }
+
+          // Also check patterns like "**/temp" against the directory name
+          if (pattern.includes("**/")) {
+            const simplifiedPattern = pattern.replace("**/", "");
+            if (fg.isDynamicPattern(simplifiedPattern)) {
+              const simpleMatches = await fg([simplifiedPattern], {
+                cwd: normalizedBaseDir,
+                onlyDirectories: true,
+                dot: true,
+                absolute: false,
+              });
+              if (simpleMatches.includes(dirName)) {
+                shouldExclude = true;
+                break;
+              }
+            } else if (simplifiedPattern === dirName) {
+              shouldExclude = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!shouldExclude) {
+        subdirs.push(dirName);
+      }
+    }
 
     // Check each subdirectory for rule files
     for (const dirName of subdirs) {
@@ -72,7 +130,9 @@ export async function discoverProjects(
       throw new Error(`Base directory does not exist: ${baseDir}`);
     }
     throw new Error(
-      `Error discovering projects in ${baseDir}: ${error instanceof Error ? error.message : String(error)}`,
+      `Error discovering projects in ${baseDir}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
     );
   }
 
@@ -91,33 +151,39 @@ async function hasRuleFiles(
   rulePatterns: string[],
 ): Promise<boolean> {
   try {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
     for (const pattern of rulePatterns) {
-      // Check for exact directory matches (like .kilocode, .clinerules)
-      const hasDirectory = entries.some(
-        (entry) => entry.isDirectory() && entry.name === pattern,
-      );
-
-      // Check for exact file matches (like .cursorrules)
-      const hasFile = entries.some(
-        (entry) => entry.isFile() && entry.name === pattern,
-      );
-
-      if (hasDirectory || hasFile) {
-        return true;
+      if (!pattern.includes("*")) {
+        try {
+          const stats = await fs.stat(path.join(dirPath, pattern));
+          if (stats.isFile() || stats.isDirectory()) {
+            return true;
+          }
+        } catch (e) {
+          // ignore error
+        }
       }
     }
 
-    return false;
+    const entries = await fg(rulePatterns, {
+      cwd: dirPath,
+      dot: true,
+      onlyFiles: true,
+      absolute: false,
+      stats: false,
+      followSymbolicLinks: false,
+      deep: 2, // Limit depth to avoid deep scans in node_modules etc.
+    });
+
+    return entries.length > 0;
   } catch (error) {
     logger.debug(
-      `Could not check rule files in ${dirPath}: ${error instanceof Error ? error.message : String(error)}`,
+      `Could not check rule files in ${dirPath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
     );
     return false;
   }
 }
-
 /**
  * Validates that all provided project paths exist and are directories.
  *
@@ -142,7 +208,9 @@ export async function validateProjects(projectPaths: string[]): Promise<void> {
         throw new Error(`Project directory does not exist: ${projectPath}`);
       }
       throw new Error(
-        `Cannot access project directory ${projectPath}: ${error instanceof Error ? error.message : String(error)}`,
+        `Cannot access project directory ${projectPath}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }

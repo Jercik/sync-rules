@@ -3,6 +3,7 @@ import type { ProjectInfo } from "./discovery.ts";
 import { scan } from "./scan.ts";
 import * as logger from "./utils/core.ts";
 import { confirm, select } from "./utils/prompts.ts";
+import { formatTime } from "./utils/formatters.ts";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -18,8 +19,6 @@ export interface GlobalFileState {
   missingFrom: string[];
   /** The newest version across all projects */
   newestVersion?: FileVersion;
-  /** Whether this file was recently deleted from a project */
-  recentDeletion?: DeletionInfo;
   /** Whether all existing versions have identical content */
   allIdentical?: boolean;
 }
@@ -32,16 +31,7 @@ export interface FileVersion {
   fileInfo: FileInfo;
   lastModified: Date;
 }
-
 /**
- * Information about a detected file deletion.
- */
-export interface DeletionInfo {
-  projectName: string;
-  deletedAt: Date;
-  wasIntentional: boolean;
-}
-
 /**
  * User's decision for a file state.
  */
@@ -62,20 +52,6 @@ export interface SyncAction {
   sourceFile?: FileInfo;
   targetFile?: FileInfo;
 }
-
-/**
- * The complete synchronization plan after user confirmation.
- */
-export interface SyncPlan {
-  actions: SyncAction[];
-  summary: {
-    updates: number;
-    additions: number;
-    deletions: number;
-    skips: number;
-  };
-}
-
 /**
  * Options for multi-project synchronization.
  */
@@ -83,7 +59,12 @@ export interface MultiSyncOptions {
   rulePatterns: string[];
   excludePatterns: string[];
   dryRun: boolean;
-  autoConfirm?: boolean; // Skip user confirmations, use newest
+  /**
+   * Skip user confirmations and automatically use the newest version.
+   * When true, the file with the most recent modification date becomes
+   * the source of truth for all projects. Never deletes files.
+   */
+  autoConfirm?: boolean;
   baseDir?: string;
 }
 
@@ -103,14 +84,13 @@ export async function scanAllProjects(
   // Scan all projects concurrently, handling failures gracefully
   const scanPromises = projects.map(async (project) => {
     try {
-      const scanResult = await scan({
-        sourceDir: project.path,
-        targetDir: project.path, // We're scanning the same directory
+      const files = await scan({
+        projectDir: project.path,
         rulePatterns: options.rulePatterns,
         excludePatterns: options.excludePatterns,
       });
 
-      return { project, files: scanResult.sourceFiles, success: true };
+      return { project, files, success: true };
     } catch (error) {
       logger.warn(
         `Skipping project ${project.name} due to scan error: ${error instanceof Error ? error.message : String(error)}`,
@@ -210,6 +190,16 @@ export async function scanAllProjects(
 /**
  * Presents file states to the user and gets their decisions.
  *
+ * In interactive mode (default), prompts the user to choose which version
+ * of each file should be the source of truth, with options to:
+ * - Use the newest version (by modification date)
+ * - Use a version from a specific project
+ * - Delete the file from all projects
+ * - Skip the file
+ *
+ * In non-interactive mode (--auto-confirm), automatically selects the
+ * newest version based on modification timestamp for all files.
+ *
  * @param fileStates Map of global file states
  * @param options Sync options
  * @returns Array of confirmed sync actions
@@ -247,12 +237,12 @@ export async function getUserConfirmations(
 
       if (versions.length > 1 && !fileState.allIdentical) {
         logger.log(
-          `   ├─ Newest:  ${fileState.newestVersion.projectName} (modified ${formatTime(fileState.newestVersion.lastModified)})`,
+          `   ├─ Newest:  ${fileState.newestVersion.projectName} (modified ${formatTime(fileState.newestVersion.lastModified, true)})`,
         );
 
         outdatedVersions.forEach((version) => {
           logger.log(
-            `   ├─ Outdated: ${version.projectName} (modified ${formatTime(version.lastModified)})`,
+            `   ├─ Outdated: ${version.projectName} (modified ${formatTime(version.lastModified, true)})`,
           );
         });
       } else if (fileState.allIdentical && fileState.missingFrom.length > 0) {
@@ -281,26 +271,45 @@ export async function getUserConfirmations(
 }
 
 /**
- * Prompts the user for a decision about what to do with a file that has differences.
- */
+ /**
+  * Prompts the user for a decision about what to do with a file that has differences.
+  */
 async function promptUserForFileDecision(
   fileState: GlobalFileState,
 ): Promise<UserDecision> {
-  // If file only exists in one project, offer to copy it to missing projects
+  // If file only exists in one project, offer to copy it to missing projects or delete it from all
   if (fileState.versions.size === 1 && fileState.missingFrom.length > 0) {
     const sourceProject = Array.from(fileState.versions.keys())[0]!;
-    const confirmed = await confirm(
-      `Copy ${fileState.relativePath} from ${sourceProject} to ${fileState.missingFrom.length} other project(s)?`,
+
+    const options = [
+      {
+        label: `Copy from ${sourceProject} to ${fileState.missingFrom.length} other project(s)`,
+        value: "copy" as const,
+      },
+      {
+        label: `Delete from ${sourceProject} (remove from all projects)`,
+        value: "delete-all" as const,
+      },
+      { label: "Skip this file", value: "skip" as const },
+    ];
+
+    const choice = await select(
+      `File ${fileState.relativePath} exists only in ${sourceProject}. What should be done?`,
+      options,
     );
 
-    return {
-      action: confirmed ? "use-newest" : "skip",
-      confirmed,
-    };
+    if (choice === "copy") {
+      return { action: "use-newest", confirmed: true };
+    } else if (choice === "delete-all") {
+      return { action: "delete-all", confirmed: true };
+    } else {
+      logger.log(`Skipping file: ${fileState.relativePath}`);
+      return { action: "skip", confirmed: true };
+    }
   }
 
-  // If file has multiple versions, let user choose what to do
-  if (fileState.versions.size > 1) {
+  // If file has multiple versions with different content, ask user to choose
+  if (fileState.versions.size > 1 && !fileState.allIdentical) {
     const projects = Array.from(fileState.versions.keys());
 
     const options = [
@@ -312,18 +321,21 @@ async function promptUserForFileDecision(
         label: `Use version from ${project}`,
         value: `use-${project}` as const,
       })),
+      { label: "Delete from all projects", value: "delete-all" as const },
       { label: "Skip this file", value: "skip" as const },
     ];
 
     const choice = await select(
-      `What should be done with ${fileState.relativePath}?`,
+      `Different versions found for ${fileState.relativePath}. Which version should be used?`,
       options,
     );
-
     if (choice === "skip") {
+      logger.log(`Skipping file: ${fileState.relativePath}`);
       return { action: "skip", confirmed: true };
     } else if (choice === "use-newest") {
       return { action: "use-newest", confirmed: true };
+    } else if (choice === "delete-all") {
+      return { action: "delete-all", confirmed: true };
     } else if (choice.startsWith("use-")) {
       const sourceProject = choice.replace("use-", "");
       return {
@@ -334,12 +346,21 @@ async function promptUserForFileDecision(
     }
   }
 
-  // Default to newest version if no specific choice needed
+  // Default to newest version if no conflicts or specific choice needed
   return { action: "use-newest", confirmed: true };
 }
-
 /**
  * Generates auto-confirmed actions using the newest version of each file.
+ *
+ * This function is used when --auto-confirm flag is set. It automatically:
+ * - Selects the file with the most recent modification date as the source of truth
+ * - Creates update actions for all projects with older versions
+ * - Creates add actions for all projects missing the file
+ * - Skips files that are identical across all projects
+ * - Never creates delete actions (deletions require manual confirmation)
+ *
+ * @param fileStates Map of global file states
+ * @returns Array of sync actions to be executed
  */
 function generateAutoConfirmedActions(
   fileStates: Map<string, GlobalFileState>,
@@ -361,6 +382,22 @@ function generateAutoConfirmedActions(
 
 /**
  * Generates sync actions for a single file based on user decision.
+ *
+ * This function creates the appropriate sync actions based on the decision:
+ * - "use-newest" or "use-specific": Updates all projects with older versions
+ *   and adds the file to all projects where it's missing
+ * - "delete-all": Creates delete actions for all projects that have the file
+ * - "skip": Returns no actions (leaves files in their current state)
+ *
+ * When actions are executed (for non-skip decisions), the function ensures
+ * that all projects will either:
+ * - Have the same version of the file (for use-newest/use-specific)
+ * - Not have the file at all (for delete-all)
+ *
+ * @param fileState The global state of this file across all projects
+ * @param decision The user's decision or auto-confirmed action
+ * @param sourceProject Optional specific project to use as source (for use-specific)
+ * @returns Array of sync actions to execute for this file
  */
 function generateActionsForFile(
   fileState: GlobalFileState,
@@ -426,22 +463,4 @@ function generateActionsForFile(
   }
 
   return actions;
-}
-
-/**
- * Formats a Date object for display.
- */
-function formatTime(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 0) {
-    return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
-  } else if (diffHours > 0) {
-    return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-  } else {
-    return "recently";
-  }
 }

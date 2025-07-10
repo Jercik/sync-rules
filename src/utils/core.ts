@@ -1,8 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFile, writeFile, stat } from "node:fs/promises";
-import { normalize } from "node:path";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFile, stat } from "node:fs/promises";
+import { resolve, sep } from "node:path";
 
 // =============================================================================
 // LOGGING UTILITIES
@@ -147,40 +145,10 @@ export async function getFileHash(filePath: string): Promise<string> {
  * normalizePath("/usr/local/../bin/script.sh"); // "/usr/bin/script.sh"
  */
 export function normalizePath(filePath: string): string {
-  const normalized = normalize(filePath).replace(/\\/g, "/");
+  // Use resolve to handle .., ., and platform-specific separators
+  const resolvedPath = resolve(filePath);
+  // Replace backslashes with forward slashes for consistency
+  const normalized = resolvedPath.replace(/\\/g, "/");
   debug(`Normalized path: "${filePath}" -> "${normalized}"`);
   return normalized;
-}
-/**
- * Creates a temporary file with the specified content and optional extension.
- * Useful for creating temporary base files for merge operations or other transient data.
- * The file is created in the system's temporary directory.
- *
- * @param content The string content to write to the temporary file.
- * @param extension Optional file extension (e.g., "txt", "json") for the temporary file.
- *                  This can help tools like mergetools identify the file type.
- * @returns A promise that resolves to the absolute path of the created temporary file.
- * @throws If there is an error creating or writing to the temporary file.
- */
-export async function createTemporaryFile(
-  content: string,
-  extension?: string,
-): Promise<string> {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  const filename = `sync-rules-${timestamp}-${random}${
-    extension ? `.${extension}` : ""
-  }`;
-  const tempFilePath = join(tmpdir(), filename);
-
-  debug(
-    `Attempting to create temporary file at: ${tempFilePath} with extension: ${
-      extension || "none"
-    }`,
-  );
-  await writeFile(tempFilePath, content, "utf-8");
-  debug(
-    `Successfully created temporary file: ${tempFilePath} with content of length ${content.length}`,
-  );
-  return tempFilePath;
 }

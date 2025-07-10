@@ -1,4 +1,4 @@
-# System Patterns: sync-agent-rules
+# System Patterns: sync-rules
 
 ## Architecture Overview
 
@@ -18,12 +18,12 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
   - Commander.js provides robust argument handling
   - Configurable exclusion patterns via `--exclude` option
   - Sensible default exclusions (memory-bank, node_modules, .git, .DS_Store)
-  - Clear exit codes communicate results (0=success, 1=conflicts, 2=error)
+  - Clear exit codes communicate results (0=success, 1=errors, 2=fatal error)
   - Interactive confirmation prompts for user decisions
 
 ### 2. Scanning Layer (`scan.ts`)
 
-- **Responsibility**: File discovery and content hashing
+- **Responsibility**: File discovery and content hashing for a single project
 - **Key Patterns**:
   - Serial hashing for simplicity
   - Glob pattern expansion for flexible file matching
@@ -31,15 +31,7 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
   - Pattern processing for comprehensive directory exclusion
   - Graceful error handling for individual file failures
 
-### 3. Merge Layer (`merge.ts`)
-
-- **Responsibility**: File comparison and conflict resolution
-- **Key Patterns**:
-  - Strategy pattern simplified to single VS Code approach
-  - Three-way merge using temporary base files
-  - Automatic fallback from `git merge-file` to VS Code
-
-### 4. Multi-Sync Layer (`multi-sync.ts`)
+### 3. Multi-Sync Layer (`multi-sync.ts`)
 
 - **Responsibility**: Multi-project synchronization orchestration
 - **Key Patterns**:
@@ -51,8 +43,6 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
 ### 5. Utilities (`utils/`)
 
 - **Core utilities** (`core.ts`): Logging, hashing, file operations
-- **Git integration** (`git.ts`): Command execution with proper error handling
-- **VS Code integration** (`vscode.ts`): Conflict resolution workflow
 - **Prompt utilities** (`prompts.ts`): Interactive user input handling (confirm, select, input)
 
 ## Data Flow
@@ -60,15 +50,17 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
 1. **Input Processing**: CLI validates directories and patterns
 2. **File Discovery**: Parallel scanning of source and target directories
 3. **Content Analysis**: SHA-1 hashing for change detection
-4. **Action Planning**: Determine copy/merge/skip operations
-5. **Execution**: Perform operations with user feedback
-6. **Conflict Resolution**: Interactive VS Code sessions when needed
+4. **Action Planning**: Determine copy/add/delete/skip operations based on user decisions. This includes an option to delete a file from all projects.
+5. **Execution**: Perform file operations (copy, delete) based on the approved plan
 
 ## Key Design Decisions
 
-### Merge Strategy Simplification
+### Conflict Resolution Strategy
 
-The tool employs a single merge strategy focused on VS Code integration, which is prepared by `git merge-file` if available. This approach simplifies the process for users while providing a familiar and powerful interface for resolving conflicts.
+The tool does not merge file contents. Instead, it resolves conflicts by designating one version of a file as the "source of truth," which then overwrites all other versions. The method for choosing the source of truth depends on the mode:
+
+- **Interactive Mode (Default)**: The user is prompted to choose the source of truth. Options include selecting the newest version (by modification date), picking a version from a specific project, or deleting the file from all projects.
+- **Non-Interactive Mode (`--auto-confirm`)**: The tool automatically selects the file with the most recent modification timestamp as the source of truth. It will _never_ delete a file in this mode.
 
 ### Error Handling Philosophy
 
