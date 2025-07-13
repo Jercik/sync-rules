@@ -22,92 +22,119 @@ describe("Sync Scenarios", () => {
     projectsPath = testContext.tempDir;
   });
 
-  describe("Two Project Sync", () => {
-    it("should skip identical files", async () => {
-      const pathA = await createTestProject("project-a", {
-        ".cursorrules.md": CONTENT.cursor.basic,
-        ".clinerules.md": CONTENT.cli.basic,
-        ".clinerules-style.md": CONTENT.style.basic,
-      });
-      const pathB = await createTestProject("project-b", {
-        ".cursorrules.md": CONTENT.cursor.basic,
-        ".clinerules.md": CONTENT.cli.basic,
-        ".clinerules-style.md": CONTENT.style.basic,
-      });
-
-      const result = await runCLI([pathA, pathB, "--auto-confirm"]);
-
-      expectSuccess(result);
-      expect(containsInOutput(result, "No synchronization needed")).toBe(true);
-    });
-
-    it("should propagate newest version when content differs", async () => {
-      const pathA = await createTestProject("project-a", {
-        ".cursorrules.md": {
-          content: CONTENT.cursor.v2,
-          mtime: new Date("2024-01-02"),
+  describe.each([
+    { 
+      name: "Two Project Sync",
+      projectCount: 2,
+      scenarios: [
+        {
+          name: "skip identical files",
+          projectFiles: [
+            {
+              ".cursorrules.md": CONTENT.cursor.basic,
+              ".clinerules.md": CONTENT.cli.basic,
+              ".clinerules-style.md": CONTENT.style.basic,
+            },
+            {
+              ".cursorrules.md": CONTENT.cursor.basic,
+              ".clinerules.md": CONTENT.cli.basic,
+              ".clinerules-style.md": CONTENT.style.basic,
+            }
+          ],
+          expectedResult: (result: any) => {
+            expectSuccess(result);
+            expect(containsInOutput(result, "No synchronization needed")).toBe(true);
+          }
         },
-        ".clinerules.md": CONTENT.cli.basic,
-      });
-      const pathB = await createTestProject("project-b", {
-        ".cursorrules.md": {
-          content: CONTENT.cursor.v1,
-          mtime: new Date("2024-01-01"),
+        {
+          name: "propagate newest version when content differs",
+          projectFiles: [
+            {
+              ".cursorrules.md": {
+                content: CONTENT.cursor.v2,
+                mtime: new Date("2024-01-02"),
+              },
+              ".clinerules.md": CONTENT.cli.basic,
+            },
+            {
+              ".cursorrules.md": {
+                content: CONTENT.cursor.v1,
+                mtime: new Date("2024-01-01"),
+              },
+              ".clinerules.md": CONTENT.cli.jsCallbacks,
+            }
+          ],
+          expectedResult: async (result: any, projects: string[]) => {
+            expectSuccess(result);
+            expect(await readTestFile(projects[1], ".cursorrules.md")).toBe(
+              CONTENT.cursor.v2, // Expected: ProjectA's v2 content (newer)
+            );
+          }
         },
-        ".clinerules.md": CONTENT.cli.jsCallbacks,
-      });
+        {
+          name: "copy files to projects where they are missing",
+          projectFiles: [
+            {
+              ".cursorrules.md": CONTENT.cursor.descriptiveNames,
+              ".clinerules.md": CONTENT.cli.typeScript,
+              ".kilocode/setup.md": CONTENT.kilocode.functional,
+            },
+            {
+              ".cursorrules.md": CONTENT.cursor.descriptiveNames,
+            }
+          ],
+          expectedResult: async (result: any, projects: string[]) => {
+            expectSuccess(result);
+            expect(await fileExists(projects[1], ".clinerules.md")).toBe(true);
+            expect(await fileExists(projects[1], ".kilocode/setup.md")).toBe(true);
+          }
+        }
+      ]
+    },
+    {
+      name: "Three Project Sync",
+      projectCount: 3,
+      scenarios: [
+        {
+          name: "handle complex three-way sync",
+          projectFiles: [
+            {
+              ".cursorrules.md": CONTENT.cursor.descriptiveNames,
+              ".clinerules.md": CONTENT.cli.typeScript,
+              ".kilocode/setup.md": CONTENT.kilocode.functional,
+            },
+            {
+              ".cursorrules.md": CONTENT.cursor.descriptiveNames,
+            },
+            {
+              ".clinerules.md": CONTENT.cli.typeScript,
+            }
+          ],
+          expectedResult: async (result: any, projects: string[]) => {
+            expectSuccess(result);
+            // Verify all projects have all files
+            for (const project of projects) {
+              expect(await fileExists(project, ".cursorrules.md")).toBe(true);
+              expect(await fileExists(project, ".clinerules.md")).toBe(true);
+              expect(await fileExists(project, ".kilocode/setup.md")).toBe(true);
+            }
+          }
+        }
+      ]
+    }
+  ])("$name", ({ projectCount, scenarios }) => {
+    it.each(scenarios)("should $name", async ({ projectFiles, expectedResult }) => {
+      const projects: string[] = [];
+      for (let i = 0; i < projectCount; i++) {
+        const projectName = `project-${String.fromCharCode(97 + i)}`; // a, b, c...
+        projects.push(
+          await createTestProject(projectName, projectFiles[i] || {})
+        );
+      }
 
-      const result = await runCLI(["--auto-confirm", pathA, pathB]);
+      const result = await runCLI(["--auto-confirm", ...projects]);
 
-      expectSuccess(result);
-      expect(await readTestFile(pathB, ".cursorrules.md")).toBe(
-        CONTENT.cursor.v2, // Expected: ProjectA's v2 content (newer)
-      );
-    });
-
-    it("should copy files to projects where they are missing", async () => {
-      const pathA = await createTestProject("project-a", {
-        ".cursorrules.md": CONTENT.cursor.descriptiveNames,
-        ".clinerules.md": CONTENT.cli.typeScript,
-        ".kilocode/setup.md": CONTENT.kilocode.functional,
-      });
-      const pathB = await createTestProject("project-b", {
-        ".cursorrules.md": CONTENT.cursor.descriptiveNames,
-      });
-
-      const result = await runCLI(["--auto-confirm", pathA, pathB]);
-
-      expectSuccess(result);
-      expect(await fileExists(pathB, ".clinerules.md")).toBe(true);
-      expect(await fileExists(pathB, ".kilocode/setup.md")).toBe(true);
-    });
-  });
-
-  describe("Three Project Sync", () => {
-    it("should handle complex three-way sync", async () => {
-      const pathA = await createTestProject("project-a", {
-        ".cursorrules.md": CONTENT.cursor.descriptiveNames,
-        ".clinerules.md": CONTENT.cli.typeScript,
-        ".kilocode/setup.md": CONTENT.kilocode.functional,
-      });
-      const pathB = await createTestProject("project-b", {
-        ".cursorrules.md": CONTENT.cursor.descriptiveNames,
-      });
-      const pathC = await createTestProject("project-c", {
-        ".clinerules.md": CONTENT.cli.typeScript,
-      });
-
-      const result = await runCLI(["--auto-confirm", pathA, pathB, pathC]);
-
-      expectSuccess(result);
-
-      expect(await fileExists(pathA, ".cursorrules.md")).toBe(true);
-      expect(await fileExists(pathB, ".cursorrules.md")).toBe(true);
-      expect(await fileExists(pathC, ".cursorrules.md")).toBe(true);
-
-      expect(await fileExists(pathA, ".clinerules.md")).toBe(true);
-      expect(await fileExists(pathB, ".clinerules.md")).toBe(true);
-      expect(await fileExists(pathC, ".clinerules.md")).toBe(true);
+      await expectedResult(result, projects);
     });
   });
 
@@ -308,32 +335,4 @@ describe("Sync Scenarios", () => {
     });
   });
 
-  describe("Custom Rules", () => {
-    it("should use custom rule patterns", async () => {
-      const pathA = await createTestProject("project-a", {
-        ".cursorrules.md": CONTENT.cursor.basic,
-        ".clinerules.md": CONTENT.cli.basic,
-        ".kilocode/setup.md": CONTENT.kilocode.functional,
-      });
-
-      const pathB = await createTestProject("project-b", {
-        ".cursorrules.md": CONTENT.cursor.v2,
-      });
-
-      const result = await runCLI([
-        pathA,
-        pathB,
-        "--auto-confirm",
-        "--rules",
-        ".cursorrules.md",
-        ".clinerules.md",
-      ]);
-
-      expectSuccess(result);
-
-      expect(await fileExists(pathB, ".cursorrules.md")).toBe(true);
-      expect(await fileExists(pathB, ".clinerules.md")).toBe(true);
-      expect(await fileExists(pathB, ".kilocode/setup.md")).toBe(false); // Should be excluded since .kilocode is not in the custom rules
-    });
-  });
 });

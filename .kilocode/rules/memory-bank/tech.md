@@ -10,16 +10,20 @@
 
 ## Dependencies
 
-### Core Dependencies (2 total)
+### Core Dependencies (3 total)
 
 - **commander**: CLI argument parsing and help generation (v14.0.0)
 - **fast-glob**: Efficient file pattern matching with glob support (v3.3.3)
   - Configured with .md constraint for consistent file filtering
   - Used in both scanning and discovery phases
+- **zod**: Runtime type validation and schema parsing (v4.0.5)
+  - Used for manifest file validation (manifest.json and manifest.local.json)
+  - Ensures type-safe parsing of conditional rule configurations
+  - Provides detailed error messages for invalid manifest schemas
 
 ### Node.js Built-ins
 
-- **crypto**: SHA-1 hash generation for reliable file comparison
+- **crypto**: SHA-256 hash generation for reliable file comparison
 - **fs/promises**: Async file system operations (copyFile, stat, readFile, etc.)
 - **os**: Temporary directory access and platform detection
 - **path**: Cross-platform path manipulation and normalization
@@ -54,7 +58,7 @@
 
 - **No Compilation**: TypeScript files run directly via Node.js 23.6+
 - **Type Checking**: `npm run typecheck` runs `tsc --noEmit` for validation
-- **Testing**: Vitest for unit and integration tests (142 tests total)
+- **Testing**: Vitest for unit and integration tests (193 tests total)
 - **Formatting**: Prettier for consistent code style
 - **Zero Build Step**: Eliminates transpilation complexity
 
@@ -74,14 +78,14 @@
 
 - **Serial Processing**: Sequential file hashing for reliability and simplicity
 - **Parallel Scanning**: Multiple projects scanned concurrently
-- **Memory Usage**: File size warnings for large files (>100MB)
+- **Memory Usage**: Files larger than 1MB are automatically skipped
 - **I/O Efficiency**: Minimal file reads, efficient glob patterns, .md constraint reduces file system overhead
 - **Smart Caching**: File hashes cached during single run for comparison
 
 ## Testing Infrastructure
 
 ### Test Coverage
-- **157 total tests** all passing across unit and integration suites
+- **193 total tests** all passing across unit and integration suites
 - **Unit tests**: Utils, scanning, discovery, generation, multi-sync, path security
 - **Integration tests**: CLI options, sync scenarios, edge cases, error handling, CLAUDE.md generation, path security
 - **Test helpers**: CLI runner (with new interactive prompt support), file system utilities, scenario fixtures

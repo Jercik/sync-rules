@@ -14,7 +14,7 @@ export async function createFile(
     await fs.chmod(filePath, options.mode);
   }
 
-  if (options?.mtime) {
+  if (options?.mtime && isFinite(options.mtime.getTime())) {
     await fs.utimes(filePath, options.mtime, options.mtime);
   }
 }
@@ -52,6 +52,9 @@ export async function createLargeFile(
 }
 
 export async function setFileTime(filePath: string, time: Date): Promise<void> {
+  if (!isFinite(time.getTime())) {
+    throw new Error("Invalid date provided to setFileTime");
+  }
   await fs.utimes(filePath, time, time);
 }
 

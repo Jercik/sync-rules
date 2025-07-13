@@ -65,13 +65,13 @@ describe("getFileHash", () => {
     projectPath = await createTestProject("hash-test", {});
   });
 
-  it("should calculate SHA-1 hash of file", async () => {
+  it("should calculate SHA-256 hash of file", async () => {
     const filePath = path.join(projectPath, "test.txt");
     await createFile(filePath, "Hello, world!");
 
     const hash = await getFileHash(filePath);
 
-    expect(hash).toBe("943a702d06f34599aee1f8da8ef9f7296031d699");
+    expect(hash).toBe("315f5bdb76d078c43b8ac0064e4a0164612b1fce77c869345bfc94c75894edd3");
   });
 
   it("should return consistent hash for same content", async () => {
@@ -94,7 +94,7 @@ describe("getFileHash", () => {
 
     const hash = await getFileHash(filePath);
 
-    expect(hash).toBe("da39a3ee5e6b4b0d3255bfef95601890afd80709");
+    expect(hash).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
   });
 
   it("should handle binary files", async () => {
@@ -104,7 +104,7 @@ describe("getFileHash", () => {
 
     const hash = await getFileHash(filePath);
 
-    expect(hash).toMatch(/^[a-f0-9]{40}$/);
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("should throw error for non-existent file", async () => {

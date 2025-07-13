@@ -12,7 +12,7 @@ export interface FileInfo {
   relativePath: string;
   /** The absolute path to the file on the filesystem. */
   absolutePath: string;
-  /** The SHA-1 hash of the file's content. Undefined if hashing failed or was not performed. */
+  /** The SHA-256 hash of the file's content. Undefined if hashing failed or was not performed. */
   hash?: string;
   /** Indicates if this file is project-specific (local) and should not be synced. */
   isLocal?: boolean;
@@ -168,10 +168,10 @@ async function scanDirectory(
 
 /**
  * Scans a project directory for rule files based on specified patterns,
- * and calculates SHA-1 hashes for each found file.
+ * and calculates SHA-256 hashes for each found file.
  *
  * The function first uses `fast-glob` to find all files matching the `rulePatterns`
- * within the project directory. It then calculates the SHA-1 hash for
+ * within the project directory. It then calculates the SHA-256 hash for
  * each file found.
  *
  * @param options An object of type {@link ScanOptions} defining the project directory
@@ -205,19 +205,33 @@ export async function scan(
   }
 
   // Calculate hashes serially for simplicity
-  for (const fileInfo of files.values()) {
+  const filesToRemove: string[] = [];
+  for (const [relativePath, fileInfo] of files.entries()) {
     try {
       fileInfo.hash = await getFileHash(fileInfo.absolutePath);
     } catch (error) {
-      // Log error but continue; file without hash will be handled later (e.g., treated as new/different)
-      logger.warn(
-        `Could not calculate hash for ${fileInfo.absolutePath}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      // Ensure hash is undefined if calculation fails
-      fileInfo.hash = undefined;
+      // Check if it's a file size error (too large)
+      if (error instanceof Error && error.message.includes("Rule files should be under 1MB")) {
+        logger.warn(
+          `Skipping large file: ${fileInfo.absolutePath} - ${error.message}`,
+        );
+        filesToRemove.push(relativePath);
+      } else {
+        // Log other errors but continue; file without hash will be handled later
+        logger.warn(
+          `Could not calculate hash for ${fileInfo.absolutePath}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        // Ensure hash is undefined if calculation fails
+        fileInfo.hash = undefined;
+      }
     }
+  }
+  
+  // Remove files that are too large
+  for (const path of filesToRemove) {
+    files.delete(path);
   }
   logger.log(
     `Scan and hash calculation complete${projectLabel}. Found ${files.size} rule files.`,

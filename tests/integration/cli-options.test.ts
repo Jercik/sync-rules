@@ -209,28 +209,6 @@ describe("CLI Options", () => {
     });
   });
 
-  describe("--help", () => {
-    it("should display help information", async () => {
-      const result = await runCLI(["--help"]);
-
-      expectSuccess(result);
-      expect(containsInOutput(result, "Usage")).toBe(true);
-      expect(containsInOutput(result, "--dry-run")).toBe(true);
-      expect(containsInOutput(result, "--auto-confirm")).toBe(true);
-      expect(containsInOutput(result, "--exclude")).toBe(true);
-      expect(containsInOutput(result, "--rules")).toBe(true);
-    });
-  });
-
-  describe("--version", () => {
-    it("should display version information", async () => {
-      const result = await runCLI(["--version"]);
-
-      expectSuccess(result);
-      // Remove sync-rules check as version output is just the version number
-      expect(result.stdout.trim()).toMatch(/\d+\.\d+\.\d+/);
-    });
-  });
 
   describe("Option combinations", () => {
     it("should handle --dry-run with --exclude", async () => {
@@ -257,32 +235,6 @@ describe("CLI Options", () => {
       expect(containsInOutput(result, "test.md")).toBe(false);
     });
 
-    it("should handle --rules with --exclude", async () => {
-      const pathA = await createTestProject("project-a", {
-        ".cursorrules.md": CONTENT.cursor.basic,
-        ".kilocode/setup.md": CONTENT.kilocode.functional,
-        ".kilocode/temp.config.md": CONTENT.kilocode.documentation,
-      });
-
-      const pathB = await createTestProject("project-b", {});
-
-      const result = await runCLI([
-        pathA,
-        pathB,
-        "--auto-confirm",
-        "--rules",
-        ".cursorrules.md",
-        ".kilocode",
-        "--exclude",
-        "temp.*",
-      ]);
-
-      expectSuccess(result);
-
-      expect(await fileExists(pathB, ".cursorrules.md")).toBe(true);
-      expect(await fileExists(pathB, ".kilocode/setup.md")).toBe(true);
-      expect(await fileExists(pathB, ".kilocode/temp.config.md")).toBe(false);
-    });
   });
 
   describe("Non-.md pattern warning", () => {

@@ -217,26 +217,25 @@ describe("Exit Code Propagation", () => {
     // This tests that the fix allows generation to run even after sync failures
     const project1 = path.join(testDir, "project1");
     const project2 = path.join(testDir, "project2");
+    const project3 = path.join(testDir, "project3");
     
     await fs.mkdir(path.join(project1, ".kilocode/rules"), { recursive: true });
     await fs.mkdir(path.join(project2, ".kilocode/rules"), { recursive: true });
+    await fs.mkdir(path.join(project3, ".kilocode/rules"), { recursive: true });
     
-    // Create files
+    // Create a file only in project1
     await fs.writeFile(
       path.join(project1, ".kilocode/rules/test.md"),
-      "# Test Rule v1"
-    );
-    await fs.writeFile(
-      path.join(project2, ".kilocode/rules/test.md"),
-      "# Test Rule v2"
+      "# Test Rule"
     );
     
-    // Make project2's rule file read-only to cause sync failure
-    await fs.chmod(path.join(project2, ".kilocode/rules/test.md"), 0o444);
+    // Make project3's rules directory read-only to cause sync failure for one action
+    await fs.chmod(path.join(project3, ".kilocode/rules"), 0o555);
     
     const projects: ProjectInfo[] = [
       { name: "project1", path: project1 },
       { name: "project2", path: project2 },
+      { name: "project3", path: project3 },
     ];
     
     logSpy.mockClear();
@@ -254,6 +253,6 @@ describe("Exit Code Propagation", () => {
     expect(exitCode).toBe(1);
     
     // Restore permissions
-    await fs.chmod(path.join(project2, ".kilocode/rules/test.md"), 0o644);
+    await fs.chmod(path.join(project3, ".kilocode/rules"), 0o755);
   });
 });

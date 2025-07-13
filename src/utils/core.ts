@@ -55,12 +55,13 @@ export function debug(...args: unknown[]): void {
 // =============================================================================
 
 /**
- * Computes the SHA-1 hash of a file's content.
+ * Computes the SHA-256 hash of a file's content.
  * This is used to determine if files are identical without comparing their full content.
+ * Uses SHA-256 for better security and collision resistance compared to SHA-1.
  * Includes file size checking and better error handling for edge cases.
  *
  * @param filePath The absolute path to the file.
- * @returns A promise that resolves to the SHA-1 hash string (hexadecimal).
+ * @returns A promise that resolves to the SHA-256 hash string (hexadecimal).
  * @throws If there's an error reading the file (e.g., file not found, permissions, too large).
  * @example
  * try {
@@ -71,7 +72,7 @@ export function debug(...args: unknown[]): void {
  * }
  */
 export async function getFileHash(filePath: string): Promise<string> {
-  debug(`Calculating SHA-1 hash for file: "${filePath}"`);
+  debug(`Calculating SHA-256 hash for file: "${filePath}"`);
 
   try {
     // Check file stats first to handle edge cases
@@ -82,23 +83,23 @@ export async function getFileHash(filePath: string): Promise<string> {
       throw new Error(`Path is not a regular file: ${filePath}`);
     }
 
-    // Warn about large files (>100MB) but still process them
+    // Skip files larger than 1MB (rule files should be concise)
     const fileSizeBytes = stats.size;
-    const maxSizeForWarning = 100 * 1024 * 1024; // 100MB
+    const maxSize = 1024 * 1024; // 1MB
 
-    if (fileSizeBytes > maxSizeForWarning) {
-      warn(
-        `Large file detected (${Math.round(
+    if (fileSizeBytes > maxSize) {
+      throw new Error(
+        `File too large (${Math.round(
           fileSizeBytes / 1024 / 1024,
-        )}MB): ${filePath}. This may take a while...`,
+        )}MB): ${filePath}. Rule files should be under 1MB.`,
       );
     }
 
     const fileContent = await readFile(filePath);
-    const hash = createHash("sha1");
+    const hash = createHash("sha256");
     hash.update(fileContent);
     const hexHash = hash.digest("hex");
-    debug(`SHA-1 for "${filePath}": ${hexHash}`);
+    debug(`SHA-256 for "${filePath}": ${hexHash}`);
     return hexHash;
   } catch (err) {
     // Provide more specific error messages

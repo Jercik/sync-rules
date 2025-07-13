@@ -2,49 +2,18 @@ import { describe, it, expect, vi } from "vitest";
 import { formatTime } from "../../../src/utils/formatters.ts";
 
 describe("formatTime", () => {
-  it("should return 'recently' for times less than an hour ago", () => {
-    const date = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
-    expect(formatTime(date)).toBe("recently");
-  });
-
-  it("should return '1 hour ago' for times between 1 and 2 hours ago", () => {
-    const date = new Date(Date.now() - 1.5 * 60 * 60 * 1000);
-    expect(formatTime(date)).toBe("1 hour ago");
-  });
-
-  it("should return 'X hours ago' for times more than an hour ago", () => {
-    const date = new Date(Date.now() - 5 * 60 * 60 * 1000); // 5 hours ago
-    expect(formatTime(date)).toBe("5 hours ago");
-  });
-
-  it("should return '1 day ago' for times between 24 and 48 hours ago", () => {
-    const date = new Date(Date.now() - 36 * 60 * 60 * 1000);
-    expect(formatTime(date)).toBe("1 day ago");
-  });
-
-  it("should return 'X days ago' for times more than a day ago", () => {
-    const date = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000); // 10 days ago
-    expect(formatTime(date)).toBe("10 days ago");
-  });
-
-  it("should handle the exact 1-hour threshold", () => {
-    const date = new Date(Date.now() - 1 * 60 * 60 * 1000);
-    expect(formatTime(date)).toBe("1 hour ago");
-  });
-
-  it("should handle the exact 24-hour threshold", () => {
-    const date = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    expect(formatTime(date)).toBe("1 day ago");
-  });
-
-  it("should handle dates in the future as 'recently'", () => {
-    const date = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour in the future
-    expect(formatTime(date)).toBe("recently");
-  });
-
-  it("should be accurate around month boundaries", () => {
-    const date = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000); // 31 days ago
-    expect(formatTime(date)).toBe("31 days ago");
+  it.each([
+    { timeAgo: 30 * 60 * 1000, expected: "recently", description: "30 minutes ago" },
+    { timeAgo: 1.5 * 60 * 60 * 1000, expected: "1 hour ago", description: "1.5 hours ago" },
+    { timeAgo: 5 * 60 * 60 * 1000, expected: "5 hours ago", description: "5 hours ago" },
+    { timeAgo: 24 * 60 * 60 * 1000, expected: "1 day ago", description: "24 hours ago (threshold)" },
+    { timeAgo: 36 * 60 * 60 * 1000, expected: "1 day ago", description: "36 hours ago" },
+    { timeAgo: 10 * 24 * 60 * 60 * 1000, expected: "10 days ago", description: "10 days ago" },
+    { timeAgo: 31 * 24 * 60 * 60 * 1000, expected: "31 days ago", description: "31 days ago" },
+    { timeAgo: -1 * 60 * 60 * 1000, expected: "recently", description: "1 hour in the future" },
+  ])("should return '$expected' for $description", ({ timeAgo, expected }) => {
+    const date = new Date(Date.now() - timeAgo);
+    expect(formatTime(date)).toBe(expected);
   });
 
   it("should handle very old dates", () => {

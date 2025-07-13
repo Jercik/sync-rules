@@ -2,7 +2,7 @@
 
 ## Current Status
 
-The `sync-rules` project is feature-complete with robust functionality, comprehensive test coverage, and security hardening. All 157 tests pass, confirming stability across all major use cases, edge scenarios, and security boundaries. The tool successfully implements the global .md constraint, minimal CLAUDE.md concatenation, interactive/auto-confirm sync modes, and path traversal protection.
+The `sync-rules` project is feature-complete with robust functionality, comprehensive test coverage, and security hardening. All 193 tests pass, confirming stability across all major use cases, edge scenarios, and security boundaries. The tool successfully implements the global .md constraint, minimal CLAUDE.md concatenation, interactive/auto-confirm sync modes, path traversal protection, and recent improvements including TOCTOU race condition fixes, SHA-256 hashing, and 1MB file size limits.
 
 ### Key Capabilities
 - **Multi-project synchronization** with intelligent conflict resolution
@@ -10,7 +10,8 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
 - **CLAUDE.md generation** with minimal concatenation for Claude Code integration
 - **Interactive and auto-confirm modes** for different workflow preferences
 - **Local file support** (*.local.* pattern) for project-specific configurations
-- **Comprehensive testing** with 157 tests covering all scenarios including security
+- **Conditional rule synchronization** via manifest-based system for applying rules based on project content
+- **Comprehensive testing** with 193 tests covering all scenarios including security
 - **Path traversal protection** preventing unauthorized access to files outside project boundaries
 
 ### Latest Breaking Changes (2025-07-12)
@@ -24,7 +25,7 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
 
 ### Test Suite Comprehensive Update (2025-07-12)
 
-- **Complete Test Alignment**: All 157 tests passing with .md constraint and security
+- **Complete Test Alignment**: All 193 tests passing with .md constraint and security
 - **Test Coverage Areas**:
   - **CLI Integration**: 13 tests covering all flags and option combinations
   - **Sync Scenarios**: 12 tests covering 2/3/5 project sync, interactive mode, local files
@@ -85,6 +86,43 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
    - Ensures users understand that manual edits to CLAUDE.md will be lost on regeneration
    - Clear guidance to edit source .md files instead
 
+10. **Added manifest-based conditional rule synchronization**
+   - Implemented `.kilocode/manifest.json` and `.kilocode/manifest.local.json` support
+   - Rules now sync conditionally based on glob pattern matches in target projects
+   - Added Zod validation for type-safe manifest parsing
+   - Two-phase sync: manifests sync first, then rules based on conditions
+   - New utility modules for enhanced file handling and decision strategies
+
+### Major Improvements (2025-07-13)
+
+1. **Fixed TOCTOU Race Condition**
+   - Implemented atomic copy operations using `fs.constants.COPYFILE_EXCL`
+   - Added `--force` flag to allow overwriting files created after initial scan
+   - Prevents silent overwrites in concurrent environments (CI/CD)
+   - Enhanced warnings for potential race condition overwrites
+
+2. **Migrated from SHA-1 to SHA-256**
+   - Improved security and collision resistance for file hashing
+   - Future-proofing against potential SHA-1 vulnerabilities
+   - Updated all tests to expect SHA-256 hash formats
+
+3. **Implemented 1MB File Size Limit**
+   - Rule files larger than 1MB are automatically skipped
+   - Ensures rule files remain concise and readable
+   - Prevents memory issues with unexpectedly large files
+   - Clear warning messages when files exceed the limit
+
+4. **Enhanced Dry-Run Mode**
+   - Added write permission checks for destination directories
+   - Better simulation of potential permission failures
+   - More accurate preview of what would happen in real execution
+
+5. **Improved Error Handling**
+   - User-friendly error messages for duplicate project names
+   - Better Zod validation error formatting for manifest files
+   - Graceful handling of invalid manifests (treated as missing)
+   - Extracted common error handling functions for consistency
+
 ### Critical Security Fix (2025-07-12)
 
 **Path Traversal Vulnerability Fixed**
@@ -113,7 +151,7 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
 ### Architecture Consolidation (Pre-2025-07-12)
 
 - **Interactive Confirmation Implementation**: Fixed critical bug where user confirmation was never requested, violating core design principles. Now properly prompts users for file decisions unless --auto-confirm is set.
-- **Identical File Detection**: Improved efficiency by comparing file content (SHA-1 hashes) rather than timestamps. Files with identical content across all projects are now automatically skipped.
+- **Identical File Detection**: Improved efficiency by comparing file content (SHA-256 hashes) rather than timestamps. Files with identical content across all projects are now automatically skipped.
 - **System File Exclusion**: Previously added `.DS_Store` to default exclusion patterns, now superseded by global .md constraint.
 - **Scanning Simplification**: Removed redundant source/target directory model, now works with single project directories.
 - **Delete-All Functionality**: Added user option to delete files from all projects when missing from some.
@@ -125,7 +163,7 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
 3.  **Safe by Default**: Conservative file handling - auto-confirm never deletes, interactive requires explicit confirmation
 4.  **Deterministic Automation**: Auto-confirm mode provides predictable newest-file selection for CI/CD workflows
 5.  **Native TypeScript**: Leveraging Node.js 23.6+ for zero-build development and deployment
-6.  **Comprehensive Testing**: 157 tests ensure reliability across all use cases, edge scenarios, and security boundaries
+6.  **Comprehensive Testing**: 193 tests ensure reliability across all use cases, edge scenarios, and security boundaries
 7.  **Claude Code Integration**: Built-in CLAUDE.md generation with minimal concatenation for optimal Claude interaction
 
 ## Current Implementation Patterns
@@ -143,7 +181,7 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
 - **Progress Feedback**: Real-time logging of scan, sync, and generation phases
 
 ### Quality Assurance
-- **Comprehensive Testing**: 157 tests covering unit, integration, edge cases, and security
+- **Comprehensive Testing**: 193 tests covering unit, integration, edge cases, and security
 - **Error Handling**: Graceful degradation with informative warnings
 - **Cross-Platform**: Consistent behavior across different operating systems
 - **Performance**: Efficient file scanning with parallel project processing
@@ -155,12 +193,12 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
 - **Serial Hash Calculation**: Simple sequential approach for reliability over speed
 - **Efficient Pattern Matching**: .md constraint reduces file system overhead significantly
 - **Smart Skipping**: Identical files automatically excluded from processing
-- **Memory Management**: File size warnings and efficient streaming for large files
+- **Memory Management**: Files larger than 1MB are automatically skipped
 
 ### Performance Benchmarks
 - **Typical Usage**: 2-5 projects with 10-20 rule files sync in under 2 seconds
 - **Large Scale**: 10+ projects with 100+ files complete within 10 seconds
-- **Memory Usage**: Minimal footprint, warnings for files >100MB
+- **Memory Usage**: Minimal footprint, files >1MB automatically skipped
 
 ## Project Maturity Status
 
@@ -168,7 +206,7 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
 The project has reached a high level of maturity with comprehensive functionality:
 
 - **Core Features**: Complete implementation of all planned sync capabilities
-- **Quality Assurance**: 157 passing tests with full edge case and security coverage
+- **Quality Assurance**: 193 passing tests with full edge case and security coverage
 - **Documentation**: Complete README, memory bank, and inline code documentation
 - **User Experience**: Polished CLI with clear prompts, warnings, and feedback
 - **Architecture**: Clean, maintainable codebase with clear separation of concerns
@@ -179,6 +217,7 @@ The project has reached a high level of maturity with comprehensive functionalit
 - **Interactive and auto-confirm modes** for different workflow preferences
 - **CLAUDE.md generation** with minimal concatenation
 - **Local file support** for project-specific configurations
+- **Conditional rule synchronization** via manifest files
 - **Comprehensive error handling** with graceful degradation
 - **Path traversal protection** for secure multi-user operation
 

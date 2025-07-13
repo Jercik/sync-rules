@@ -58,7 +58,7 @@ describe("Race Condition Overwrite Scenario", () => {
     await fs.writeFile(rulesPath2, "# Local API Rules\nCreated after scan!");
     
     // Get confirmations (which includes the overwrite check)
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
     
     // Check warnings
     const warnings = logWarnSpy.mock.calls.map(call => call[0]);
@@ -119,7 +119,7 @@ describe("Race Condition Overwrite Scenario", () => {
     logWarnSpy.mockClear();
     
     // Get confirmations
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
     
     const warnings = logWarnSpy.mock.calls.map(call => call[0]);
     console.log("Multiple overwrites warnings:", warnings);

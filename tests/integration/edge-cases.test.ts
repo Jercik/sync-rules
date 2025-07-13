@@ -129,11 +129,64 @@ describe("Edge Cases", () => {
   });
 
   describe("File Types", () => {
-    it("should handle empty files", async () => {
+    it.each([
+      {
+        name: "empty files",
+        setup: async (pathA: string) => {
+          await createFile(path.join(pathA, "empty.md"), "");
+        },
+        verifyResult: async (result: any) => {
+          expectSuccess(result);
+        },
+        verifyFile: async (pathB: string) => {
+          expect(await fileExists(pathB, "empty.md")).toBe(true);
+          const content = await import("fs").then((fs) =>
+            fs.readFileSync(path.join(pathB, "empty.md"), "utf8"),
+          );
+          expect(content).toBe("");
+        }
+      },
+      {
+        name: "large files",
+        setup: async (pathA: string) => {
+          const largeFilePath = path.join(pathA, "large.md");
+          await createLargeFile(largeFilePath, 2); // 2MB (> 1MB limit)
+        },
+        verifyResult: async (result: any) => {
+          expectSuccess(result); // Should still succeed but skip the large file
+          expect(containsInOutput(result, "Rule files should be under 1MB")).toBe(true);
+        },
+        verifyFile: async (pathB: string) => {
+          // Large file should not be synced
+          expect(await fileExists(pathB, "large.md")).toBe(false);
+        }
+      },
+      {
+        name: "binary-like content in .md files",
+        setup: async (pathA: string) => {
+          const binaryContent = Buffer.alloc(1024).toString('base64');
+          const mdPath = path.join(pathA, "binary-data.md");
+          await createFile(mdPath, `# Binary Data\n\n\`\`\`\n${binaryContent}\n\`\`\``);
+        },
+        verifyResult: async (result: any) => {
+          expectSuccess(result);
+        },
+        verifyFile: async (pathB: string, pathA: string) => {
+          expect(await fileExists(pathB, "binary-data.md")).toBe(true);
+          const originalContent = await import("fs").then(
+            (fs) => fs.readFileSync(path.join(pathA, "binary-data.md"), "utf8"),
+          );
+          const copiedContent = await import("fs").then(
+            (fs) => fs.readFileSync(path.join(pathB, "binary-data.md"), "utf8"),
+          );
+          expect(copiedContent).toBe(originalContent);
+        }
+      }
+    ])("should handle %s", async ({ setup, verifyResult, verifyFile }) => {
       const pathA = await createTestProject("project-a", {});
       const pathB = await createTestProject("project-b", {});
 
-      await createFile(path.join(pathA, "empty.md"), "");
+      await setup(pathA);
 
       const result = await runCLI([
         pathA,
@@ -143,32 +196,8 @@ describe("Edge Cases", () => {
         "*.md",
       ]);
 
-      expectSuccess(result);
-
-      expect(await fileExists(pathB, "empty.md")).toBe(true);
-      const content = await import("fs").then((fs) =>
-        fs.readFileSync(path.join(pathB, "empty.md"), "utf8"),
-      );
-      expect(content).toBe("");
-    });
-
-    it("should warn for large files", async () => {
-      const pathA = await createTestProject("project-a", {});
-      const pathB = await createTestProject("project-b", {});
-
-      const largeFilePath = path.join(pathA, "large.md");
-      await createLargeFile(largeFilePath, 101); // 101MB
-
-      const result = await runCLI([
-        pathA,
-        pathB,
-        "--auto-confirm",
-        "--rules",
-        "*.md",
-      ]);
-
-      expectSuccess(result);
-      expect(containsInOutput(result, "large file")).toBe(true);
+      await verifyResult(result);
+      await verifyFile(pathB, pathA);
     });
 
     it("should skip symbolic links", async () => {
@@ -199,61 +228,6 @@ describe("Edge Cases", () => {
 
       expect(await fileExists(pathB, "target.md")).toBe(true);
       expect(await fileExists(pathB, "link.md")).toBe(false);
-    });
-
-    it("should process .md files with binary-like content correctly", async () => {
-      const pathA = await createTestProject("project-a", {});
-      const pathB = await createTestProject("project-b", {});
-
-      // Create an .md file with binary-like content (base64 encoded data)
-      const binaryContent = Buffer.alloc(1024).toString('base64');
-      const mdPath = path.join(pathA, "binary-data.md");
-      await createFile(mdPath, `# Binary Data\n\n\`\`\`\n${binaryContent}\n\`\`\``);
-
-      const result = await runCLI([
-        pathA,
-        pathB,
-        "--auto-confirm",
-        "--rules",
-        "*.md",
-      ]);
-
-      expectSuccess(result);
-
-      expect(await fileExists(pathB, "binary-data.md")).toBe(true);
-
-      const originalContent = await import("fs").then(
-        (fs) => fs.readFileSync(mdPath, "utf8"),
-      );
-      const copiedContent = await import("fs").then(
-        (fs) => fs.readFileSync(path.join(pathB, "binary-data.md"), "utf8"),
-      );
-
-      expect(copiedContent).toBe(originalContent);
-    });
-
-    it("should handle unicode content", async () => {
-      const pathA = await createTestProject("project-a", {
-        "unicode.md": "Hello 世界! 🌍 Café naïve résumé",
-      });
-
-      const pathB = await createTestProject("project-b", {});
-
-      const result = await runCLI([
-        "--auto-confirm",
-        pathA,
-        pathB,
-        "--rules",
-        "*.md",
-      ]);
-
-      expectSuccess(result);
-
-      expect(await fileExists(pathB, "unicode.md")).toBe(true);
-      const content = await import("fs").then((fs) =>
-        fs.readFileSync(path.join(pathB, "unicode.md"), "utf8"),
-      );
-      expect(content).toBe("Hello 世界! 🌍 Café naïve résumé");
     });
   });
 

@@ -30,7 +30,8 @@ Developers using AI coding assistants face a common challenge: keeping rule conf
 - **Interactive Decision Making**: Smart prompts for conflict resolution with multiple options
 - **Auto-Confirm Mode**: Deterministic newest-file selection for automated workflows
 - **Local File Support**: Project-specific *.local.* files are automatically excluded from sync
-- **Comprehensive Testing**: 157 tests covering all scenarios, edge cases, and security
+- **Conditional Rule Synchronization**: Manifest-based system allows rules to sync only when specific file patterns exist in target projects
+- **Comprehensive Testing**: 193 tests covering all scenarios, edge cases, and security
 - **Security Hardened**: Path traversal protection prevents unauthorized file access
 
 ## User Experience Vision

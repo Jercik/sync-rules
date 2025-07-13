@@ -37,7 +37,7 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
 
 - **Responsibility**: Multi-project synchronization orchestration
 - **Key Patterns**:
-  - **Content-based comparison**: SHA-1 hashes for reliable difference detection
+  - **Content-based comparison**: SHA-256 hashes for reliable difference detection
   - **Automatic skip**: Files with identical content across all projects
   - **Interactive prompts**: Multiple decision options (newest, specific version, delete-all, skip)
   - **Auto-confirm mode**: Deterministic newest-file selection, never deletes
@@ -67,12 +67,24 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
 ### 6. Utilities (`utils/`)
 
 - **Core utilities** (`core.ts`): 
-  - Logging, hashing, file operations, path normalization
-  - **NEW**: Shared pattern transformation logic (`generateEffectiveMdPatterns`)
-  - **NEW**: Post-processing filter (`filterMdFiles`) for additional safety
-  - **NEW**: Path security validation (`validatePathSecurity`) preventing traversal attacks
+  - Logging, hashing (SHA-256), file operations, path normalization
+  - Shared pattern transformation logic (`generateEffectiveMdPatterns`)
+  - Post-processing filter (`filterMdFiles`) for additional safety
+  - Path security validation (`validatePathSecurity`) preventing traversal attacks
+  - 1MB file size limit enforcement in `getFileHash()`
+- **Common functions** (`common-functions.ts`):
+  - `logDryRunAction()`: Consistent dry-run output formatting
+  - `ensureFilePath()`: Safe directory creation for file operations
+  - `handleFsError()`: User-friendly file system error messages
+  - `formatZodErrors()`: Readable Zod validation error formatting
 - **Prompt utilities** (`prompts.ts`): Interactive user input handling (confirm, select, input)
 - **Formatters** (`formatters.ts`): Time formatting for user-friendly output
+- **File Scanner** (`file-scanner.ts`): Scans specific files across projects (used for manifest scanning)
+- **File State Builder** (`file-state-builder.ts`): Builds global file state from project data
+- **File Decision Strategies** (`file-decision-strategies.ts`): Implements decision logic for file synchronization
+- **Project Utilities** (`project-utils.ts`): Project-related utility functions
+- **Sync Phases** (`sync-phases.ts`): Manages synchronization phases
+- **Manifest Validator** (`manifest-validator.ts`): Zod schemas for manifest validation
 
 ### 7. Test Infrastructure (`tests/`)
 
@@ -89,7 +101,7 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
 
 1. **Input Processing**: CLI validates directories and patterns, applies .md constraints and security checks
 2. **File Discovery**: Parallel scanning of all project directories with .md filtering
-3. **Content Analysis**: SHA-1 hashing for reliable change detection
+3. **Content Analysis**: SHA-256 hashing for reliable change detection
 4. **Decision Making**: Interactive prompts or auto-confirm logic for conflict resolution
 5. **Action Planning**: Determine copy/add/delete/skip operations based on user decisions
 6. **Execution**: Perform file operations (copy, delete) based on the approved plan
@@ -127,10 +139,42 @@ The tool does not merge file contents. Instead, it resolves conflicts by designa
 - **Auto-confirm safety**: Never deletes files in automated mode
 - **Dry Run Support**: Preview all changes before execution with `--dry-run`
 - **Local file preservation**: *.local.* files never synced or deleted
+- **Atomic Operations**: Uses `fs.constants.COPYFILE_EXCL` to prevent TOCTOU race conditions
+- **Force Mode**: Optional `--force` flag allows overwriting files created after initial scan
 - **Backup Strategy**: Rely on user's existing version control (Git recommended)
 
 ## Performance Considerations
 
 - **Serial Processing**: Simple sequential file hashing for reliability
-- **Memory Management**: File size warnings for large files
+- **Memory Management**: Files larger than 1MB are automatically skipped
 - **I/O Optimization**: Efficient glob patterns and minimal file reads
+
+## Manifest System (`manifest.json`)
+
+### 8. Conditional Rule Application
+
+- **Responsibility**: Apply rules only when specific file patterns exist in target projects
+- **Key Patterns**:
+  - **Condition-based filtering**: Rules sync only if glob patterns match project content
+  - **Two-file system**: 
+    - `.kilocode/manifest.json`: Shared manifest defining rule conditions
+    - `.kilocode/manifest.local.json`: Local overrides for project-specific includes/excludes
+  - **Zod validation**: Runtime type safety ensures manifest files conform to schema
+  - **Two-phase sync**: Manifest files sync first, then rules sync based on conditions
+  - **Pattern matching**: Uses same glob patterns as main sync for consistency
+  - **Graceful fallback**: Missing or invalid manifests don't break sync
+
+### Manifest Schema
+
+```typescript
+{
+  rules: {
+    [ruleName: string]: {
+      include?: string[];  // Glob patterns - rule applies if ANY match
+      exclude?: string[];  // Glob patterns - rule excluded if ANY match
+    }
+  }
+}
+```
+
+Local manifest can override with additional includes/excludes that merge with base manifest.

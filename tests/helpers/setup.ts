@@ -45,7 +45,7 @@ export async function createTestProject(
       await fs.writeFile(fullPath, fileData, "utf8");
     } else {
       await fs.writeFile(fullPath, fileData.content, "utf8");
-      if (fileData.mtime) {
+      if (fileData.mtime && isFinite(fileData.mtime.getTime())) {
         await fs.utimes(fullPath, fileData.mtime, fileData.mtime);
       }
     }

@@ -4,8 +4,17 @@ import { scan } from "./scan.ts";
 import * as logger from "./utils/core.ts";
 import { confirm, select } from "./utils/prompts.ts";
 import { formatTime } from "./utils/formatters.ts";
+import { getFileHash } from "./utils/core.ts";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import fg from "fast-glob";
+import { z } from "zod";
+import { ManifestSchema, LocalManifestSchema } from "./utils/manifest-validator.ts";
+import type { Manifest, LocalManifest, RuleCondition } from "./utils/manifest-validator.ts";
+import { scanSingleFileAcrossProjects } from "./utils/file-scanner.ts";
+import { buildGlobalFileStates } from "./utils/file-state-builder.ts";
+import { createProjectMap, findProjectByName } from "./utils/project-utils.ts";
+import { promptUserForFileDecision } from "./utils/file-decision-strategies.ts";
 
 /**
  * Represents the state of a file across all projects in the sync set.
@@ -66,7 +75,17 @@ export interface MultiSyncOptions {
    */
   autoConfirm?: boolean;
   baseDir?: string;
+  /**
+   * Force overwrite existing files when adding (bypasses atomic copy protection).
+   * Only used when a file would be added to a project but already exists there.
+   */
+  force?: boolean;
 }
+
+
+// Special manifest path
+const MANIFEST_PATH = '.kilocode/manifest.json';
+const LOCAL_MANIFEST_PATH = '.kilocode/manifest.local.json';
 
 /**
  * Scans all projects in parallel and builds a global file state map.
@@ -118,74 +137,281 @@ export async function scanAllProjects(
 
   logger.log(`Successfully scanned ${projectScanResults.length} project(s)`);
 
-  // Build global file state map
-  const globalFileStates = new Map<string, GlobalFileState>();
-
-  // First pass: collect all files from all projects
+  // Build map of files by project for the state builder
+  const filesByProject = new Map<string, Map<string, FileInfo>>();
   for (const { project, files } of projectScanResults) {
-    for (const [relativePath, fileInfo] of files) {
-      if (fileInfo.isLocal) {
-        continue; // Skip local files
-      }
-
-      if (!globalFileStates.has(relativePath)) {
-        globalFileStates.set(relativePath, {
-          relativePath,
-          versions: new Map(),
-          missingFrom: [],
-        });
-      }
-
-      const globalState = globalFileStates.get(relativePath)!;
-
-      // Get file modification time
-      const stats = await fs.stat(fileInfo.absolutePath);
-      const lastModified = stats.mtime;
-
-      globalState.versions.set(project.name, {
-        projectName: project.name,
-        fileInfo,
-        lastModified,
-      });
-    }
+    filesByProject.set(project.name, files);
   }
 
-  // Second pass: determine missing files and newest versions
-  const allProjectNames = projects.map((p) => p.name);
-
-  for (const globalState of globalFileStates.values()) {
-    // Find missing projects
-    globalState.missingFrom = allProjectNames.filter(
-      (projectName) => !globalState.versions.has(projectName),
-    );
-
-    // Find newest version
-    const versions = Array.from(globalState.versions.values());
-    if (versions.length > 0) {
-      globalState.newestVersion = versions.reduce((newest, current) =>
-        current.lastModified > newest.lastModified ? current : newest,
-      );
-
-      // Check if all versions have the same content
-      const hashes = versions
-        .map((v) => v.fileInfo.hash)
-        .filter((hash) => hash !== undefined);
-
-      if (hashes.length === versions.length && hashes.length > 1) {
-        // All files have hashes - check if they're all the same
-        const firstHash = hashes[0];
-        globalState.allIdentical = hashes.every((hash) => hash === firstHash);
-      } else {
-        globalState.allIdentical = false;
-      }
-    }
-  }
+  // Use the consolidated state builder
+  const globalFileStates = await buildGlobalFileStates(projects, filesByProject);
 
   logger.log(
     `Found ${globalFileStates.size} unique rule files across all projects`,
   );
 
   return globalFileStates;
+}
+
+/**
+ * Handles initial manifest synchronization across projects.
+ * 
+ * When manifests differ across projects, this function ensures they are
+ * consistent before regular rule synchronization begins. It treats manifests
+ * as a special case with a separate interactive decision point.
+ * 
+ * @param projects Array of project information
+ * @param options Sync options
+ * @returns The consistent manifest object if found, null otherwise
+ */
+export async function handleManifestSync(
+  projects: ProjectInfo[],
+  options: MultiSyncOptions
+): Promise<Manifest | null> {
+  // Use the new utility to scan manifest files across all projects
+  const manifestState = await scanSingleFileAcrossProjects(projects, MANIFEST_PATH);
+
+  // If no manifests found, return null
+  if (manifestState.versions.size === 0) {
+    return null;
+  }
+
+  // If all identical and present everywhere, load and return
+  if (manifestState.allIdentical && manifestState.missingFrom.length === 0) {
+    const content = await fs.readFile(manifestState.newestVersion!.fileInfo.absolutePath, 'utf8');
+    try {
+      const parsed = JSON.parse(content);
+      return ManifestSchema.parse(parsed);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        logger.error(`Invalid manifest structure in ${manifestState.newestVersion!.projectName}:`);
+        const { logZodErrors } = await import("./utils/common-functions.ts");
+        logZodErrors(error);
+        logger.error("Treating invalid manifest as if it doesn't exist - sync will continue");
+        return null;
+      }
+      // For JSON parse errors, also treat as missing
+      if (error instanceof SyntaxError) {
+        logger.error(`Invalid JSON in manifest from ${manifestState.newestVersion!.projectName}: ${error.message}`);
+        logger.error("Treating invalid manifest as if it doesn't exist - sync will continue");
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  // Manifests differ or missing from some - need to sync them first
+  logger.log("\nManifest files (.kilocode/manifest.json) differ across projects. Resolving first...");
+  
+  if (manifestState.newestVersion) {
+    const selectedProject = manifestState.newestVersion.projectName;
+    const lastModified = formatTime(manifestState.newestVersion.lastModified, true);
+    logger.log(`\nSelecting manifest from ${selectedProject} (last modified ${lastModified}) as source of truth`);
+  }
+
+  let syncActions: SyncAction[] = [];
+
+  if (options.autoConfirm || options.dryRun) {
+    syncActions = await generateAutoConfirmedActions(new Map([[MANIFEST_PATH, manifestState]]), null, projects);
+  } else {
+    // Interactive: prompt user for decision
+    const decision = await promptUserForFileDecision(manifestState);
+    syncActions = await generateActionsForFile(manifestState, decision.action, decision.sourceProject, null, undefined, true);
+  }
+
+  // Execute manifest sync actions
+  const { executeSyncActions } = await import("./cli.ts");
+  await executeSyncActions(syncActions, options, projects);
+
+  logger.log("Manifest synced. Rescanning projects with consistent manifest...");
+
+  // Return the now-consistent manifest
+  if (projects.length === 0) {
+    return null;
+  }
+  const firstProject = projects[0];
+  if (!firstProject) {
+    return null;
+  }
+  const consistentManifestPath = path.join(firstProject.path, MANIFEST_PATH); // Any project now has the same
+  const content = await fs.readFile(consistentManifestPath, 'utf8').catch(() => null);
+  if (!content) {
+    return null;
+  }
+  
+  try {
+    const parsed = JSON.parse(content);
+    return ManifestSchema.parse(parsed);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      logger.error(`Invalid manifest structure after sync:`);
+      const { logZodErrors } = await import("./utils/common-functions.ts");
+      logZodErrors(error);
+      logger.error("Treating invalid manifest as if it doesn't exist - sync will continue");
+      return null;
+    }
+    // For JSON parse errors, also treat as missing
+    if (error instanceof SyntaxError) {
+      logger.error(`Invalid JSON in manifest after sync: ${error.message}`);
+      logger.error("Treating invalid manifest as if it doesn't exist - sync will continue");
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Loads local manifest overrides for a project if they exist.
+ * 
+ * @param projectPath The project directory path
+ * @returns Local manifest object or null if not found
+ */
+async function loadLocalManifest(projectPath: string): Promise<LocalManifest | null> {
+  try {
+    const localManifestPath = path.join(projectPath, LOCAL_MANIFEST_PATH);
+    const content = await fs.readFile(localManifestPath, 'utf8');
+    const parsed = JSON.parse(content);
+    return LocalManifestSchema.parse(parsed);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      logger.warn(`Invalid local manifest structure in ${projectPath}, ignoring:`);
+      const { formatZodErrors } = await import("./utils/common-functions.ts");
+      const errors = formatZodErrors(error);
+      errors.forEach(err => logger.warn(`  - ${err}`));
+    }
+    return null; // No local manifest, invalid JSON, or validation failed
+  }
+}
+
+/**
+ * Checks if a rule file should be included based on manifest conditions.
+ * 
+ * @param relativePath The relative path of the rule file
+ * @param targetProjectPath The target project directory
+ * @param manifest The manifest object
+ * @param localManifest Optional local manifest overrides
+ * @returns True if the rule should be included, false otherwise
+ */
+async function shouldIncludeRule(
+  relativePath: string,
+  targetProjectPath: string,
+  manifest: Manifest | null,
+  localManifest: LocalManifest | null
+): Promise<boolean> {
+  // Check local overrides first
+  if (localManifest) {
+    if (localManifest.exclude?.includes(relativePath)) {
+      return false; // Explicitly excluded
+    }
+    if (localManifest.include?.includes(relativePath)) {
+      return true; // Explicitly included
+    }
+  }
+
+  // If no manifest, include all rules
+  if (!manifest) {
+    return true;
+  }
+
+  // Check if rule has a condition in manifest
+  const ruleCondition = manifest.rules[relativePath];
+  if (!ruleCondition) {
+    return true; // No condition means always include
+  }
+
+  // Check if condition glob matches any files in target project
+  const matches = await fg(ruleCondition.condition, {
+    cwd: targetProjectPath,
+    onlyFiles: true,
+    absolute: false,
+  });
+
+  return matches.length > 0;
+}
+
+/**
+ * Handles extraneous files that exist in projects but shouldn't based on manifest.
+ * 
+ * @param projects Array of project information
+ * @param manifest The manifest object
+ * @param options Sync options
+ * @returns Array of delete actions for extraneous files
+ */
+export async function handleExtraneousFiles(
+  projects: ProjectInfo[],
+  manifest: Manifest | null,
+  options: MultiSyncOptions
+): Promise<SyncAction[]> {
+  if (!manifest) {
+    return []; // No manifest means no extraneous file handling
+  }
+
+  const deleteActions: SyncAction[] = [];
+  
+  logger.log("\nChecking for extraneous files based on manifest conditions...");
+
+  // Scan all projects to find existing rule files
+  const globalFileStates = await scanAllProjects(projects, options);
+
+  for (const [relativePath, fileState] of globalFileStates) {
+    // Skip manifest itself and local files
+    if (relativePath === MANIFEST_PATH || relativePath === LOCAL_MANIFEST_PATH) {
+      continue;
+    }
+
+    // Check each project that has this file
+    for (const [projectName, version] of fileState.versions) {
+      const project = findProjectByName(projects, projectName);
+      if (!project) continue;
+
+      const localManifest = await loadLocalManifest(project.path);
+      const shouldInclude = await shouldIncludeRule(relativePath, project.path, manifest, localManifest);
+
+      if (!shouldInclude) {
+        // File exists but shouldn't based on manifest
+        deleteActions.push({
+          type: "delete",
+          targetProject: projectName,
+          relativePath,
+          targetFile: version.fileInfo,
+        });
+      }
+    }
+  }
+
+  if (deleteActions.length === 0) {
+    logger.log("No extraneous files found.");
+    return [];
+  }
+
+  // Report extraneous files
+  logger.log(`\nFound ${deleteActions.length} extraneous file(s) that don't meet manifest conditions:`);
+  const filesByPath = new Map<string, string[]>();
+  
+  for (const action of deleteActions) {
+    if (!filesByPath.has(action.relativePath)) {
+      filesByPath.set(action.relativePath, []);
+    }
+    filesByPath.get(action.relativePath)!.push(action.targetProject);
+  }
+
+  for (const [filePath, projectNames] of filesByPath) {
+    logger.log(`  - ${filePath} in: ${projectNames.join(", ")}`);
+  }
+
+  // Get user confirmation
+  if (!options.dryRun && !options.autoConfirm) {
+    const proceed = await confirm("\nDelete these extraneous files?");
+    if (!proceed) {
+      logger.log("Keeping extraneous files.");
+      return [];
+    }
+  } else if (options.autoConfirm) {
+    logger.log("\nAuto-confirm mode: Keeping extraneous files (deletions require manual confirmation).");
+    return [];
+  }
+
+  return deleteActions;
 }
 
 /**
@@ -202,12 +428,14 @@ export async function scanAllProjects(
  * newest version based on modification timestamp for all files.
  *
  * @param fileStates Map of global file states
+ * @param manifest The manifest object for conditional rules
  * @param options Sync options
  * @param projects Array of project information
  * @returns Array of confirmed sync actions
  */
 export async function getUserConfirmations(
   fileStates: Map<string, GlobalFileState>,
+  manifest: Manifest | null,
   options: MultiSyncOptions,
   projects: ProjectInfo[],
 ): Promise<SyncAction[]> {
@@ -216,7 +444,7 @@ export async function getUserConfirmations(
 
   if (options.autoConfirm || options.dryRun) {
     // Auto-confirm mode or dry-run: use newest version for all
-    return generateAutoConfirmedActions(fileStates, projects);
+    return generateAutoConfirmedActions(fileStates, manifest, projects);
   }
   // Filter out files that are identical across all projects
   const filesToReview = Array.from(fileStates.values()).filter(
@@ -283,155 +511,19 @@ export async function getUserConfirmations(
 
     // Get user decision for this file
     const decision = await promptUserForFileDecision(fileState);
-    const fileActions = generateActionsForFile(
+    const fileActions = await generateActionsForFile(
       fileState,
       decision.action,
       decision.sourceProject,
+      manifest,
+      projects,
     );
     actions.push(...fileActions);
   }
   return actions;
 }
 
-/**
- /**
-  * Prompts the user for a decision about what to do with a file that has differences.
-  */
-async function promptUserForFileDecision(
-  fileState: GlobalFileState,
-): Promise<UserDecision> {
-  // If file only exists in one project, offer to copy it to missing projects or delete it from all
-  if (fileState.versions.size === 1 && fileState.missingFrom.length > 0) {
-    const sourceProject = Array.from(fileState.versions.keys())[0]!;
-
-    const options = [
-      {
-        label: `Copy from ${sourceProject} to ${fileState.missingFrom.length} other project(s)`,
-        value: "copy" as const,
-      },
-      {
-        label: `Delete from ${sourceProject} (remove from all projects)`,
-        value: "delete-all" as const,
-      },
-      { label: "Skip this file", value: "skip" as const },
-    ];
-
-    const choice = await select(
-      `File ${fileState.relativePath} exists only in ${sourceProject}. What should be done?`,
-      options,
-    );
-
-    if (choice === "copy") {
-      return { action: "use-newest", confirmed: true };
-    } else if (choice === "delete-all") {
-      return { action: "delete-all", confirmed: true };
-    } else {
-      logger.log(`Skipping file: ${fileState.relativePath}`);
-      return { action: "skip", confirmed: true };
-    }
-  }
-
-  // If file exists in multiple projects and all identical, but missing from some, prompt to add or delete
-  if (
-    fileState.versions.size > 1 &&
-    fileState.allIdentical &&
-    fileState.missingFrom.length > 0
-  ) {
-    const sourceProject = fileState.newestVersion!.projectName;
-
-    const options = [
-      {
-        label: `Add to ${fileState.missingFrom.length} missing project(s) using version from ${sourceProject}`,
-        value: "add" as const,
-      },
-      {
-        label: `Delete from all ${fileState.versions.size} projects that have it`,
-        value: "delete-all" as const,
-      },
-      { label: "Skip this file", value: "skip" as const },
-    ];
-
-    const choice = await select(
-      `File ${fileState.relativePath} is identical in ${fileState.versions.size} projects but missing from ${fileState.missingFrom.length}. What should be done?`,
-      options,
-    );
-
-    if (choice === "add") {
-      return { action: "use-newest", confirmed: true };
-    } else if (choice === "delete-all") {
-      return { action: "delete-all", confirmed: true };
-    } else {
-      logger.log(`Skipping file: ${fileState.relativePath}`);
-      return { action: "skip", confirmed: true };
-    }
-  }
-
-  // If file has multiple versions with different content, ask user to choose
-  if (fileState.versions.size > 1 && !fileState.allIdentical) {
-    // Group by hash
-    const groups = new Map<
-      string,
-      { projects: string[]; newestInGroup: FileVersion }
-    >();
-    const versions = Array.from(fileState.versions.values());
-    for (const version of versions) {
-      const hash = version.fileInfo.hash || "";
-      if (!groups.has(hash)) {
-        groups.set(hash, { projects: [], newestInGroup: version });
-      }
-      const group = groups.get(hash)!;
-      group.projects.push(version.projectName);
-      if (version.lastModified > group.newestInGroup.lastModified) {
-        group.newestInGroup = version;
-      }
-    }
-
-    // Sort groups by newest timestamp in group (descending)
-    const sortedGroups = Array.from(groups.values()).sort(
-      (a, b) =>
-        b.newestInGroup.lastModified.getTime() -
-        a.newestInGroup.lastModified.getTime(),
-    );
-
-    // Build options for unique groups
-    const versionOptions = sortedGroups.map((group, index) => ({
-      label: `Use version ${index + 1} (from ${group.newestInGroup.projectName}, used in ${group.projects.length} project${group.projects.length > 1 ? "s" : ""})`,
-      value: `use-group-${index}` as const,
-    }));
-
-    const options = [
-      ...versionOptions,
-      { label: "Delete from all projects", value: "delete-all" as const },
-      { label: "Skip this file", value: "skip" as const },
-    ];
-
-    const choice = await select(
-      `Different versions found for ${fileState.relativePath}. Which version should be used?`,
-      options,
-    );
-
-    if (choice === "skip") {
-      logger.log(`Skipping file: ${fileState.relativePath}`);
-      return { action: "skip", confirmed: true };
-    } else if (choice === "delete-all") {
-      return { action: "delete-all", confirmed: true };
-    } else if (choice.startsWith("use-group-")) {
-      const groupIndex = parseInt(choice.replace("use-group-", ""), 10);
-      const selectedGroup = sortedGroups[groupIndex];
-      if (!selectedGroup) {
-        throw new Error(`Invalid group index: ${groupIndex}`);
-      }
-      return {
-        action: "use-specific",
-        sourceProject: selectedGroup.newestInGroup.projectName,
-        confirmed: true,
-      };
-    }
-  }
-
-  // Default to newest version if no conflicts or specific choice needed
-  return { action: "use-newest", confirmed: true };
-}
+// promptUserForFileDecision is now imported from file-decision-strategies.ts
 /**
  * Generates auto-confirmed actions using the newest version of each file.
  *
@@ -443,11 +535,13 @@ async function promptUserForFileDecision(
  * - Never creates delete actions (deletions require manual confirmation)
  *
  * @param fileStates Map of global file states
+ * @param manifest The manifest object for conditional rules
  * @param projects Array of project information for checking existing files
  * @returns Array of sync actions to be executed
  */
 async function generateAutoConfirmedActions(
   fileStates: Map<string, GlobalFileState>,
+  manifest: Manifest | null,
   projects: ProjectInfo[],
 ): Promise<SyncAction[]> {
   const actions: SyncAction[] = [];
@@ -455,7 +549,14 @@ async function generateAutoConfirmedActions(
   const overwriteWarnings: string[] = [];
 
   // Create project lookup map
-  const projectMap = new Map(projects.map((p) => [p.name, p.path]));
+  let projectMap: Map<string, string>;
+  try {
+    projectMap = createProjectMap(projects);
+  } catch (error) {
+    // This should have been caught earlier in CLI, but handle it for safety
+    logger.error("Cannot generate auto-confirmed actions due to duplicate project names");
+    return [];
+  }
 
   for (const fileState of fileStates.values()) {
     // Skip files that are identical across all projects
@@ -463,7 +564,8 @@ async function generateAutoConfirmedActions(
       continue;
     }
 
-    const fileActions = generateActionsForFile(fileState, "use-newest");
+    const isManifestFile = fileState.relativePath === MANIFEST_PATH;
+    const fileActions = await generateActionsForFile(fileState, "use-newest", undefined, manifest, projects, isManifestFile);
     
     // Check for potential overwrites in add actions
     for (const action of fileActions) {
@@ -522,7 +624,7 @@ async function generateAutoConfirmedActions(
  *
  * This function creates the appropriate sync actions based on the decision:
  * - "use-newest" or "use-specific": Updates all projects with older versions
- *   and adds the file to all projects where it's missing
+ *   and adds the file to all projects where it's missing (if manifest conditions are met)
  * - "delete-all": Creates delete actions for all projects that have the file
  * - "skip": Returns no actions (leaves files in their current state)
  *
@@ -534,13 +636,19 @@ async function generateAutoConfirmedActions(
  * @param fileState The global state of this file across all projects
  * @param decision The user's decision or auto-confirmed action
  * @param sourceProject Optional specific project to use as source (for use-specific)
+ * @param manifest The manifest object for conditional rules
+ * @param projects Array of project information
+ * @param isManifest Whether this file is the manifest itself (skips condition checks)
  * @returns Array of sync actions to execute for this file
  */
-function generateActionsForFile(
+async function generateActionsForFile(
   fileState: GlobalFileState,
   decision: "use-newest" | "use-specific" | "delete-all" | "skip",
   sourceProject?: string,
-): SyncAction[] {
+  manifest?: Manifest | null,
+  projects?: ProjectInfo[],
+  isManifest: boolean = false,
+): Promise<SyncAction[]> {
   const actions: SyncAction[] = [];
 
   if (decision === "skip") {
@@ -590,6 +698,24 @@ function generateActionsForFile(
 
   // Add to projects that are missing the file
   for (const missingProject of fileState.missingFrom) {
+    // Check manifest conditions unless this is the manifest itself
+    if (!isManifest && manifest && projects) {
+      const targetProject = findProjectByName(projects, missingProject);
+      if (targetProject) {
+        const localManifest = await loadLocalManifest(targetProject.path);
+        const shouldInclude = await shouldIncludeRule(
+          fileState.relativePath,
+          targetProject.path,
+          manifest,
+          localManifest
+        );
+        
+        if (!shouldInclude) {
+          continue; // Skip this project, conditions not met
+        }
+      }
+    }
+    
     actions.push({
       type: "add",
       targetProject: missingProject,

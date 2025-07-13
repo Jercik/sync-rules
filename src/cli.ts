@@ -5,12 +5,13 @@ import packageJson from "../package.json" with { type: "json" };
 import * as logger from "./utils/core.ts";
 import { discoverProjects, validateProjects } from "./discovery.ts";
 import type { ProjectInfo } from "./discovery.ts";
-import { scanAllProjects, getUserConfirmations } from "./multi-sync.ts";
+import { scanAllProjects, getUserConfirmations, handleManifestSync, handleExtraneousFiles } from "./multi-sync.ts";
 import type { MultiSyncOptions, SyncAction } from "./multi-sync.ts";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { homedir } from "node:os";
-import { generateClaudeMd } from "./generate-claude.ts";
+import { createProjectMap } from "./utils/project-utils.ts";
+import { preparationPhase, planningPhase, executionPhase, generationPhase, handleExtraneousFilesPhase } from "./utils/sync-phases.ts";
 
 /**
  * Main entry point for the `sync-rules` CLI application.
@@ -57,6 +58,10 @@ export async function main(argv: string[]) {
     .option(
       "--auto-confirm",
       "Auto-confirm using newest versions (skip prompts). Automatically selects the file with the most recent modification date as the source of truth",
+    )
+    .option(
+      "--force",
+      "Force overwrite existing files when adding (use with caution)",
     )
     .option(
       "--generate-claude",
@@ -147,119 +152,101 @@ export async function main(argv: string[]) {
 }
 
 /**
- * Executes the unified multi-project synchronization.
+ * Executes the unified multi-project synchronization using a phased approach.
  * @returns Exit code: 0 for success, 1 for errors
  */
 export async function executeUnifiedSync(
   projects: ProjectInfo[],
   options: any,
 ): Promise<number> {
+  // Validate project names first
+  try {
+    createProjectMap(projects);
+  } catch (error) {
+    if (error instanceof Error) {
+      logger.error(error.message);
+    }
+    logger.error("Please ensure all project directories have unique names.");
+    return 2; // Configuration error
+  }
+
+  // Phase 1: Preparation
+  const prepResult = await preparationPhase(projects, options);
+  if (!prepResult.success || !prepResult.shouldContinue) {
+    // If no files found or preparation failed
+    if (prepResult.success && !prepResult.shouldContinue && prepResult.data) {
+      // No files found case - still run generation if requested
+      const genResult = await generationPhase(projects, options, 0);
+      return genResult.data || 0;
+    }
+    return prepResult.errors ? 1 : 0;
+  }
+
+  const { consistentManifest, globalFileStates } = prepResult.data!;
   const multiSyncOptions: MultiSyncOptions = {
     rulePatterns: options.rules,
     excludePatterns: options.exclude,
     dryRun: options.dryRun || false,
     autoConfirm: options.autoConfirm || false,
     baseDir: options.baseDir,
+    force: options.force || false,
   };
 
-  logger.log("\nStarting unified synchronization...");
-
-  if (multiSyncOptions.autoConfirm) {
-    logger.log(
-      "Auto-confirm mode enabled: automatically using newest versions as source of truth.",
-    );
-  }
-
-  // Scan all projects and build global file state
-  const globalFileStates = await scanAllProjects(projects, multiSyncOptions);
-  if (globalFileStates.size === 0) {
-    logger.log("No rule files found across any projects.");
-    return 0;
-  }
-
-  // Get user confirmations and build sync plan
-  const syncActions = await getUserConfirmations(
+  // Phase 2: Planning
+  const planResult = await planningPhase(
+    projects,
     globalFileStates,
+    consistentManifest,
     multiSyncOptions,
-    projects,
   );
-
-  if (syncActions.length === 0) {
-    logger.log("No synchronization needed - all files are already up to date.");
-
-    // Still generate CLAUDE.md if requested, even when no sync is needed
-    const shouldGenerateClaude = options.generateClaude !== false;
-    if (shouldGenerateClaude) {
-      logger.log("\nStarting CLAUDE.md generation for all projects...");
-      const genExitCode = await executeClaudeGeneration(projects, options);
-      return genExitCode;
-    }
-
-    return 0;
+  
+  if (!planResult.success) {
+    return 1;
   }
-
-  // Show final summary and get confirmation before executing changes
-  if (!multiSyncOptions.dryRun && !multiSyncOptions.autoConfirm) {
-    logger.log(`\n=== Planned Changes Summary ===`);
-    logger.log(`Total actions: ${syncActions.length}`);
-
-    const updates = syncActions.filter((a) => a.type === "update").length;
-    const additions = syncActions.filter((a) => a.type === "add").length;
-    const deletions = syncActions.filter((a) => a.type === "delete").length;
-
-    logger.log(`Updates: ${updates}`);
-    logger.log(`Additions: ${additions}`);
-    logger.log(`Deletions: ${deletions}`);
-
-    const { confirm } = await import("./utils/prompts.ts");
-    const proceedConfirmed = await confirm("\nProceed with these changes?");
-    if (!proceedConfirmed) {
-      logger.log("Synchronization cancelled by user.");
-      return 0;
+  
+  if (!planResult.shouldContinue) {
+    // No sync needed or user cancelled
+    if (planResult.data?.userCancelled) {
+      return 0; // User cancelled, exit cleanly
     }
-  }
-
-  // Execute the sync plan
-  const result = await executeSyncActions(
-    syncActions,
-    multiSyncOptions,
-    projects,
-  );
-
-  // Report results
-  logger.log("\n=== Synchronization Summary ===");
-  logger.log(`Total actions: ${syncActions.length}`);
-  logger.log(`Updates: ${result.updates}`);
-  logger.log(`Additions: ${result.additions}`);
-  logger.log(`Deletions: ${result.deletions}`);
-  logger.log(`Skipped: ${result.skips}`);
-  if (result.errors > 0) {
-    logger.warn(
-      `\n⚠️  Synchronization complete with ${result.errors} errors detected.`,
+    
+    // No sync needed - handle extraneous files and generate CLAUDE.md
+    const extraneousResult = await handleExtraneousFilesPhase(
+      projects,
+      consistentManifest,
+      multiSyncOptions,
     );
-    logger.warn("Please review the affected files and resolve any issues.");
-  } else {
-    logger.log("\n✅ Synchronization completed successfully!");
+    
+    const errors = extraneousResult.data?.errors || 0;
+    const genResult = await generationPhase(projects, options, errors);
+    return genResult.data || 0;
   }
 
-  // Generate CLAUDE.md if flag is set (regardless of sync success/failure)
-  let exitCode = result.errors > 0 ? 1 : 0;
-  // Default to true if not explicitly set to false
-  const shouldGenerateClaude = options.generateClaude !== false;
-  if (shouldGenerateClaude) {
-    logger.log("\nStarting CLAUDE.md generation for all projects...");
-    const genExitCode = await executeClaudeGeneration(projects, options);
-    // Use Math.max to preserve the highest exit code (1 = error, 0 = success)
-    exitCode = Math.max(exitCode, genExitCode);
+  const { syncActions } = planResult.data!;
+
+  // Phase 3: Execution
+  const execResult = await executionPhase(
+    projects,
+    syncActions,
+    consistentManifest,
+    multiSyncOptions,
+  );
+  
+  if (!execResult.success) {
+    return 1;
   }
 
-  return exitCode;
+  const syncErrors = execResult.data?.errors || 0;
+
+  // Phase 4: Generation
+  const genResult = await generationPhase(projects, options, syncErrors);
+  return genResult.data || 0;
 }
 
 /**
  * Executes the sync actions and returns summary statistics.
  */
-async function executeSyncActions(
+export async function executeSyncActions(
   actions: SyncAction[],
   options: MultiSyncOptions,
   projects: ProjectInfo[],
@@ -277,7 +264,14 @@ async function executeSyncActions(
     errors = 0;
 
   // Create project lookup map
-  const projectMap = new Map(projects.map((p) => [p.name, p.path]));
+  let projectMap: Map<string, string>;
+  try {
+    projectMap = createProjectMap(projects);
+  } catch (error) {
+    // This should have been caught earlier, but handle it gracefully
+    logger.error("Project name validation failed during execution:", error);
+    throw error;
+  }
 
   for (const action of actions) {
     try {
@@ -329,14 +323,27 @@ async function executeUpdate(
 
   const targetPath = path.join(targetProjectPath, action.relativePath);
 
-  logger.log(
-    `${options.dryRun ? "[DRY RUN] Would update" : "Updating"}: ${action.relativePath} in ${action.targetProject} from ${action.sourceProject}`,
-  );
-
   if (!options.dryRun) {
+    logger.log(
+      `Updating: ${action.relativePath} in ${action.targetProject} from ${action.sourceProject}`,
+    );
     const destDir = path.dirname(targetPath);
     await fs.mkdir(destDir, { recursive: true });
+    // For updates, we expect the file to exist, so we don't use COPYFILE_EXCL
     await fs.copyFile(action.sourceFile.absolutePath, targetPath);
+  } else {
+    // Dry-run mode - check write permissions
+    const destDir = path.dirname(targetPath);
+    try {
+      await fs.access(destDir, fs.constants.W_OK);
+      logger.log(
+        `[DRY RUN] Would update: ${action.relativePath} in ${action.targetProject} from ${action.sourceProject}`,
+      );
+    } catch {
+      logger.warn(
+        `[DRY RUN] Would fail to update: ${action.relativePath} in ${action.targetProject} - directory is not writable`,
+      );
+    }
   }
 }
 
@@ -359,29 +366,74 @@ async function executeAdd(
 
   const targetPath = path.join(targetProjectPath, action.relativePath);
 
-  // Check if file already exists
-  let fileExists = false;
-  try {
-    await fs.access(targetPath);
-    fileExists = true;
-  } catch {
-    // File doesn't exist, which is expected
-  }
-
-  if (fileExists) {
-    logger.warn(
-      `⚠️  ${options.dryRun ? "[DRY RUN] Would overwrite" : "Overwriting"} existing file: ${action.relativePath} in ${action.targetProject}`,
-    );
-  } else {
-    logger.log(
-      `${options.dryRun ? "[DRY RUN] Would add" : "Adding"}: ${action.relativePath} to ${action.targetProject} from ${action.sourceProject}`,
-    );
-  }
-
   if (!options.dryRun) {
     const destDir = path.dirname(targetPath);
     await fs.mkdir(destDir, { recursive: true });
-    await fs.copyFile(action.sourceFile.absolutePath, targetPath);
+    
+    try {
+      // Use COPYFILE_EXCL to fail if file exists (atomic check and copy)
+      await fs.copyFile(action.sourceFile.absolutePath, targetPath, fs.constants.COPYFILE_EXCL);
+      logger.log(
+        `Adding: ${action.relativePath} to ${action.targetProject} from ${action.sourceProject}`,
+      );
+    } catch (error: any) {
+      if (error.code === 'EEXIST') {
+        // File already exists
+        if (options.force) {
+          // Force overwrite
+          await fs.copyFile(action.sourceFile.absolutePath, targetPath);
+          logger.warn(
+            `⚠️  Overwriting existing file (--force): ${action.relativePath} in ${action.targetProject}`,
+          );
+        } else {
+          // Skip with warning
+          logger.warn(
+            `⚠️  Skipping existing file: ${action.relativePath} in ${action.targetProject} (use --force to overwrite)`,
+          );
+        }
+      } else {
+        // Re-throw other errors
+        throw error;
+      }
+    }
+  } else {
+    // Dry run mode - check existence right before we would copy
+    let fileExists = false;
+    try {
+      await fs.access(targetPath);
+      fileExists = true;
+    } catch {
+      // File doesn't exist, which is expected
+    }
+
+    // Check write permissions on the destination directory
+    const destDir = path.dirname(targetPath);
+    let canWrite = true;
+    try {
+      await fs.access(destDir, fs.constants.W_OK);
+    } catch {
+      canWrite = false;
+    }
+
+    if (!canWrite) {
+      logger.warn(
+        `⚠️  [DRY RUN] Would fail to add: ${action.relativePath} in ${action.targetProject} - directory is not writable`,
+      );
+    } else if (fileExists) {
+      if (options.force) {
+        logger.warn(
+          `⚠️  [DRY RUN] Would overwrite existing file (--force): ${action.relativePath} in ${action.targetProject}`,
+        );
+      } else {
+        logger.warn(
+          `⚠️  [DRY RUN] Would skip existing file: ${action.relativePath} in ${action.targetProject} (use --force to overwrite)`,
+        );
+      }
+    } else {
+      logger.log(
+        `[DRY RUN] Would add: ${action.relativePath} to ${action.targetProject} from ${action.sourceProject}`,
+      );
+    }
   }
 }
 
@@ -397,85 +449,22 @@ async function executeDelete(
     throw new Error("Delete action missing target file");
   }
 
-  logger.log(
-    `${options.dryRun ? "[DRY RUN] Would delete" : "Deleting"}: ${action.relativePath} from ${action.targetProject}`,
-  );
-
   if (!options.dryRun) {
+    logger.log(
+      `Deleting: ${action.relativePath} from ${action.targetProject}`,
+    );
     await fs.unlink(action.targetFile.absolutePath);
-  }
-}
-
-/**
- * Executes CLAUDE.md generation for projects.
- */
-async function executeClaudeGeneration(
-  projects: ProjectInfo[],
-  options: any,
-): Promise<number> {
-  const genOptions: MultiSyncOptions = {
-    rulePatterns: options.rules,
-    excludePatterns: options.exclude,
-    dryRun: options.dryRun || false,
-    autoConfirm: options.autoConfirm || false,
-    baseDir: options.baseDir,
-  };
-
-  logger.log(`\nGenerating CLAUDE.md for ${projects.length} projects...`);
-
-  let successes = 0,
-    skips = 0,
-    errors = 0;
-
-  for (const project of projects) {
+  } else {
+    // Dry-run mode - check if we can delete the file
     try {
-      // In dry-run mode, wrap generateClaudeMd in try-catch to handle permission errors gracefully
-      let content: string;
-      if (genOptions.dryRun) {
-        try {
-          content = await generateClaudeMd(project.path, genOptions);
-        } catch (genErr) {
-          // In dry-run mode, if we can't read files due to permissions, simulate success
-          logger.warn(
-            `[DRY RUN] Cannot read files in ${project.name} (${genErr instanceof Error ? genErr.message : String(genErr)}), but would generate CLAUDE.md`,
-          );
-          successes++;
-          continue;
-        }
-        logger.log(
-          `[DRY RUN] Would generate CLAUDE.md for ${project.name}:\n${content.slice(0, 200)}...`,
-        );
-        successes++;
-        continue;
-      }
-
-      // Normal mode - let errors propagate to outer catch
-      content = await generateClaudeMd(project.path, genOptions);
-
-      if (!options.autoConfirm) {
-        const { confirm } = await import("./utils/prompts.ts");
-        const proceed = await confirm(
-          `Generate CLAUDE.md for ${project.name}?`,
-        );
-        if (!proceed) {
-          logger.log(`Skipped ${project.name}`);
-          skips++;
-          continue;
-        }
-      }
-
-      const outputPath = path.join(project.path, "CLAUDE.md");
-      await fs.writeFile(outputPath, content);
-      logger.log(`Generated CLAUDE.md in ${project.name}`);
-      successes++;
-    } catch (err) {
-      logger.error(`Error generating for ${project.name}:`, err);
-      errors++;
+      await fs.access(action.targetFile.absolutePath, fs.constants.W_OK);
+      logger.log(
+        `[DRY RUN] Would delete: ${action.relativePath} from ${action.targetProject}`,
+      );
+    } catch {
+      logger.warn(
+        `[DRY RUN] Would fail to delete: ${action.relativePath} from ${action.targetProject} - file is not writable`,
+      );
     }
   }
-
-  logger.log(
-    `\nGeneration Summary: ${successes} generated, ${skips} skipped, ${errors} errors`,
-  );
-  return errors > 0 ? 1 : 0;
 }

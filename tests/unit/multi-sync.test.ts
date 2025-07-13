@@ -356,7 +356,7 @@ describe("getUserConfirmations", () => {
 
     fileStates.set(".clinerules.md", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
 
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe("add");
@@ -398,7 +398,7 @@ describe("getUserConfirmations", () => {
 
     fileStates.set(".clinerules.md", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
 
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe("add");
@@ -450,7 +450,7 @@ describe("getUserConfirmations", () => {
 
     fileStates.set(".clinerules.md", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
     expect(actions).toHaveLength(0);
   });
 
@@ -492,7 +492,7 @@ describe("getUserConfirmations", () => {
     // Mock user selecting delete-all
     mockSelect.mockResolvedValueOnce("delete-all");
 
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
 
     expect(mockSelect).toHaveBeenCalledWith(
       expect.stringContaining("exists only in project1"),
@@ -542,7 +542,7 @@ describe("getUserConfirmations", () => {
 
     fileStates.set(".clinerules.md", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
 
     // Should add to missing project, not delete
     expect(actions).toHaveLength(1);
@@ -600,7 +600,7 @@ describe("getUserConfirmations", () => {
     // Mock user selecting project1's version (which should be group-1 since project2 is newer)
     mockSelect.mockResolvedValueOnce("use-group-1");
 
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
 
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe("update");
@@ -686,9 +686,10 @@ describe("getUserConfirmations", () => {
     fileStates.set("identical.rule", identicalFileState);
     fileStates.set("different.rule", differentFileState);
 
-    mockSelect.mockResolvedValueOnce("use-newest");
+    // Mock selecting the first version (use-group-0)
+    mockSelect.mockResolvedValueOnce("use-group-0");
 
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
     expect(actions.length).toBe(1); // Only one action for the different file
     expect(actions[0].relativePath).toBe("different.rule");
   });
@@ -728,7 +729,7 @@ describe("getUserConfirmations", () => {
     };
     fileStates.set("delete-me.rule", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options, projects);
+    const actions = await getUserConfirmations(fileStates, null, options, projects);
 
     expect(actions).toHaveLength(2);
     expect(actions[0].type).toBe("delete");
