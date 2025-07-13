@@ -1,7 +1,8 @@
+#!/usr/bin/env node
+
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import * as logger from "./utils/core.ts";
-import type { FileInfo } from "./scan.ts";
 import { discoverProjects, validateProjects } from "./discovery.ts";
 import type { ProjectInfo } from "./discovery.ts";
 import { scanAllProjects, getUserConfirmations } from "./multi-sync.ts";
@@ -9,6 +10,7 @@ import type { MultiSyncOptions, SyncAction } from "./multi-sync.ts";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { homedir } from "node:os";
+import { generateClaudeMd } from "./generate-claude.ts";
 
 /**
  * Main entry point for the `sync-rules` CLI application.
@@ -18,8 +20,8 @@ import { homedir } from "node:os";
  * @param argv An array of command-line arguments, typically `process.argv`.
  * @returns A promise that resolves when the command processing is complete.
  *          The process will exit with appropriate status codes:
- *          - 0: Success, all files synchronized or no synchronization needed.
- *          - 1: Partial success with errors during file operations (e.g., permission issues).
+ *          - 0: Success, all files synchronized (or no synchronization needed) and CLAUDE.md generated successfully (if enabled).
+ *          - 1: Partial success with errors during file operations, including sync errors or CLAUDE.md generation failures.
  *          - 2: Fatal error during processing (e.g., invalid arguments, no projects found).
  */
 export async function main(argv: string[]) {
@@ -43,21 +45,27 @@ export async function main(argv: string[]) {
     )
     .option(
       "--rules <names...>",
-      "Specify rule directory/file names (e.g., .clinerules .cursorrules)",
-      [".clinerules", ".cursorrules", ".kilocode"],
+      "Specify rule directory/file names (e.g., .clinerules.md .cursorrules.md)",
+      [".clinerules.md", ".cursorrules.md", ".kilocode"],
     )
     .option(
       "--exclude <patterns...>",
       "Exclude patterns (directories/files to skip)",
-      ["memory-bank", "node_modules", ".git", ".DS_Store"],
+      ["memory-bank", "node_modules", ".git", "CLAUDE.md"], // Exclude CLAUDE.md by default
     )
     .option("--dry-run", "Perform a dry run without actual changes")
     .option(
       "--auto-confirm",
       "Auto-confirm using newest versions (skip prompts). Automatically selects the file with the most recent modification date as the source of truth",
     )
+    .option(
+      "--generate-claude",
+      "Generate CLAUDE.md after successful sync",
+      true,
+    )
+    .option("--no-generate-claude", "Skip CLAUDE.md generation")
     .option("--verbose", "Enable verbose logging")
-    .action(async (projectPaths: string[], options) => {
+    .action(async (projectPaths: string[], options): Promise<void> => {
       logger.setVerbose(options.verbose); // Set verbosity early
 
       try {
@@ -65,7 +73,6 @@ export async function main(argv: string[]) {
 
         if (projectPaths.length === 0) {
           // Multi-project discovery mode
-          logger.log(`Discovering projects in: ${options.baseDir}`);
           projects = await discoverProjects(
             options.baseDir,
             options.rules,
@@ -76,7 +83,7 @@ export async function main(argv: string[]) {
             logger.warn(
               `No projects with rule files found in ${options.baseDir}`,
             );
-            return 0;
+            process.exit(0);
           }
 
           logger.log(`Found ${projects.length} projects to synchronize:`);
@@ -90,10 +97,13 @@ export async function main(argv: string[]) {
           // Validate all project paths
           await validateProjects(projectPaths);
 
-          projects = projectPaths.map((projectPath) => ({
-            name: path.basename(projectPath),
-            path: path.resolve(projectPath),
-          }));
+          projects = projectPaths.map((projectPath) => {
+            const resolvedPath = path.resolve(projectPath);
+            return {
+              name: path.basename(resolvedPath),
+              path: resolvedPath,
+            };
+          });
 
           logger.log("Projects to synchronize:");
           projects.forEach((project) => {
@@ -171,10 +181,20 @@ export async function executeUnifiedSync(
   const syncActions = await getUserConfirmations(
     globalFileStates,
     multiSyncOptions,
+    projects,
   );
 
   if (syncActions.length === 0) {
     logger.log("No synchronization needed - all files are already up to date.");
+
+    // Still generate CLAUDE.md if requested, even when no sync is needed
+    const shouldGenerateClaude = options.generateClaude !== false;
+    if (shouldGenerateClaude) {
+      logger.log("\nStarting CLAUDE.md generation for all projects...");
+      const genExitCode = await executeClaudeGeneration(projects, options);
+      return genExitCode;
+    }
+
     return 0;
   }
 
@@ -218,11 +238,22 @@ export async function executeUnifiedSync(
       `\n⚠️  Synchronization complete with ${result.errors} errors detected.`,
     );
     logger.warn("Please review the affected files and resolve any issues.");
-    return 1;
   } else {
     logger.log("\n✅ Synchronization completed successfully!");
-    return 0;
   }
+
+  // Generate CLAUDE.md if flag is set (regardless of sync success/failure)
+  let exitCode = result.errors > 0 ? 1 : 0;
+  // Default to true if not explicitly set to false
+  const shouldGenerateClaude = options.generateClaude !== false;
+  if (shouldGenerateClaude) {
+    logger.log("\nStarting CLAUDE.md generation for all projects...");
+    const genExitCode = await executeClaudeGeneration(projects, options);
+    // Use Math.max to preserve the highest exit code (1 = error, 0 = success)
+    exitCode = Math.max(exitCode, genExitCode);
+  }
+
+  return exitCode;
 }
 
 /**
@@ -328,9 +359,24 @@ async function executeAdd(
 
   const targetPath = path.join(targetProjectPath, action.relativePath);
 
-  logger.log(
-    `${options.dryRun ? "[DRY RUN] Would add" : "Adding"}: ${action.relativePath} to ${action.targetProject} from ${action.sourceProject}`,
-  );
+  // Check if file already exists
+  let fileExists = false;
+  try {
+    await fs.access(targetPath);
+    fileExists = true;
+  } catch {
+    // File doesn't exist, which is expected
+  }
+
+  if (fileExists) {
+    logger.warn(
+      `⚠️  ${options.dryRun ? "[DRY RUN] Would overwrite" : "Overwriting"} existing file: ${action.relativePath} in ${action.targetProject}`,
+    );
+  } else {
+    logger.log(
+      `${options.dryRun ? "[DRY RUN] Would add" : "Adding"}: ${action.relativePath} to ${action.targetProject} from ${action.sourceProject}`,
+    );
+  }
 
   if (!options.dryRun) {
     const destDir = path.dirname(targetPath);
@@ -358,4 +404,78 @@ async function executeDelete(
   if (!options.dryRun) {
     await fs.unlink(action.targetFile.absolutePath);
   }
+}
+
+/**
+ * Executes CLAUDE.md generation for projects.
+ */
+async function executeClaudeGeneration(
+  projects: ProjectInfo[],
+  options: any,
+): Promise<number> {
+  const genOptions: MultiSyncOptions = {
+    rulePatterns: options.rules,
+    excludePatterns: options.exclude,
+    dryRun: options.dryRun || false,
+    autoConfirm: options.autoConfirm || false,
+    baseDir: options.baseDir,
+  };
+
+  logger.log(`\nGenerating CLAUDE.md for ${projects.length} projects...`);
+
+  let successes = 0,
+    skips = 0,
+    errors = 0;
+
+  for (const project of projects) {
+    try {
+      // In dry-run mode, wrap generateClaudeMd in try-catch to handle permission errors gracefully
+      let content: string;
+      if (genOptions.dryRun) {
+        try {
+          content = await generateClaudeMd(project.path, genOptions);
+        } catch (genErr) {
+          // In dry-run mode, if we can't read files due to permissions, simulate success
+          logger.warn(
+            `[DRY RUN] Cannot read files in ${project.name} (${genErr instanceof Error ? genErr.message : String(genErr)}), but would generate CLAUDE.md`,
+          );
+          successes++;
+          continue;
+        }
+        logger.log(
+          `[DRY RUN] Would generate CLAUDE.md for ${project.name}:\n${content.slice(0, 200)}...`,
+        );
+        successes++;
+        continue;
+      }
+
+      // Normal mode - let errors propagate to outer catch
+      content = await generateClaudeMd(project.path, genOptions);
+
+      if (!options.autoConfirm) {
+        const { confirm } = await import("./utils/prompts.ts");
+        const proceed = await confirm(
+          `Generate CLAUDE.md for ${project.name}?`,
+        );
+        if (!proceed) {
+          logger.log(`Skipped ${project.name}`);
+          skips++;
+          continue;
+        }
+      }
+
+      const outputPath = path.join(project.path, "CLAUDE.md");
+      await fs.writeFile(outputPath, content);
+      logger.log(`Generated CLAUDE.md in ${project.name}`);
+      successes++;
+    } catch (err) {
+      logger.error(`Error generating for ${project.name}:`, err);
+      errors++;
+    }
+  }
+
+  logger.log(
+    `\nGeneration Summary: ${successes} generated, ${skips} skipped, ${errors} errors`,
+  );
+  return errors > 0 ? 1 : 0;
 }

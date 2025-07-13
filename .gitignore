@@ -138,6 +138,9 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+# Claude Code
+CLAUDE.md
+
 # Kilo Code agent rules
 .kilocode/rules/**
 # excluding memory bank

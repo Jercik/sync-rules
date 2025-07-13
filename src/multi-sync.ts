@@ -86,6 +86,7 @@ export async function scanAllProjects(
     try {
       const files = await scan({
         projectDir: project.path,
+        projectName: project.name, // Pass project name for logging
         rulePatterns: options.rulePatterns,
         excludePatterns: options.excludePatterns,
       });
@@ -202,18 +203,20 @@ export async function scanAllProjects(
  *
  * @param fileStates Map of global file states
  * @param options Sync options
+ * @param projects Array of project information
  * @returns Array of confirmed sync actions
  */
 export async function getUserConfirmations(
   fileStates: Map<string, GlobalFileState>,
   options: MultiSyncOptions,
+  projects: ProjectInfo[],
 ): Promise<SyncAction[]> {
   const actions: SyncAction[] = [];
   let fileIndex = 1;
 
   if (options.autoConfirm || options.dryRun) {
     // Auto-confirm mode or dry-run: use newest version for all
-    return generateAutoConfirmedActions(fileStates);
+    return generateAutoConfirmedActions(fileStates, projects);
   }
   // Filter out files that are identical across all projects
   const filesToReview = Array.from(fileStates.values()).filter(
@@ -226,6 +229,7 @@ export async function getUserConfirmations(
   logger.log("═".repeat(60));
 
   for (const fileState of filesToReview) {
+    // Log file header
     logger.log(`\n${fileIndex}. FILE: ${fileState.relativePath}`);
     fileIndex++;
 
@@ -235,24 +239,43 @@ export async function getUserConfirmations(
         (v) => v.lastModified < fileState.newestVersion!.lastModified,
       );
 
-      if (versions.length > 1 && !fileState.allIdentical) {
-        logger.log(
-          `   ├─ Newest:  ${fileState.newestVersion.projectName} (modified ${formatTime(fileState.newestVersion.lastModified, true)})`,
+      // Log versions, grouped by hash if multiple
+      if (versions.length > 1) {
+        // Group by hash
+        const groups = new Map<
+          string,
+          { projects: string[]; newestInGroup: FileVersion }
+        >();
+        for (const version of versions) {
+          const hash = version.fileInfo.hash || "";
+          if (!groups.has(hash)) {
+            groups.set(hash, { projects: [], newestInGroup: version });
+          }
+          const group = groups.get(hash)!;
+          group.projects.push(version.projectName);
+          if (version.lastModified > group.newestInGroup.lastModified) {
+            group.newestInGroup = version;
+          }
+        }
+
+        // Sort groups by newest timestamp descending
+        const sortedGroups = Array.from(groups.values()).sort(
+          (a, b) =>
+            b.newestInGroup.lastModified.getTime() -
+            a.newestInGroup.lastModified.getTime(),
         );
 
-        outdatedVersions.forEach((version) => {
-          logger.log(
-            `   ├─ Outdated: ${version.projectName} (modified ${formatTime(version.lastModified, true)})`,
-          );
+        // Log groups
+        sortedGroups.forEach((group, index) => {
+          const prefix = index === 0 ? "├─" : "├─";
+          const versionLabel = `Version ${index + 1} (newest in ${group.newestInGroup.projectName} at ${formatTime(group.newestInGroup.lastModified, true)}): ${group.projects.join(", ")}`;
+          logger.log(`   ${prefix} ${versionLabel}`);
         });
-      } else if (fileState.allIdentical && fileState.missingFrom.length > 0) {
-        logger.log(
-          `   ├─ Content identical in: ${Array.from(fileState.versions.keys()).join(", ")}`,
-        );
-      } else {
+      } else if (fileState.newestVersion) {
         logger.log(`   └─ Only in: ${fileState.newestVersion.projectName}`);
       }
 
+      // Log missing if any
       if (fileState.missingFrom.length > 0) {
         logger.log(`   └─ Missing from: ${fileState.missingFrom.join(", ")}`);
       }
@@ -308,19 +331,76 @@ async function promptUserForFileDecision(
     }
   }
 
-  // If file has multiple versions with different content, ask user to choose
-  if (fileState.versions.size > 1 && !fileState.allIdentical) {
-    const projects = Array.from(fileState.versions.keys());
+  // If file exists in multiple projects and all identical, but missing from some, prompt to add or delete
+  if (
+    fileState.versions.size > 1 &&
+    fileState.allIdentical &&
+    fileState.missingFrom.length > 0
+  ) {
+    const sourceProject = fileState.newestVersion!.projectName;
 
     const options = [
       {
-        label: `Use newest version (from ${fileState.newestVersion?.projectName})`,
-        value: "use-newest" as const,
+        label: `Add to ${fileState.missingFrom.length} missing project(s) using version from ${sourceProject}`,
+        value: "add" as const,
       },
-      ...projects.map((project) => ({
-        label: `Use version from ${project}`,
-        value: `use-${project}` as const,
-      })),
+      {
+        label: `Delete from all ${fileState.versions.size} projects that have it`,
+        value: "delete-all" as const,
+      },
+      { label: "Skip this file", value: "skip" as const },
+    ];
+
+    const choice = await select(
+      `File ${fileState.relativePath} is identical in ${fileState.versions.size} projects but missing from ${fileState.missingFrom.length}. What should be done?`,
+      options,
+    );
+
+    if (choice === "add") {
+      return { action: "use-newest", confirmed: true };
+    } else if (choice === "delete-all") {
+      return { action: "delete-all", confirmed: true };
+    } else {
+      logger.log(`Skipping file: ${fileState.relativePath}`);
+      return { action: "skip", confirmed: true };
+    }
+  }
+
+  // If file has multiple versions with different content, ask user to choose
+  if (fileState.versions.size > 1 && !fileState.allIdentical) {
+    // Group by hash
+    const groups = new Map<
+      string,
+      { projects: string[]; newestInGroup: FileVersion }
+    >();
+    const versions = Array.from(fileState.versions.values());
+    for (const version of versions) {
+      const hash = version.fileInfo.hash || "";
+      if (!groups.has(hash)) {
+        groups.set(hash, { projects: [], newestInGroup: version });
+      }
+      const group = groups.get(hash)!;
+      group.projects.push(version.projectName);
+      if (version.lastModified > group.newestInGroup.lastModified) {
+        group.newestInGroup = version;
+      }
+    }
+
+    // Sort groups by newest timestamp in group (descending)
+    const sortedGroups = Array.from(groups.values()).sort(
+      (a, b) =>
+        b.newestInGroup.lastModified.getTime() -
+        a.newestInGroup.lastModified.getTime(),
+    );
+
+    // Build options for unique groups
+    const versionOptions = sortedGroups.map((group, index) => ({
+      label: `Use version ${index + 1} (from ${group.newestInGroup.projectName}, used in ${group.projects.length} project${group.projects.length > 1 ? "s" : ""})`,
+      value: `use-group-${index}` as const,
+    }));
+
+    const options = [
+      ...versionOptions,
       { label: "Delete from all projects", value: "delete-all" as const },
       { label: "Skip this file", value: "skip" as const },
     ];
@@ -329,18 +409,21 @@ async function promptUserForFileDecision(
       `Different versions found for ${fileState.relativePath}. Which version should be used?`,
       options,
     );
+
     if (choice === "skip") {
       logger.log(`Skipping file: ${fileState.relativePath}`);
       return { action: "skip", confirmed: true };
-    } else if (choice === "use-newest") {
-      return { action: "use-newest", confirmed: true };
     } else if (choice === "delete-all") {
       return { action: "delete-all", confirmed: true };
-    } else if (choice.startsWith("use-")) {
-      const sourceProject = choice.replace("use-", "");
+    } else if (choice.startsWith("use-group-")) {
+      const groupIndex = parseInt(choice.replace("use-group-", ""), 10);
+      const selectedGroup = sortedGroups[groupIndex];
+      if (!selectedGroup) {
+        throw new Error(`Invalid group index: ${groupIndex}`);
+      }
       return {
         action: "use-specific",
-        sourceProject,
+        sourceProject: selectedGroup.newestInGroup.projectName,
         confirmed: true,
       };
     }
@@ -360,12 +443,19 @@ async function promptUserForFileDecision(
  * - Never creates delete actions (deletions require manual confirmation)
  *
  * @param fileStates Map of global file states
+ * @param projects Array of project information for checking existing files
  * @returns Array of sync actions to be executed
  */
-function generateAutoConfirmedActions(
+async function generateAutoConfirmedActions(
   fileStates: Map<string, GlobalFileState>,
-): SyncAction[] {
+  projects: ProjectInfo[],
+): Promise<SyncAction[]> {
   const actions: SyncAction[] = [];
+  const additionsWarning: string[] = [];
+  const overwriteWarnings: string[] = [];
+
+  // Create project lookup map
+  const projectMap = new Map(projects.map((p) => [p.name, p.path]));
 
   for (const fileState of fileStates.values()) {
     // Skip files that are identical across all projects
@@ -374,7 +464,54 @@ function generateAutoConfirmedActions(
     }
 
     const fileActions = generateActionsForFile(fileState, "use-newest");
+    
+    // Check for potential overwrites in add actions
+    for (const action of fileActions) {
+      if (action.type === "add") {
+        const targetProjectPath = projectMap.get(action.targetProject);
+        if (targetProjectPath) {
+          const targetPath = path.join(targetProjectPath, action.relativePath);
+          try {
+            await fs.access(targetPath);
+            // File exists, this would be an overwrite
+            overwriteWarnings.push(
+              `  - ${action.relativePath} in ${action.targetProject} (file already exists!)`
+            );
+          } catch {
+            // File doesn't exist, safe to add
+          }
+        }
+      }
+    }
+    
     actions.push(...fileActions);
+    
+    // Track files that will be added to projects
+    const addActions = fileActions.filter(a => a.type === "add");
+    if (addActions.length > 0) {
+      additionsWarning.push(
+        `  - ${fileState.relativePath} will be added to ${addActions.length} project(s)`
+      );
+    }
+  }
+
+  // Warn about additions and potential overwrites in auto-confirm mode
+  if (overwriteWarnings.length > 0) {
+    logger.warn("\n⚠️  WARNING: Auto-confirm will OVERWRITE the following existing files:");
+    overwriteWarnings.forEach(msg => logger.warn(msg));
+    logger.warn("\nThese files already exist and will be replaced with versions from other projects!");
+  }
+  
+  if (additionsWarning.length > 0) {
+    logger.warn("\n⚠️  Auto-confirm will add the following files to projects:");
+    additionsWarning.forEach(msg => logger.warn(msg));
+    
+    if (overwriteWarnings.length === 0) {
+      logger.warn("\nNote: Use --dry-run first to preview changes, or use interactive mode for more control.");
+    } else {
+      logger.warn("\nSTRONGLY RECOMMENDED: Use --dry-run first or use interactive mode to review these changes!");
+    }
+    logger.warn("");
   }
 
   return actions;

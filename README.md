@@ -16,7 +16,6 @@ A utility to synchronize AI coding assistant rule files seamlessly between proje
 Make sure you have the following installed:
 
 - **Node.js**: v23.6 or later (required for native TypeScript execution)
-- **Git**: v2.37 or later
 
 ### Installation
 
@@ -72,7 +71,7 @@ sync-rules ./project-a ./project-b --verbose
 Specify custom rule directories or patterns:
 
 ```bash
-sync-rules ./src ./dst --rules .myRules .customRules "config/*.json"
+sync-rules ./src ./dst --rules .myRules.md .customRules.md "config/*.md"
 ```
 
 ### Non-Interactive Mode (Auto-Confirm)
@@ -108,8 +107,8 @@ Files matching the `*.local.*` pattern are automatically recognized as project-s
 ```bash
 # Example local files that won't be synced:
 .clinerules/custom.local.md        # Project-specific markdown rules
-.kilocode/config.local.json        # Local configuration
-.cursorrules.local                 # Local cursor rules file
+.kilocode/config.local.md          # Local configuration
+.cursorrules.local.md              # Local cursor rules file
 ```
 
 Local files are:
@@ -125,6 +124,17 @@ This is useful for:
 - Project-specific coding standards
 - Temporary or experimental rules
 - Client-specific customizations
+
+### CLAUDE.md Generation
+
+After a successful sync, the tool can automatically generate a `CLAUDE.md` file in each project by concatenating all rule files into a single Markdown document. This is useful for sharing or reviewing rules in one place.
+
+- `--generate-claude` (default: true): Enable generation after sync
+- `--no-generate-claude`: Skip generation
+
+In interactive mode, you'll be prompted per project. Use `--auto-confirm` to generate without prompts. Generation respects `--dry-run` and skips if sync fails.
+
+> **⚠️ Important**: CLAUDE.md is auto-generated and will be overwritten on each regeneration. Any manual edits to CLAUDE.md will be lost. Always edit the source rule files instead.
 
 ## Interactive Decision Making
 
@@ -169,9 +179,11 @@ The tool performs the following actions:
 
 By default, these rule files are included:
 
-- `.clinerules`
-- `.cursorrules`
-- `.kilocode` (matches a file or directory named `.kilocode`. If it's a directory, all nested files and folders are included recursively)
+- `.clinerules.md`
+- `.cursorrules.md`
+- `.kilocode` (directory - searches for all `.md` files recursively)
+
+**Note:** The tool only processes `.md` files for consistency and to focus on Markdown-based rules.
 
 ### Excluded Patterns
 
@@ -180,7 +192,6 @@ These patterns are excluded from synchronization by default:
 - `memory-bank`
 - `node_modules`
 - `.git`
-- `.DS_Store`
 
 ## Exit Codes
 

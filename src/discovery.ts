@@ -3,7 +3,7 @@ import fg from "fast-glob";
 import path from "node:path";
 import { homedir } from "node:os";
 import * as logger from "./utils/core.ts";
-import { normalizePath } from "./utils/core.ts";
+import { normalizePath, validatePathSecurity } from "./utils/core.ts";
 
 /**
  * Represents a discovered project directory.
@@ -26,7 +26,7 @@ export interface ProjectInfo {
  */
 export async function discoverProjects(
   baseDir: string = path.join(homedir(), "Developer"),
-  rulePatterns: string[] = [".clinerules", ".cursorrules", ".kilocode"],
+  rulePatterns: string[] = [".clinerules.md", ".cursorrules.md", ".kilocode"],
   excludePatterns: string[] = ["node_modules", ".git", "dist", "build"],
 ): Promise<ProjectInfo[]> {
   logger.log(`Discovering projects in: ${baseDir}`);
@@ -141,6 +141,7 @@ export async function discoverProjects(
 
 /**
  * Checks if a directory contains any rule files matching the patterns.
+ * Respects the .md constraint to match scan behavior.
  *
  * @param dirPath The directory path to check
  * @param rulePatterns Array of rule patterns to look for
@@ -151,27 +152,47 @@ async function hasRuleFiles(
   rulePatterns: string[],
 ): Promise<boolean> {
   try {
+    // Build effective patterns that only match .md files
+    const effectivePatterns: string[] = [];
+    
     for (const pattern of rulePatterns) {
-      if (!pattern.includes("*")) {
+      if (pattern.endsWith(".md")) {
+        // Already .md file
+        effectivePatterns.push(pattern);
+      } else if (!pattern.includes("*") && !pattern.includes("/")) {
+        // Check if it's a directory
         try {
           const stats = await fs.stat(path.join(dirPath, pattern));
-          if (stats.isFile() || stats.isDirectory()) {
-            return true;
+          if (stats.isDirectory()) {
+            // Directory pattern - search for .md files recursively
+            effectivePatterns.push(`${pattern}/**/*.md`);
+          } else if (stats.isFile() && pattern.endsWith(".md")) {
+            effectivePatterns.push(pattern);
           }
         } catch (e) {
-          // ignore error
+          // If stat fails, treat as a file pattern
+          if (pattern.endsWith(".md")) {
+            effectivePatterns.push(pattern);
+          }
         }
+      } else if (pattern.includes("*") && pattern.endsWith(".md")) {
+        // Glob pattern already ending in .md
+        effectivePatterns.push(pattern);
       }
     }
 
-    const entries = await fg(rulePatterns, {
+    if (effectivePatterns.length === 0) {
+      return false;
+    }
+
+    const entries = await fg(effectivePatterns, {
       cwd: dirPath,
       dot: true,
       onlyFiles: true,
       absolute: false,
       stats: false,
       followSymbolicLinks: false,
-      deep: 2, // Limit depth to avoid deep scans in node_modules etc.
+      deep: Infinity, // Match scan.ts behavior for consistency
     });
 
     return entries.length > 0;
@@ -186,13 +207,34 @@ async function hasRuleFiles(
 }
 /**
  * Validates that all provided project paths exist and are directories.
+ * Also validates against path traversal attacks.
  *
  * @param projectPaths Array of project paths to validate
- * @throws Error if any project path is invalid
+ * @param baseDir Optional base directory for path traversal validation
+ * @throws Error if any project path is invalid or attempts path traversal
  */
-export async function validateProjects(projectPaths: string[]): Promise<void> {
+export async function validateProjects(
+  projectPaths: string[], 
+  baseDir?: string
+): Promise<void> {
   for (const projectPath of projectPaths) {
-    const normalizedPath = normalizePath(projectPath);
+    let normalizedPath: string;
+    
+    try {
+      if (baseDir) {
+        // Validate path security when base directory is provided
+        normalizedPath = validatePathSecurity(projectPath, baseDir);
+      } else {
+        // For absolute paths, just normalize
+        normalizedPath = normalizePath(projectPath);
+      }
+    } catch (error) {
+      throw new Error(
+        `Invalid project path: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
 
     try {
       const stat = await fs.stat(normalizedPath);

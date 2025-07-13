@@ -82,6 +82,87 @@ export async function runCLIWithInput(
   return runCLI(args, { ...options, input });
 }
 
+/**
+ * Runs the CLI with interactive prompt handling.
+ * Waits for each prompt pattern before sending the corresponding input.
+ */
+export async function runCLIInteractive(
+  args: string[],
+  interactions: Array<{ waitFor: string; input: string }>,
+  options: CLIOptions = {},
+): Promise<CLIResult> {
+  const cliPath = path.join(process.cwd(), "bin", "sync-rules.ts");
+
+  return new Promise((resolve, reject) => {
+    const env = {
+      ...process.env,
+      ...options.env,
+      FORCE_COLOR: "0",
+      NO_COLOR: "1",
+    };
+
+    const child = spawn("node", [cliPath, ...args], {
+      cwd: options.cwd || process.cwd(),
+      env,
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let interactionIndex = 0;
+    let buffer = "";
+
+    const checkForPrompt = () => {
+      if (interactionIndex >= interactions.length) return;
+      
+      const currentInteraction = interactions[interactionIndex];
+      const combinedOutput = stdout + stderr + buffer;
+      
+      if (combinedOutput.toLowerCase().includes(currentInteraction.waitFor.toLowerCase())) {
+        // Found the prompt, send the input
+        child.stdin.write(currentInteraction.input + "\n");
+        interactionIndex++;
+        buffer = ""; // Reset buffer after finding prompt
+      }
+    };
+
+    child.stdout.on("data", (data) => {
+      const text = data.toString();
+      stdout += text;
+      buffer += text;
+      checkForPrompt();
+    });
+
+    child.stderr.on("data", (data) => {
+      const text = data.toString();
+      stderr += text;
+      buffer += text;
+      checkForPrompt();
+    });
+
+    const timeoutId = options.timeout
+      ? setTimeout(() => {
+          child.kill();
+          reject(new Error("CLI command timed out"));
+        }, options.timeout)
+      : null;
+
+    child.on("close", (code) => {
+      if (timeoutId) clearTimeout(timeoutId);
+
+      resolve({
+        stdout,
+        stderr,
+        exitCode: code || 0,
+      });
+    });
+
+    child.on("error", (err) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      reject(err);
+    });
+  });
+}
+
 export function expectSuccess(result: CLIResult): void {
   if (result.exitCode !== 0) {
     throw new Error(

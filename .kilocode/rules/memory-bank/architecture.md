@@ -17,7 +17,7 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
   - Early validation prevents downstream errors
   - Commander.js provides robust argument handling
   - Configurable exclusion patterns via `--exclude` option
-  - Sensible default exclusions (memory-bank, node_modules, .git, .DS_Store)
+  - Sensible default exclusions (memory-bank, node_modules, .git, CLAUDE.md)
   - Clear exit codes communicate results (0=success, 1=errors, 2=fatal error)
   - Interactive confirmation prompts for user decisions
 
@@ -25,42 +25,95 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
 
 - **Responsibility**: File discovery and content hashing for a single project
 - **Key Patterns**:
-  - Serial hashing for simplicity
+  - **Global .md constraint**: Only markdown files are processed, eliminating system file issues
+  - **Warning system**: Alerts users when non-.md patterns are specified
+  - **Pattern transformation**: Smart conversion of patterns to .md-only equivalents
+  - Serial hashing for simplicity and reliability
   - Glob pattern expansion for flexible file matching
-  - Configurable exclusion patterns with sensible defaults
-  - Pattern processing for comprehensive directory exclusion
+  - Local file detection (*.local.* pattern) for project-specific exclusions
   - Graceful error handling for individual file failures
 
 ### 3. Multi-Sync Layer (`multi-sync.ts`)
 
 - **Responsibility**: Multi-project synchronization orchestration
 - **Key Patterns**:
-  - Content-based comparison using SHA-1 hashes
-  - Automatic skip for files with identical content across all projects
-  - Interactive user prompts for file decisions
-  - Support for project-specific local files (_.local._ pattern)
+  - **Content-based comparison**: SHA-1 hashes for reliable difference detection
+  - **Automatic skip**: Files with identical content across all projects
+  - **Interactive prompts**: Multiple decision options (newest, specific version, delete-all, skip)
+  - **Auto-confirm mode**: Deterministic newest-file selection, never deletes
+  - **Local file support**: Project-specific *.local.* files automatically excluded
+  - **Delete-all option**: User can choose to remove files from all projects
 
-### 5. Utilities (`utils/`)
+### 4. Generate Claude Layer (`generate-claude.ts`)
 
-- **Core utilities** (`core.ts`): Logging, hashing, file operations
+- **Responsibility**: Generate CLAUDE.md by concatenating all rule files
+- **Key Patterns**:
+  - **Minimal concatenation**: trim + \n\n between files, no added headers
+  - **File-internal structure**: Relies on existing headers within each file
+  - **Global .md constraint**: Consistent with scanning layer
+  - **Pattern respect**: Uses same inclusion/exclusion logic as sync
+  - **Interactive/auto modes**: Prompts per project or auto-generates based on flags
+  - **Auto-generated file**: Always overwrites existing CLAUDE.md, manual edits will be lost
+  - **Clear warnings**: Generated file includes prominent warning about manual edits
+
+### 5. Discovery Layer (`discovery.ts`)
+
+- **Responsibility**: Auto-discover projects with rule files in directory trees
+- **Key Patterns**:
+  - **Smart detection**: Uses same .md constraint as scanning
+  - **Pattern matching**: Supports custom rule patterns for discovery
+  - **Exclusion handling**: Respects common exclusions (node_modules, .git)
+
+### 6. Utilities (`utils/`)
+
+- **Core utilities** (`core.ts`): 
+  - Logging, hashing, file operations, path normalization
+  - **NEW**: Shared pattern transformation logic (`generateEffectiveMdPatterns`)
+  - **NEW**: Post-processing filter (`filterMdFiles`) for additional safety
+  - **NEW**: Path security validation (`validatePathSecurity`) preventing traversal attacks
 - **Prompt utilities** (`prompts.ts`): Interactive user input handling (confirm, select, input)
+- **Formatters** (`formatters.ts`): Time formatting for user-friendly output
+
+### 7. Test Infrastructure (`tests/`)
+
+- **Test Helpers** (`helpers/cli-runner.ts`): CLI spawning with input simulation
+  - `runCLI()`: Basic command execution with args
+  - `runCLIWithInput()`: Simulates interactive user input via stdin
+  - **NEW**: `runCLIInteractive()`: Handles sequential prompts by waiting for specific text
+  - Case-insensitive output assertions for cross-platform compatibility
+- **All tests passing**: Previously skipped interactive CLAUDE.md generation tests now work
+  - Fixed bug where CLAUDE.md generation was skipped when no sync needed
+  - New interactive runner properly handles dual-prompt scenarios
 
 ## Data Flow
 
-1. **Input Processing**: CLI validates directories and patterns
-2. **File Discovery**: Parallel scanning of source and target directories
-3. **Content Analysis**: SHA-1 hashing for change detection
-4. **Action Planning**: Determine copy/add/delete/skip operations based on user decisions. This includes an option to delete a file from all projects.
-5. **Execution**: Perform file operations (copy, delete) based on the approved plan
+1. **Input Processing**: CLI validates directories and patterns, applies .md constraints and security checks
+2. **File Discovery**: Parallel scanning of all project directories with .md filtering
+3. **Content Analysis**: SHA-1 hashing for reliable change detection
+4. **Decision Making**: Interactive prompts or auto-confirm logic for conflict resolution
+5. **Action Planning**: Determine copy/add/delete/skip operations based on user decisions
+6. **Execution**: Perform file operations (copy, delete) based on the approved plan
+7. **CLAUDE.md Generation**: Optional concatenation of all rule files post-sync
 
 ## Key Design Decisions
 
 ### Conflict Resolution Strategy
 
-The tool does not merge file contents. Instead, it resolves conflicts by designating one version of a file as the "source of truth," which then overwrites all other versions. The method for choosing the source of truth depends on the mode:
+The tool does not merge file contents. Instead, it resolves conflicts by designating one version of a file as the "source of truth," which then overwrites all other versions.
 
-- **Interactive Mode (Default)**: The user is prompted to choose the source of truth. Options include selecting the newest version (by modification date), picking a version from a specific project, or deleting the file from all projects.
-- **Non-Interactive Mode (`--auto-confirm`)**: The tool automatically selects the file with the most recent modification timestamp as the source of truth. It will _never_ delete a file in this mode.
+**Interactive Mode (Default)**:
+- User prompted with multiple options:
+  - Use newest version (by modification date)
+  - Use version from specific project
+  - Delete file from all projects
+  - Skip (leave as-is)
+- Clear prompts show file paths, dates, and content previews
+
+**Non-Interactive Mode (`--auto-confirm`)**:
+- Automatically selects file with most recent modification timestamp
+- **Never deletes files** - only copies/updates
+- Deterministic behavior for automated workflows
+- Logs decisions for transparency
 
 ### Error Handling Philosophy
 
@@ -70,9 +123,11 @@ The tool does not merge file contents. Instead, it resolves conflicts by designa
 
 ### File Safety
 
-- **Never Delete**: Preserve all existing files in target
-- **Dry Run Support**: Preview changes before execution
-- **Backup Strategy**: Rely on user's existing version control
+- **Controlled Deletion**: Only in interactive mode with explicit user choice
+- **Auto-confirm safety**: Never deletes files in automated mode
+- **Dry Run Support**: Preview all changes before execution with `--dry-run`
+- **Local file preservation**: *.local.* files never synced or deleted
+- **Backup Strategy**: Rely on user's existing version control (Git recommended)
 
 ## Performance Considerations
 

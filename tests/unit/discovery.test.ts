@@ -36,8 +36,8 @@ describe("discoverProjects", () => {
     await fs.mkdir(project3, { recursive: true });
 
     // Only project1 and project3 have rule files
-    await createFile(path.join(project1, ".clinerules"), "rule content");
-    await createFile(path.join(project3, ".cursorrules"), "cursor rules");
+    await createFile(path.join(project1, ".clinerules.md"), "rule content");
+    await createFile(path.join(project3, ".cursorrules.md"), "cursor rules");
 
     const projects = await discoverProjects(baseDir);
 
@@ -69,9 +69,9 @@ describe("discoverProjects", () => {
   it("should use custom rule patterns", async () => {
     const project1 = path.join(baseDir, "project1");
     await fs.mkdir(project1, { recursive: true });
-    await createFile(path.join(project1, "custom.rules"), "custom rules");
+    await createFile(path.join(project1, "custom.rules.md"), "custom rules");
 
-    const projects = await discoverProjects(baseDir, ["custom.rules"]);
+    const projects = await discoverProjects(baseDir, ["custom.rules.md"]);
 
     expect(projects).toHaveLength(1);
     expect(projects[0].name).toBe("project1");
@@ -80,13 +80,13 @@ describe("discoverProjects", () => {
   it("should discover projects using complex glob patterns", async () => {
     const project1 = path.join(baseDir, "project1");
     await fs.mkdir(project1, { recursive: true });
-    await createFile(path.join(project1, "project.rule"), "custom rules");
+    await createFile(path.join(project1, "project.rule.md"), "custom rules");
 
     const project2 = path.join(baseDir, "project2");
     await fs.mkdir(project2, { recursive: true });
-    await createFile(path.join(project2, "project.rules"), "more custom rules");
+    await createFile(path.join(project2, "project.rules.md"), "more custom rules");
 
-    const projects = await discoverProjects(baseDir, ["**/*.{rule,rules}"]);
+    const projects = await discoverProjects(baseDir, ["**/*.rule.md", "**/*.rules.md"]);
 
     expect(projects.map((p) => p.name).sort()).toEqual([
       "project1",
@@ -97,7 +97,7 @@ describe("discoverProjects", () => {
   it("should discover rules in hidden directories", async () => {
     const project1 = path.join(baseDir, ".hidden-project");
     await fs.mkdir(project1, { recursive: true });
-    await createFile(path.join(project1, ".clinerules"), "hidden rules");
+    await createFile(path.join(project1, ".clinerules.md"), "hidden rules");
 
     const projects = await discoverProjects(baseDir);
 
@@ -110,8 +110,8 @@ describe("discoverProjects", () => {
     await fs.mkdir(project1, { recursive: true });
     await fs.mkdir(nodeModules, { recursive: true });
 
-    await createFile(path.join(project1, ".clinerules"), "rules");
-    await createFile(path.join(nodeModules, ".clinerules"), "rules");
+    await createFile(path.join(project1, ".clinerules.md"), "rules");
+    await createFile(path.join(nodeModules, ".clinerules.md"), "rules");
 
     const projects = await discoverProjects(baseDir);
 
@@ -130,15 +130,15 @@ describe("discoverProjects", () => {
     await fs.mkdir(buildProject, { recursive: true });
     await fs.mkdir(normalProject, { recursive: true });
 
-    await createFile(path.join(project1, ".clinerules"), "rules");
-    await createFile(path.join(tempProject, ".clinerules"), "rules");
-    await createFile(path.join(buildProject, ".clinerules"), "rules");
-    await createFile(path.join(normalProject, ".clinerules"), "rules");
+    await createFile(path.join(project1, ".clinerules.md"), "rules");
+    await createFile(path.join(tempProject, ".clinerules.md"), "rules");
+    await createFile(path.join(buildProject, ".clinerules.md"), "rules");
+    await createFile(path.join(normalProject, ".clinerules.md"), "rules");
 
     // Exclude directories matching patterns
     const projects = await discoverProjects(
       baseDir,
-      [".clinerules"],
+      [".clinerules.md"],
       ["temp*", "build-*"],
     );
 
@@ -156,15 +156,15 @@ describe("discoverProjects", () => {
     await fs.mkdir(prodProject, { recursive: true });
     await fs.mkdir(otherProject, { recursive: true });
 
-    await createFile(path.join(devProject, ".clinerules"), "rules");
-    await createFile(path.join(testProject, ".clinerules"), "rules");
-    await createFile(path.join(prodProject, ".clinerules"), "rules");
-    await createFile(path.join(otherProject, ".clinerules"), "rules");
+    await createFile(path.join(devProject, ".clinerules.md"), "rules");
+    await createFile(path.join(testProject, ".clinerules.md"), "rules");
+    await createFile(path.join(prodProject, ".clinerules.md"), "rules");
+    await createFile(path.join(otherProject, ".clinerules.md"), "rules");
 
     // Exclude projects matching pattern
     const projects = await discoverProjects(
       baseDir,
-      [".clinerules"],
+      [".clinerules.md"],
       ["project-*"],
     );
 
@@ -180,14 +180,14 @@ describe("discoverProjects", () => {
     await fs.mkdir(tempDir2, { recursive: true });
     await fs.mkdir(project1, { recursive: true });
 
-    await createFile(path.join(tempDir1, ".clinerules"), "rules");
-    await createFile(path.join(tempDir2, ".clinerules"), "rules");
-    await createFile(path.join(project1, ".clinerules"), "rules");
+    await createFile(path.join(tempDir1, ".clinerules.md"), "rules");
+    await createFile(path.join(tempDir2, ".clinerules.md"), "rules");
+    await createFile(path.join(project1, ".clinerules.md"), "rules");
 
     // Use **/temp pattern to exclude any directory starting with "temp"
     const projects = await discoverProjects(
       baseDir,
-      [".clinerules"],
+      [".clinerules.md"],
       ["**/temp*"],
     );
 
@@ -224,8 +224,8 @@ describe("discoverProjects", () => {
     const project1 = path.join(baseDir, "project1");
     await fs.mkdir(project1, { recursive: true });
 
-    await createFile(path.join(project1, ".clinerules"), "cline rules");
-    await createFile(path.join(project1, ".cursorrules"), "cursor rules");
+    await createFile(path.join(project1, ".clinerules.md"), "cline rules");
+    await createFile(path.join(project1, ".cursorrules.md"), "cursor rules");
 
     const kilocodeDir = path.join(project1, ".kilocode");
     await fs.mkdir(kilocodeDir, { recursive: true });

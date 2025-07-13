@@ -52,7 +52,7 @@ describe("scanAllProjects", () => {
     ];
 
     options = {
-      rulePatterns: [".clinerules", ".cursorrules"],
+      rulePatterns: [".clinerules.md", ".cursorrules.md"],
       excludePatterns: ["node_modules"],
       dryRun: false,
     };
@@ -64,8 +64,8 @@ describe("scanAllProjects", () => {
     const mockScan = vi.mocked(scan);
 
     // Create test files
-    const file1Path = path.join(projects[0].path, ".clinerules");
-    const file2Path = path.join(projects[1].path, ".clinerules");
+    const file1Path = path.join(projects[0].path, ".clinerules.md");
+    const file2Path = path.join(projects[1].path, ".clinerules.md");
 
     await createFile(file1Path, "rule content 1");
     await createFile(file2Path, "rule content 2");
@@ -75,15 +75,15 @@ describe("scanAllProjects", () => {
       const files = new Map();
 
       if (options.projectDir === projects[0].path) {
-        files.set(".clinerules", {
-          relativePath: ".clinerules",
+        files.set(".clinerules.md", {
+          relativePath: ".clinerules.md",
           absolutePath: file1Path,
           hash: "hash1",
           isLocal: false,
         });
       } else if (options.projectDir === projects[1].path) {
-        files.set(".clinerules", {
-          relativePath: ".clinerules",
+        files.set(".clinerules.md", {
+          relativePath: ".clinerules.md",
           absolutePath: file2Path,
           hash: "hash2",
           isLocal: false,
@@ -96,9 +96,9 @@ describe("scanAllProjects", () => {
     const globalFileStates = await scanAllProjects(projects, options);
 
     expect(globalFileStates.size).toBe(1);
-    expect(globalFileStates.has(".clinerules")).toBe(true);
+    expect(globalFileStates.has(".clinerules.md")).toBe(true);
 
-    const fileState = globalFileStates.get(".clinerules")!;
+    const fileState = globalFileStates.get(".clinerules.md")!;
     expect(fileState.versions.size).toBe(2);
     expect(fileState.versions.has("project1")).toBe(true);
     expect(fileState.versions.has("project2")).toBe(true);
@@ -110,15 +110,15 @@ describe("scanAllProjects", () => {
     const mockScan = vi.mocked(scan);
 
     // Create file only in project1
-    const file1Path = path.join(projects[0].path, ".clinerules");
+    const file1Path = path.join(projects[0].path, ".clinerules.md");
     await createFile(file1Path, "rule content");
 
     mockScan.mockImplementation(async (options) => {
       const files = new Map();
 
       if (options.projectDir === projects[0].path) {
-        files.set(".clinerules", {
-          relativePath: ".clinerules",
+        files.set(".clinerules.md", {
+          relativePath: ".clinerules.md",
           absolutePath: file1Path,
           hash: "hash1",
           isLocal: false,
@@ -132,7 +132,7 @@ describe("scanAllProjects", () => {
 
     expect(globalFileStates.size).toBe(1);
 
-    const fileState = globalFileStates.get(".clinerules")!;
+    const fileState = globalFileStates.get(".clinerules.md")!;
     expect(fileState.versions.size).toBe(1);
     expect(fileState.versions.has("project1")).toBe(true);
     expect(fileState.missingFrom).toEqual(["project2"]);
@@ -171,8 +171,8 @@ describe("scanAllProjects", () => {
     const mockScan = vi.mocked(scan);
 
     // Create files with different modification times
-    const file1Path = path.join(projects[0].path, ".clinerules");
-    const file2Path = path.join(projects[1].path, ".clinerules");
+    const file1Path = path.join(projects[0].path, ".clinerules.md");
+    const file2Path = path.join(projects[1].path, ".clinerules.md");
 
     await createFile(file1Path, "rule content 1");
     await createFile(file2Path, "rule content 2");
@@ -188,15 +188,15 @@ describe("scanAllProjects", () => {
       const files = new Map();
 
       if (options.projectDir === projects[0].path) {
-        files.set(".clinerules", {
-          relativePath: ".clinerules",
+        files.set(".clinerules.md", {
+          relativePath: ".clinerules.md",
           absolutePath: file1Path,
           hash: "hash1",
           isLocal: false,
         });
       } else if (options.projectDir === projects[1].path) {
-        files.set(".clinerules", {
-          relativePath: ".clinerules",
+        files.set(".clinerules.md", {
+          relativePath: ".clinerules.md",
           absolutePath: file2Path,
           hash: "hash2",
           isLocal: false,
@@ -208,7 +208,7 @@ describe("scanAllProjects", () => {
 
     const globalFileStates = await scanAllProjects(projects, options);
 
-    const fileState = globalFileStates.get(".clinerules")!;
+    const fileState = globalFileStates.get(".clinerules.md")!;
     expect(fileState.newestVersion?.projectName).toBe("project2");
   });
 
@@ -217,8 +217,8 @@ describe("scanAllProjects", () => {
     const mockScan = vi.mocked(scan);
 
     // Create identical files
-    const file1Path = path.join(projects[0].path, ".clinerules");
-    const file2Path = path.join(projects[1].path, ".clinerules");
+    const file1Path = path.join(projects[0].path, ".clinerules.md");
+    const file2Path = path.join(projects[1].path, ".clinerules.md");
 
     await createFile(file1Path, "same content");
     await createFile(file2Path, "same content");
@@ -227,15 +227,15 @@ describe("scanAllProjects", () => {
       const files = new Map();
 
       if (options.projectDir === projects[0].path) {
-        files.set(".clinerules", {
-          relativePath: ".clinerules",
+        files.set(".clinerules.md", {
+          relativePath: ".clinerules.md",
           absolutePath: file1Path,
           hash: "samehash",
           isLocal: false,
         });
       } else if (options.projectDir === projects[1].path) {
-        files.set(".clinerules", {
-          relativePath: ".clinerules",
+        files.set(".clinerules.md", {
+          relativePath: ".clinerules.md",
           absolutePath: file2Path,
           hash: "samehash",
           isLocal: false,
@@ -247,7 +247,7 @@ describe("scanAllProjects", () => {
 
     const globalFileStates = await scanAllProjects(projects, options);
 
-    const fileState = globalFileStates.get(".clinerules")!;
+    const fileState = globalFileStates.get(".clinerules.md")!;
     expect(fileState.allIdentical).toBe(true);
   });
 
@@ -256,7 +256,7 @@ describe("scanAllProjects", () => {
     const mockScan = vi.mocked(scan);
 
     // Create the actual file for project2 so stat() can work
-    const file2Path = path.join(projects[1].path, ".clinerules");
+    const file2Path = path.join(projects[1].path, ".clinerules.md");
     await createFile(file2Path, "rule content 2");
 
     // Make first project fail, second succeed
@@ -267,9 +267,9 @@ describe("scanAllProjects", () => {
 
       return new Map([
         [
-          ".clinerules",
+          ".clinerules.md",
           {
-            relativePath: ".clinerules",
+            relativePath: ".clinerules.md",
             absolutePath: file2Path,
             hash: "hash2",
             isLocal: false,
@@ -281,7 +281,7 @@ describe("scanAllProjects", () => {
     const globalFileStates = await scanAllProjects(projects, options);
 
     expect(globalFileStates.size).toBe(1);
-    const fileState = globalFileStates.get(".clinerules")!;
+    const fileState = globalFileStates.get(".clinerules.md")!;
     expect(fileState.versions.size).toBe(1);
     expect(fileState.versions.has("project2")).toBe(true);
     expect(fileState.missingFrom).toEqual(["project1"]);
@@ -303,30 +303,38 @@ describe("scanAllProjects", () => {
 describe("getUserConfirmations", () => {
   let fileStates: Map<string, GlobalFileState>;
   let options: MultiSyncOptions;
+  let projects: ProjectInfo[];
 
   beforeEach(() => {
     options = {
-      rulePatterns: [".clinerules"],
+      rulePatterns: [".clinerules.md"],
       excludePatterns: [],
       dryRun: false,
     };
 
     fileStates = new Map();
+    
+    // Mock projects array
+    projects = [
+      { name: "project1", path: "/path/to/project1" },
+      { name: "project2", path: "/path/to/project2" },
+      { name: "project3", path: "/path/to/project3" },
+    ];
   });
 
   it("should return auto-confirmed actions for dry run", async () => {
     options.dryRun = true;
 
     const fileState: GlobalFileState = {
-      relativePath: ".clinerules",
+      relativePath: ".clinerules.md",
       versions: new Map([
         [
           "project1",
           {
             projectName: "project1",
             fileInfo: {
-              relativePath: ".clinerules",
-              absolutePath: "/path/to/project1/.clinerules",
+              relativePath: ".clinerules.md",
+              absolutePath: "/path/to/project1/.clinerules.md",
               hash: "hash1",
             },
             lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -337,8 +345,8 @@ describe("getUserConfirmations", () => {
       newestVersion: {
         projectName: "project1",
         fileInfo: {
-          relativePath: ".clinerules",
-          absolutePath: "/path/to/project1/.clinerules",
+          relativePath: ".clinerules.md",
+          absolutePath: "/path/to/project1/.clinerules.md",
           hash: "hash1",
         },
         lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -346,9 +354,9 @@ describe("getUserConfirmations", () => {
       allIdentical: false,
     };
 
-    fileStates.set(".clinerules", fileState);
+    fileStates.set(".clinerules.md", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options);
+    const actions = await getUserConfirmations(fileStates, options, projects);
 
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe("add");
@@ -360,15 +368,15 @@ describe("getUserConfirmations", () => {
     options.autoConfirm = true;
 
     const fileState: GlobalFileState = {
-      relativePath: ".clinerules",
+      relativePath: ".clinerules.md",
       versions: new Map([
         [
           "project1",
           {
             projectName: "project1",
             fileInfo: {
-              relativePath: ".clinerules",
-              absolutePath: "/path/to/project1/.clinerules",
+              relativePath: ".clinerules.md",
+              absolutePath: "/path/to/project1/.clinerules.md",
               hash: "hash1",
             },
             lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -379,8 +387,8 @@ describe("getUserConfirmations", () => {
       newestVersion: {
         projectName: "project1",
         fileInfo: {
-          relativePath: ".clinerules",
-          absolutePath: "/path/to/project1/.clinerules",
+          relativePath: ".clinerules.md",
+          absolutePath: "/path/to/project1/.clinerules.md",
           hash: "hash1",
         },
         lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -388,9 +396,9 @@ describe("getUserConfirmations", () => {
       allIdentical: false,
     };
 
-    fileStates.set(".clinerules", fileState);
+    fileStates.set(".clinerules.md", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options);
+    const actions = await getUserConfirmations(fileStates, options, projects);
 
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe("add");
@@ -400,15 +408,15 @@ describe("getUserConfirmations", () => {
 
   it("should skip identical files", async () => {
     const fileState: GlobalFileState = {
-      relativePath: ".clinerules",
+      relativePath: ".clinerules.md",
       versions: new Map([
         [
           "project1",
           {
             projectName: "project1",
             fileInfo: {
-              relativePath: ".clinerules",
-              absolutePath: "/path/to/project1/.clinerules",
+              relativePath: ".clinerules.md",
+              absolutePath: "/path/to/project1/.clinerules.md",
               hash: "samehash",
             },
             lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -419,8 +427,8 @@ describe("getUserConfirmations", () => {
           {
             projectName: "project2",
             fileInfo: {
-              relativePath: ".clinerules",
-              absolutePath: "/path/to/project2/.clinerules",
+              relativePath: ".clinerules.md",
+              absolutePath: "/path/to/project2/.clinerules.md",
               hash: "samehash",
             },
             lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -431,8 +439,8 @@ describe("getUserConfirmations", () => {
       newestVersion: {
         projectName: "project1",
         fileInfo: {
-          relativePath: ".clinerules",
-          absolutePath: "/path/to/project1/.clinerules",
+          relativePath: ".clinerules.md",
+          absolutePath: "/path/to/project1/.clinerules.md",
           hash: "samehash",
         },
         lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -440,9 +448,9 @@ describe("getUserConfirmations", () => {
       allIdentical: true,
     };
 
-    fileStates.set(".clinerules", fileState);
+    fileStates.set(".clinerules.md", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options);
+    const actions = await getUserConfirmations(fileStates, options, projects);
     expect(actions).toHaveLength(0);
   });
 
@@ -451,15 +459,15 @@ describe("getUserConfirmations", () => {
     const mockSelect = vi.mocked(select);
 
     const fileState: GlobalFileState = {
-      relativePath: ".clinerules",
+      relativePath: ".clinerules.md",
       versions: new Map([
         [
           "project1",
           {
             projectName: "project1",
             fileInfo: {
-              relativePath: ".clinerules",
-              absolutePath: "/path/to/project1/.clinerules",
+              relativePath: ".clinerules.md",
+              absolutePath: "/path/to/project1/.clinerules.md",
               hash: "hash1",
             },
             lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -470,8 +478,8 @@ describe("getUserConfirmations", () => {
       newestVersion: {
         projectName: "project1",
         fileInfo: {
-          relativePath: ".clinerules",
-          absolutePath: "/path/to/project1/.clinerules",
+          relativePath: ".clinerules.md",
+          absolutePath: "/path/to/project1/.clinerules.md",
           hash: "hash1",
         },
         lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -479,12 +487,12 @@ describe("getUserConfirmations", () => {
       allIdentical: false,
     };
 
-    fileStates.set(".clinerules", fileState);
+    fileStates.set(".clinerules.md", fileState);
 
     // Mock user selecting delete-all
     mockSelect.mockResolvedValueOnce("delete-all");
 
-    const actions = await getUserConfirmations(fileStates, options);
+    const actions = await getUserConfirmations(fileStates, options, projects);
 
     expect(mockSelect).toHaveBeenCalledWith(
       expect.stringContaining("exists only in project1"),
@@ -504,15 +512,15 @@ describe("getUserConfirmations", () => {
     options.autoConfirm = true;
 
     const fileState: GlobalFileState = {
-      relativePath: ".clinerules",
+      relativePath: ".clinerules.md",
       versions: new Map([
         [
           "project1",
           {
             projectName: "project1",
             fileInfo: {
-              relativePath: ".clinerules",
-              absolutePath: "/path/to/project1/.clinerules",
+              relativePath: ".clinerules.md",
+              absolutePath: "/path/to/project1/.clinerules.md",
               hash: "hash1",
             },
             lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -523,8 +531,8 @@ describe("getUserConfirmations", () => {
       newestVersion: {
         projectName: "project1",
         fileInfo: {
-          relativePath: ".clinerules",
-          absolutePath: "/path/to/project1/.clinerules",
+          relativePath: ".clinerules.md",
+          absolutePath: "/path/to/project1/.clinerules.md",
           hash: "hash1",
         },
         lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -532,9 +540,9 @@ describe("getUserConfirmations", () => {
       allIdentical: false,
     };
 
-    fileStates.set(".clinerules", fileState);
+    fileStates.set(".clinerules.md", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options);
+    const actions = await getUserConfirmations(fileStates, options, projects);
 
     // Should add to missing project, not delete
     expect(actions).toHaveLength(1);
@@ -548,15 +556,15 @@ describe("getUserConfirmations", () => {
     const mockSelect = vi.mocked(select);
 
     const fileState: GlobalFileState = {
-      relativePath: ".clinerules",
+      relativePath: ".clinerules.md",
       versions: new Map([
         [
           "project1",
           {
             projectName: "project1",
             fileInfo: {
-              relativePath: ".clinerules",
-              absolutePath: "/path/to/project1/.clinerules",
+              relativePath: ".clinerules.md",
+              absolutePath: "/path/to/project1/.clinerules.md",
               hash: "hash1",
             },
             lastModified: new Date("2024-01-01T00:00:00Z"),
@@ -567,8 +575,8 @@ describe("getUserConfirmations", () => {
           {
             projectName: "project2",
             fileInfo: {
-              relativePath: ".clinerules",
-              absolutePath: "/path/to/project2/.clinerules",
+              relativePath: ".clinerules.md",
+              absolutePath: "/path/to/project2/.clinerules.md",
               hash: "hash2",
             },
             lastModified: new Date("2024-01-02T00:00:00Z"),
@@ -579,8 +587,8 @@ describe("getUserConfirmations", () => {
       newestVersion: {
         projectName: "project2",
         fileInfo: {
-          relativePath: ".clinerules",
-          absolutePath: "/path/to/project2/.clinerules",
+          relativePath: ".clinerules.md",
+          absolutePath: "/path/to/project2/.clinerules.md",
           hash: "hash2",
         },
         lastModified: new Date("2024-01-02T00:00:00Z"),
@@ -588,11 +596,11 @@ describe("getUserConfirmations", () => {
       allIdentical: false,
     };
 
-    fileStates.set(".clinerules", fileState);
-    // Mock user selecting project1's version
-    mockSelect.mockResolvedValueOnce("use-project1");
+    fileStates.set(".clinerules.md", fileState);
+    // Mock user selecting project1's version (which should be group-1 since project2 is newer)
+    mockSelect.mockResolvedValueOnce("use-group-1");
 
-    const actions = await getUserConfirmations(fileStates, options);
+    const actions = await getUserConfirmations(fileStates, options, projects);
 
     expect(actions).toHaveLength(1);
     expect(actions[0].type).toBe("update");
@@ -680,7 +688,7 @@ describe("getUserConfirmations", () => {
 
     mockSelect.mockResolvedValueOnce("use-newest");
 
-    const actions = await getUserConfirmations(fileStates, options);
+    const actions = await getUserConfirmations(fileStates, options, projects);
     expect(actions.length).toBe(1); // Only one action for the different file
     expect(actions[0].relativePath).toBe("different.rule");
   });
@@ -720,7 +728,7 @@ describe("getUserConfirmations", () => {
     };
     fileStates.set("delete-me.rule", fileState);
 
-    const actions = await getUserConfirmations(fileStates, options);
+    const actions = await getUserConfirmations(fileStates, options, projects);
 
     expect(actions).toHaveLength(2);
     expect(actions[0].type).toBe("delete");

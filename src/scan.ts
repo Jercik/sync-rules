@@ -2,7 +2,7 @@ import fg from "fast-glob";
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import * as logger from "./utils/core.ts";
-import { getFileHash, normalizePath } from "./utils/core.ts";
+import { getFileHash, normalizePath, generateEffectiveMdPatterns, isGlobPattern, filterMdFiles } from "./utils/core.ts";
 
 /**
  * Represents information about a single file found during a scan.
@@ -38,6 +38,8 @@ export interface ScanOptions {
    * @example ["memory-bank", "node_modules", ".git", "*.tmp"]
    */
   excludePatterns: string[];
+  /** Optional project name for logging purposes. */
+  projectName?: string;
 }
 
 /**
@@ -73,16 +75,17 @@ function normalizeGlob(pattern: string): string {
 }
 
 /**
- * Scans a single base directory for files matching the provided patterns.
+ * Scans a single base directory for .md files matching the provided patterns.
  *
  * @param baseDir The absolute path to the directory to scan.
  * @param patterns An array of glob patterns or literal names.
- *                 If a pattern is a literal name (e.g., ".clinerules"), it will be treated as
- *                 both the literal name and a recursive glob (e.g., ".clinerules/** /*").
- *                 Existing glob patterns are used as-is.
+ *                 All patterns are constrained to only match .md files.
+ *                 If a pattern is a literal directory name (e.g., ".clinerules"), it will
+ *                 search for .md files within it recursively.
+ * @param excludePatterns An array of patterns to exclude from scanning.
  * @returns A promise that resolves to a Map of {@link FileInfo} objects, keyed by their `relativePath` from `baseDir`.
  */
-export async function scanDirectory(
+async function scanDirectory(
   baseDir: string,
   patterns: string[],
   excludePatterns: string[] = [],
@@ -90,29 +93,24 @@ export async function scanDirectory(
   const filesMap = new Map<string, FileInfo>();
   const normalizedBaseDir = normalizePath(baseDir);
 
-  // Helper to check if a pattern string contains glob characters
-  const isGlobPattern = (pattern: string): boolean =>
-    /[*?[\]{}!]/.test(pattern);
+  // Check if any patterns are non-.md patterns
+  const hasNonMdPatterns = patterns.some(p => {
+    if (p.endsWith(".md")) return false;
+    if (!p.includes("*") && !p.includes("/")) {
+      // Could be a directory, will check during processing
+      return false;
+    }
+    // Glob pattern that doesn't end with .md
+    return true;
+  });
+  
+  if (hasNonMdPatterns) {
+    logger.log("Note: Only .md files are processed. Non-.md patterns will be ignored.");
+  }
 
   // Transform user-provided patterns into globs
-  const globPromises = patterns.map(async (p) => {
-    if (isGlobPattern(p)) {
-      return [p]; // Use existing glob as is
-    }
-    // For literal names, check if it's a directory.
-    // If it is, search recursively. Otherwise, just match the file.
-    try {
-      const stats = await fs.stat(path.join(normalizedBaseDir, p));
-      if (stats.isDirectory()) {
-        return [p, `${p}/**/*`];
-      }
-    } catch {
-      // Path doesn't exist or other stat error. Treat as a file pattern.
-    }
-    return [p]; // It's a file or doesn't exist.
-  });
-
-  let effectiveGlobPatterns = (await Promise.all(globPromises)).flat();
+  // Global .md constraint: ensure all patterns only match .md files
+  let effectiveGlobPatterns = await generateEffectiveMdPatterns(patterns, normalizedBaseDir);
   // Normalize simple globs to be recursive
   effectiveGlobPatterns = effectiveGlobPatterns.map(normalizeGlob);
 
@@ -145,7 +143,16 @@ export async function scanDirectory(
     deep: Infinity, // Ensure deep scanning (default is Infinity, but explicit)
   });
 
-  for (const relativePath of relativeEntries) {
+  // Apply post-processing filter to ensure only .md files are processed
+  // This is a safety net in case any non-.md files slip through the pattern transformation
+  const mdFiles = filterMdFiles(relativeEntries);
+  
+  if (relativeEntries.length > mdFiles.length) {
+    const nonMdCount = relativeEntries.length - mdFiles.length;
+    logger.debug(`Filtered out ${nonMdCount} non-.md file(s) from glob results`);
+  }
+
+  for (const relativePath of mdFiles) {
     // Keep relative path as-is from fast-glob (already in POSIX format)
     // We don't normalize relative paths as that would make them absolute
     const absolutePath = path.join(normalizedBaseDir, relativePath);
@@ -178,7 +185,10 @@ export async function scanDirectory(
 export async function scan(
   options: ScanOptions,
 ): Promise<Map<string, FileInfo>> {
-  logger.log("Starting scan phase...");
+  const projectLabel = options.projectName
+    ? ` for project '${options.projectName}'`
+    : "";
+  logger.log(`Starting scan phase${projectLabel}...`);
 
   const { projectDir, rulePatterns, excludePatterns } = options;
 
@@ -189,7 +199,7 @@ export async function scan(
     files = await scanDirectory(projectDir, rulePatterns, excludePatterns);
   } catch (error) {
     logger.error(
-      `Error during directory scanning: ${error instanceof Error ? error.message : String(error)}`,
+      `Error during directory scanning${projectLabel}: ${error instanceof Error ? error.message : String(error)}`,
     );
     throw error;
   }
@@ -210,7 +220,7 @@ export async function scan(
     }
   }
   logger.log(
-    `Scan and hash calculation complete. Found ${files.size} rule files.`,
+    `Scan and hash calculation complete${projectLabel}. Found ${files.size} rule files.`,
   );
 
   return files;

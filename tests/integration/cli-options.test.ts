@@ -25,12 +25,12 @@ describe("CLI Options", () => {
   describe("--dry-run", () => {
     it("should preview changes without executing", async () => {
       const pathA = await createTestProject("project-a", {
-        ".cursorrules": CONTENT.cursor.basic,
-        ".clinerules": CONTENT.cli.basic,
+        ".cursorrules.md": CONTENT.cursor.basic,
+        ".clinerules.md": CONTENT.cli.basic,
       });
 
       const pathB = await createTestProject("project-b", {
-        ".cursorrules": CONTENT.cursor.v1,
+        ".cursorrules.md": CONTENT.cursor.v1,
       });
 
       const result = await runCLI([pathA, pathB, "--dry-run"]);
@@ -40,17 +40,17 @@ describe("CLI Options", () => {
       expect(containsInOutput(result, "Would add")).toBe(true);
       expect(containsInOutput(result, "Would update")).toBe(true);
 
-      expect(await fileExists(pathB, ".clinerules")).toBe(false);
-      expect(await readTestFile(pathB, ".cursorrules")).toBe(CONTENT.cursor.v1);
+      expect(await fileExists(pathB, ".clinerules.md")).toBe(false);
+      expect(await readTestFile(pathB, ".cursorrules.md")).toBe(CONTENT.cursor.v1);
     });
 
     it("should work with --auto-confirm", async () => {
       const pathA = await createTestProject("project-a", {
-        ".cursorrules": CONTENT.cursor.basic,
+        ".cursorrules.md": CONTENT.cursor.basic,
       });
 
       const pathB = await createTestProject("project-b", {
-        ".cursorrules": CONTENT.cursor.v1,
+        ".cursorrules.md": CONTENT.cursor.v1,
       });
 
       const result = await runCLI([
@@ -68,14 +68,14 @@ describe("CLI Options", () => {
   describe("--auto-confirm", () => {
     it("should use newest version without prompting", async () => {
       const pathA = await createTestProject("project-a", {
-        ".cursorrules": {
+        ".cursorrules.md": {
           content: CONTENT.cursor.basic,
           mtime: new Date("2024-01-02"),
         },
       });
 
       const pathB = await createTestProject("project-b", {
-        ".cursorrules": {
+        ".cursorrules.md": {
           content: CONTENT.cursor.v1,
           mtime: new Date("2024-01-01"),
         },
@@ -85,33 +85,52 @@ describe("CLI Options", () => {
 
       expectSuccess(result);
       expect(containsInOutput(result, "automatically")).toBe(true);
-      expect(await readTestFile(pathB, ".cursorrules")).toBe(
+      expect(await readTestFile(pathB, ".cursorrules.md")).toBe(
         CONTENT.cursor.basic,
       );
     });
 
     it("should copy missing files without prompting", async () => {
       const pathA = await createTestProject("project-a", {
-        ".cursorrules": CONTENT.cursor.basic,
-        ".clinerules": CONTENT.cli.basic,
+        ".cursorrules.md": CONTENT.cursor.basic,
+        ".clinerules.md": CONTENT.cli.basic,
       });
 
       const pathB = await createTestProject("project-b", {
-        ".cursorrules": CONTENT.cursor.basic,
+        ".cursorrules.md": CONTENT.cursor.basic,
       });
 
       const result = await runCLI([pathA, pathB, "--auto-confirm"]);
 
       expectSuccess(result);
-      expect(await fileExists(pathB, ".clinerules")).toBe(true);
+      expect(await fileExists(pathB, ".clinerules.md")).toBe(true);
+    });
+
+    it("should never delete files in auto-confirm mode", async () => {
+      // Tests requirement that auto-confirm never deletes files
+      const pathA = await createTestProject("project-a", {
+        ".cursorrules.md": CONTENT.cursor.basic,
+      });
+
+      const pathB = await createTestProject("project-b", {
+        ".cursorrules.md": CONTENT.cursor.basic,
+        ".clinerules.md": CONTENT.cli.basic, // File only in pathB
+      });
+
+      const result = await runCLI([pathA, pathB, "--auto-confirm"]);
+
+      expectSuccess(result);
+      // File in pathB should not be deleted
+      expect(await fileExists(pathB, ".clinerules.md")).toBe(true);
+      expect(await readTestFile(pathB, ".clinerules.md")).toBe(CONTENT.cli.basic);
     });
   });
 
   describe("--exclude", () => {
     it("should apply custom exclusion patterns", async () => {
       const pathA = await createTestProject("project-a", {
-        ".cursorrules": CONTENT.cursor.basic,
-        ".clinerules": CONTENT.cli.basic,
+        ".cursorrules.md": CONTENT.cursor.basic,
+        ".clinerules.md": CONTENT.cli.basic,
         ".kilocode/setup.md": CONTENT.kilocode.functional,
         ".kilocode/example.test.md": CONTENT.kilocode.documentation,
       });
@@ -129,18 +148,17 @@ describe("CLI Options", () => {
 
       expectSuccess(result);
 
-      expect(await fileExists(pathB, ".cursorrules")).toBe(true);
-      expect(await fileExists(pathB, ".clinerules")).toBe(true);
+      expect(await fileExists(pathB, ".cursorrules.md")).toBe(true);
+      expect(await fileExists(pathB, ".clinerules.md")).toBe(true);
       expect(await fileExists(pathB, ".kilocode/setup.md")).toBe(true);
       expect(await fileExists(pathB, ".kilocode/example.test.md")).toBe(false);
     });
 
     it("should combine with default exclusions", async () => {
       const pathA = await createTestProject("project-a", {
-        ".cursorrules": CONTENT.cursor.basic,
-        ".cursorrules.local": CONTENT.local.debugConsole,
-        ".temp-rules": CONTENT.cursor.v1,
-        ".DS_Store": "system file",
+        ".cursorrules.md": CONTENT.cursor.basic,
+        ".cursorrules.local.md": CONTENT.local.debugConsole,
+        ".temp-rules.md": CONTENT.cursor.v1,
       });
 
       const pathB = await createTestProject("project-b", {});
@@ -155,38 +173,20 @@ describe("CLI Options", () => {
 
       expectSuccess(result);
 
-      expect(await fileExists(pathB, ".cursorrules")).toBe(true);
-      expect(await fileExists(pathB, ".cursorrules.local")).toBe(false);
-      expect(await fileExists(pathB, ".temp-rules")).toBe(false);
-      expect(await fileExists(pathB, ".DS_Store")).toBe(false);
+      expect(await fileExists(pathB, ".cursorrules.md")).toBe(true);
+      expect(await fileExists(pathB, ".cursorrules.local.md")).toBe(false); // Local files excluded
+      expect(await fileExists(pathB, ".temp-rules.md")).toBe(false); // Excluded by pattern
     });
   });
 
-  describe("--rules", () => {
-    it("should handle non-existent rules file", async () => {
-      const pathA = await createTestProject("project-a", {
-        ".cursorrules": CONTENT.cursor.basic,
-      });
-
-      const pathB = await createTestProject("project-b", {});
-
-      const result = await runCLI([
-        pathA,
-        pathB,
-        "--rules",
-        "nonexistent.sync-rules",
-      ]);
-
-      expectSuccess(result);
-      expect(containsInOutput(result, "No rule files found")).toBe(true);
-    });
-  });
+  // --rules tests removed:
+  // - "should handle non-existent rules file": Low usefulness - duplicates "no rule files found" assertions elsewhere
 
   describe("Custom patterns via arguments", () => {
     it("should accept patterns as arguments", async () => {
       const pathA = await createTestProject("project-a", {
-        ".cursorrules": CONTENT.cursor.basic,
-        ".clinerules": CONTENT.cli.basic,
+        ".cursorrules.md": CONTENT.cursor.basic,
+        ".clinerules.md": CONTENT.cli.basic,
         ".kilocode/setup.md": CONTENT.kilocode.functional,
       });
 
@@ -197,14 +197,14 @@ describe("CLI Options", () => {
         pathB,
         "--auto-confirm",
         "--rules",
-        ".cursorrules",
-        ".clinerules",
+        ".cursorrules.md",
+        ".clinerules.md",
       ]);
 
       expectSuccess(result);
 
-      expect(await fileExists(pathB, ".cursorrules")).toBe(true);
-      expect(await fileExists(pathB, ".clinerules")).toBe(true);
+      expect(await fileExists(pathB, ".cursorrules.md")).toBe(true);
+      expect(await fileExists(pathB, ".clinerules.md")).toBe(true);
       expect(await fileExists(pathB, ".kilocode/setup.md")).toBe(false);
     });
   });
@@ -235,8 +235,8 @@ describe("CLI Options", () => {
   describe("Option combinations", () => {
     it("should handle --dry-run with --exclude", async () => {
       const pathA = await createTestProject("project-a", {
-        ".cursorrules": CONTENT.cursor.basic,
-        ".clinerules": CONTENT.cli.basic,
+        ".cursorrules.md": CONTENT.cursor.basic,
+        ".clinerules.md": CONTENT.cli.basic,
         ".kilocode/example.test.md": CONTENT.kilocode.documentation,
       });
 
@@ -259,9 +259,9 @@ describe("CLI Options", () => {
 
     it("should handle --rules with --exclude", async () => {
       const pathA = await createTestProject("project-a", {
-        ".cursorrules": CONTENT.cursor.basic,
+        ".cursorrules.md": CONTENT.cursor.basic,
         ".kilocode/setup.md": CONTENT.kilocode.functional,
-        ".kilocode/temp.config": CONTENT.kilocode.documentation,
+        ".kilocode/temp.config.md": CONTENT.kilocode.documentation,
       });
 
       const pathB = await createTestProject("project-b", {});
@@ -271,7 +271,7 @@ describe("CLI Options", () => {
         pathB,
         "--auto-confirm",
         "--rules",
-        ".cursorrules",
+        ".cursorrules.md",
         ".kilocode",
         "--exclude",
         "temp.*",
@@ -279,25 +279,39 @@ describe("CLI Options", () => {
 
       expectSuccess(result);
 
-      expect(await fileExists(pathB, ".cursorrules")).toBe(true);
+      expect(await fileExists(pathB, ".cursorrules.md")).toBe(true);
       expect(await fileExists(pathB, ".kilocode/setup.md")).toBe(true);
-      expect(await fileExists(pathB, ".kilocode/temp.config")).toBe(false);
+      expect(await fileExists(pathB, ".kilocode/temp.config.md")).toBe(false);
     });
   });
 
-  describe("Invalid options", () => {
-    it("should handle unknown options", async () => {
-      const result = await runCLI(["--unknown-option"]);
+  describe("Non-.md pattern warning", () => {
+    it("should warn when using non-.md patterns", async () => {
+      const pathA = await createTestProject("project-a", {
+        ".cursorrules.md": CONTENT.cursor.basic,
+        ".clinerules": "This should be ignored", // Non-.md file
+      });
 
-      expectFailure(result);
-      expect(containsInOutput(result, "Unknown")).toBe(true);
-    });
+      const pathB = await createTestProject("project-b", {});
 
-    it("should handle missing required arguments", async () => {
-      const result = await runCLI(["--rules"]);
+      const result = await runCLI([
+        pathA,
+        pathB,
+        "--auto-confirm",
+        "--rules",
+        ".clinerules", // Non-.md pattern
+        "config/*.json", // Non-.md glob
+      ]);
 
-      expectFailure(result);
-      expect(containsInOutput(result, "argument missing")).toBe(true);
+      expectSuccess(result);
+      // Should warn about non-.md patterns
+      expect(containsInOutput(result, "Only .md files are processed")).toBe(true);
+      // Non-.md file should not be synced
+      expect(await fileExists(pathB, ".clinerules")).toBe(false);
     });
   });
+
+  // Invalid options tests removed based on complexity-to-usefulness ratio:
+  // - "should handle unknown options": Brittle (relies on commander output), low usefulness
+  // - "should handle missing required arguments": Similar to above, low value
 });

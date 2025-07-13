@@ -12,15 +12,17 @@
 
 ### Core Dependencies (2 total)
 
-- **commander**: CLI argument parsing and help generation
-- **fast-glob**: Efficient file pattern matching with glob support
+- **commander**: CLI argument parsing and help generation (v14.0.0)
+- **fast-glob**: Efficient file pattern matching with glob support (v3.3.3)
+  - Configured with .md constraint for consistent file filtering
+  - Used in both scanning and discovery phases
 
 ### Node.js Built-ins
 
-- **crypto**: SHA-1 hash generation for file comparison
-- **fs/promises**: Async file system operations
-- **os**: Temporary directory access
-- **path**: Cross-platform path manipulation
+- **crypto**: SHA-1 hash generation for reliable file comparison
+- **fs/promises**: Async file system operations (copyFile, stat, readFile, etc.)
+- **os**: Temporary directory access and platform detection
+- **path**: Cross-platform path manipulation and normalization
 
 ## TypeScript Configuration
 
@@ -50,8 +52,10 @@
 
 ### Build Process
 
-- **No Compilation**: TypeScript files run directly via Node.js
+- **No Compilation**: TypeScript files run directly via Node.js 23.6+
 - **Type Checking**: `npm run typecheck` runs `tsc --noEmit` for validation
+- **Testing**: Vitest for unit and integration tests (142 tests total)
+- **Formatting**: Prettier for consistent code style
 - **Zero Build Step**: Eliminates transpilation complexity
 
 ### External Process Integration
@@ -68,17 +72,43 @@
 
 ## Performance Characteristics
 
-- **Serial Processing**: Simple sequential file hashing for reliability
+- **Serial Processing**: Sequential file hashing for reliability and simplicity
+- **Parallel Scanning**: Multiple projects scanned concurrently
 - **Memory Usage**: File size warnings for large files (>100MB)
-- **I/O Efficiency**: Minimal file reads and efficient glob patterns
+- **I/O Efficiency**: Minimal file reads, efficient glob patterns, .md constraint reduces file system overhead
+- **Smart Caching**: File hashes cached during single run for comparison
+
+## Testing Infrastructure
+
+### Test Coverage
+- **157 total tests** all passing across unit and integration suites
+- **Unit tests**: Utils, scanning, discovery, generation, multi-sync, path security
+- **Integration tests**: CLI options, sync scenarios, edge cases, error handling, CLAUDE.md generation, path security
+- **Test helpers**: CLI runner (with new interactive prompt support), file system utilities, scenario fixtures
+- **Coverage**: All major code paths, edge cases, and security boundaries
+
+### Test Categories
+- **CLI behavior**: Flag combinations, error handling, help/version
+- **File operations**: Sync, copy, delete, hash calculation
+- **.md constraint**: Non-.md file ignorance, pattern warnings
+- **Interactive mode**: User prompts, decision handling
+- **Auto-confirm**: Newest file selection, no-delete guarantee
+- **Edge cases**: Large files, permissions, symlinks, special characters
+- **CLAUDE.md generation**: 9 passing tests covering all interactive scenarios
+  - Includes interactive prompt handling with new `runCLIInteractive` helper
+  - Fixed bug where CLAUDE.md generation was skipped when no sync was needed
+- **Path security**: 15 tests (9 unit + 6 integration) preventing path traversal attacks
+  - Tests cover Unix/Windows paths, encoded attempts, complex traversals
+  - Validates all user inputs stay within allowed directory boundaries
 
 ## Known Limitations
 
 ### Adoption Constraints
 
-- **Node.js Version**: Requires 23.6+ which may limit adoption in environments with older Node.js versions
+- **Node.js Version**: Requires 23.6+ for native TypeScript execution
+- **Breaking Changes**: Global .md constraint requires existing users to rename rule files
 
 ### Operational Considerations
 
-- **Version Compatibility**: The Node.js 23.6+ requirement may prevent usage in legacy environments
-- **Platform Limitations**: While cross-platform compatible, external tool dependencies may vary by platform
+- **Version Compatibility**: Modern Node.js requirement may prevent usage in legacy environments
+- **File Format Constraint**: Only .md files supported (by design for consistency)

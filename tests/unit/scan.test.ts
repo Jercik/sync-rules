@@ -39,69 +39,83 @@ describe("scan", () => {
     });
   });
 
-  it("should discover files and calculate hashes", async () => {
+  it("should discover only .md files and calculate hashes", async () => {
+    await createFile(path.join(projectPath, "rules.md"), "# Rules");
+    await createFile(path.join(projectPath, "style.md"), "# Style Guide");
+
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: ["*.js", "*.json"],
+      rulePatterns: ["*"],
       excludePatterns: [],
     });
 
+    // Only .md files should be discovered
     expect(result.size).toBe(2);
     expect(mockGetFileHash).toHaveBeenCalledTimes(2);
-    expect(result.get("config.js")?.hash).toBe("hash-of-config.js");
-    expect(result.get("package.json")?.hash).toBe("hash-of-package.json");
+    expect(result.get("rules.md")?.hash).toBe("hash-of-rules.md");
+    expect(result.get("style.md")?.hash).toBe("hash-of-style.md");
+    // Non-.md files should not be included
+    expect(result.has("config.js")).toBe(false);
+    expect(result.has("package.json")).toBe(false);
   });
 
-  it("should identify local files", async () => {
-    await createFile(path.join(projectPath, "config.local.js"), "local config");
+  it("should identify local .md files", async () => {
+    await createFile(path.join(projectPath, "rules.md"), "# Rules");
+    await createFile(path.join(projectPath, "config.local.md"), "local config");
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: ["*.js"],
+      rulePatterns: ["*"],
       excludePatterns: [],
     });
 
-    expect(result.get("config.js")?.isLocal).toBe(false);
-    expect(result.get("config.local.js")?.isLocal).toBe(true);
+    expect(result.get("rules.md")?.isLocal).toBe(false);
+    expect(result.get("config.local.md")?.isLocal).toBe(true);
   });
 
   it("should skip symbolic links", async () => {
-    const targetPath = path.join(projectPath, "config.js");
-    const symlinkPath = path.join(projectPath, "config.symlink.js");
+    await createFile(path.join(projectPath, "config.md"), "# Config");
+    const targetPath = path.join(projectPath, "config.md");
+    const symlinkPath = path.join(projectPath, "config.symlink.md");
     await createSymlink(targetPath, symlinkPath);
 
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: ["*.js"],
+      rulePatterns: ["*"],
       excludePatterns: [],
     });
 
-    expect(result.has("config.symlink.js")).toBe(false);
+    expect(result.has("config.symlink.md")).toBe(false);
+    expect(result.has("config.md")).toBe(true);
   });
 
   it("should handle hash calculation failures gracefully", async () => {
-    const errorFile = "src/index.ts";
+    // Create .md files for testing
+    await createFile(path.join(projectPath, "src/index.md"), "# Index");
+    await createFile(path.join(projectPath, "src/utils/helper.md"), "# Helper");
+
+    const errorFile = "src/index.md";
     mockGetFileHash.mockImplementation(async (filePath) => {
       if (filePath.endsWith(errorFile)) {
-        throw new Error("EACCES: permission denied, open 'src/index.ts'");
+        throw new Error("EACCES: permission denied, open 'src/index.md'");
       }
       return `hash-of-${path.basename(filePath)}`;
     });
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: ["src/**/*.ts"],
+      rulePatterns: ["src/**/*.md"],
       excludePatterns: [],
     });
 
     expect(result.size).toBe(2);
     expect(result.get(errorFile)?.hash).toBeUndefined();
-    expect(result.get("src/utils/helper.ts")?.hash).toBe("hash-of-helper.ts");
+    expect(result.get("src/utils/helper.md")?.hash).toBe("hash-of-helper.md");
   });
 
   it("should handle an empty directory", async () => {
     const emptyProjectPath = await createTestProject("empty-project", {});
     const result = await scan({
       projectDir: emptyProjectPath,
-      rulePatterns: ["*.js"],
+      rulePatterns: ["*"],
       excludePatterns: [],
     });
 
@@ -109,42 +123,49 @@ describe("scan", () => {
   });
 
   it("should handle multiple exclusion patterns", async () => {
-    await createFile(path.join(projectPath, "test.spec.js"), "test();");
-    await createFile(path.join(projectPath, "another-test.js"), "test();");
+    await createFile(path.join(projectPath, "test.spec.md"), "# Test spec");
+    await createFile(
+      path.join(projectPath, "another-test.md"),
+      "# Another test",
+    );
+    await createFile(path.join(projectPath, "rules.md"), "# Rules");
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: ["*.js"],
-      excludePatterns: ["*.spec.js", "another-test.js"],
+      rulePatterns: ["*"],
+      excludePatterns: ["*.spec.md", "another-test.md"],
     });
     expect(result.size).toBe(1);
-    expect(result.has("config.js")).toBe(true);
-    expect(result.has("test.spec.js")).toBe(false);
-    expect(result.has("another-test.js")).toBe(false);
+    expect(result.has("rules.md")).toBe(true);
+    expect(result.has("test.spec.md")).toBe(false);
+    expect(result.has("another-test.md")).toBe(false);
   });
   it("should respect exclusion patterns", async () => {
-    await createFile(path.join(projectPath, "test.spec.js"), "test();");
+    await createFile(path.join(projectPath, "test.spec.md"), "# Test spec");
+    await createFile(path.join(projectPath, "rules.md"), "# Rules");
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: ["*.js"],
-      excludePatterns: ["*.spec.js"],
+      rulePatterns: ["*"],
+      excludePatterns: ["*.spec.md"],
     });
     expect(result.size).toBe(1);
-    expect(result.has("config.js")).toBe(true);
-    expect(result.has("test.spec.js")).toBe(false);
+    expect(result.has("rules.md")).toBe(true);
+    expect(result.has("test.spec.md")).toBe(false);
   });
 
-  it("should handle binary files", async () => {
-    const binaryPath = path.join(projectPath, "image.png");
-    await createBinaryFile(binaryPath, 1024);
+  it("should handle binary content in .md files", async () => {
+    // Create an .md file with binary-like content
+    const binaryContentMd = path.join(projectPath, "binary-content.md");
+    const binaryContent = Buffer.alloc(1024).toString('base64');
+    await createFile(binaryContentMd, `# Binary Data\n\n\`\`\`\n${binaryContent}\n\`\`\``);
 
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: ["*.png"],
+      rulePatterns: ["*.md"],
       excludePatterns: [],
     });
 
     expect(result.size).toBe(1);
-    expect(result.get("image.png")?.hash).toBe("hash-of-image.png");
+    expect(result.get("binary-content.md")?.hash).toBe("hash-of-binary-content.md");
   });
   it("should return an empty map for a non-existent directory", async () => {
     const nonExistentPath = path.join(testContext.tempDir, "non-existent");
@@ -156,13 +177,14 @@ describe("scan", () => {
     expect(result.size).toBe(0);
   });
 
-  it("should handle literal directory patterns", async () => {
+  it("should handle literal directory patterns and only include .md files", async () => {
     // Create a .kilocode directory with files
     await createFile(path.join(projectPath, ".kilocode/rules.md"), "# Rules");
     await createFile(
       path.join(projectPath, ".kilocode/config.yml"),
       "config: true",
     );
+    await createFile(path.join(projectPath, ".kilocode/style.md"), "# Style");
 
     const result = await scan({
       projectDir: projectPath,
@@ -170,9 +192,11 @@ describe("scan", () => {
       excludePatterns: [],
     });
 
+    // Only .md files should be included
     expect(result.size).toBe(2);
     expect(result.has(".kilocode/rules.md")).toBe(true);
-    expect(result.has(".kilocode/config.yml")).toBe(true);
+    expect(result.has(".kilocode/style.md")).toBe(true);
+    expect(result.has(".kilocode/config.yml")).toBe(false);
   });
 
   it("should detect local files in nested directories", async () => {
@@ -192,66 +216,76 @@ describe("scan", () => {
     expect(result.get(".kilocode/config.md")?.isLocal).toBe(false);
   });
 
-  it("should handle mixed glob and literal patterns", async () => {
-    // Create .cursorrules file
+  it("should handle mixed glob and literal patterns with .md constraint", async () => {
+    // Create various files
     await createFile(path.join(projectPath, ".cursorrules"), "cursor rules");
+    await createFile(
+      path.join(projectPath, ".cursorrules.md"),
+      "# Cursor rules",
+    );
     // Create .kilocode directory
     await createFile(
       path.join(projectPath, ".kilocode/rules.md"),
-      "kilo rules",
+      "# Kilo rules",
     );
+    await createFile(path.join(projectPath, "guide.md"), "# Guide");
 
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: [".cursorrules", ".kilocode", "*.json"],
+      rulePatterns: [".cursorrules", ".kilocode", "*"],
       excludePatterns: [],
     });
 
+    // Only .md files should be included
     expect(result.size).toBe(3);
-    expect(result.has(".cursorrules")).toBe(true);
+    expect(result.has(".cursorrules")).toBe(false); // Not .md
+    expect(result.has(".cursorrules.md")).toBe(true);
     expect(result.has(".kilocode/rules.md")).toBe(true);
-    expect(result.has("package.json")).toBe(true);
+    expect(result.has("guide.md")).toBe(true);
+    expect(result.has("package.json")).toBe(false); // Not .md
   });
 
-  it("should exclude .DS_Store files by default patterns", async () => {
+  it("should exclude non-.md files like .DS_Store automatically", async () => {
     await createFile(path.join(projectPath, ".DS_Store"), "system file");
+    await createFile(path.join(projectPath, "rules.md"), "# Rules");
     const result = await scan({
       projectDir: projectPath,
       rulePatterns: ["*"],
-      excludePatterns: [".DS_Store"],
+      excludePatterns: [], // No need to explicitly exclude .DS_Store
     });
 
-    expect(result.has(".DS_Store")).toBe(false);
+    expect(result.has(".DS_Store")).toBe(false); // Automatically excluded as non-.md
+    expect(result.has("rules.md")).toBe(true);
   });
 
-  it("should handle special characters in file names", async () => {
+  it("should handle special characters in .md file names", async () => {
     await createFile(
-      path.join(projectPath, "file with spaces.js"),
-      "module.exports = {};",
+      path.join(projectPath, "file with spaces.md"),
+      "# File with spaces",
     );
     await createFile(
-      path.join(projectPath, "file-with-dashes.js"),
-      "module.exports = {};",
+      path.join(projectPath, "file-with-dashes.md"),
+      "# File with dashes",
     );
 
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: ["*.js"],
+      rulePatterns: ["*"],
       excludePatterns: [],
     });
 
     const paths = Array.from(result.keys());
-    expect(paths).toContain("file with spaces.js");
-    expect(paths).toContain("file-with-dashes.js");
+    expect(paths).toContain("file with spaces.md");
+    expect(paths).toContain("file-with-dashes.md");
   });
 
   it("should maintain consistent hash for identical content", async () => {
-    await createFile(path.join(projectPath, "copy1.js"), "const x = 1;");
-    await createFile(path.join(projectPath, "copy2.js"), "const x = 1;");
+    await createFile(path.join(projectPath, "copy1.md"), "# Same content");
+    await createFile(path.join(projectPath, "copy2.md"), "# Same content");
 
     // Mock same hash for identical content
     mockGetFileHash.mockImplementation(async (filePath) => {
-      if (filePath.includes("copy1.js") || filePath.includes("copy2.js")) {
+      if (filePath.includes("copy1.md") || filePath.includes("copy2.md")) {
         return "identical-hash";
       }
       return `hash-of-${path.basename(filePath)}`;
@@ -259,12 +293,55 @@ describe("scan", () => {
 
     const result = await scan({
       projectDir: projectPath,
-      rulePatterns: ["copy*.js"],
+      rulePatterns: ["copy*"],
       excludePatterns: [],
     });
 
     expect(result.size).toBe(2);
-    expect(result.get("copy1.js")?.hash).toBe("identical-hash");
-    expect(result.get("copy2.js")?.hash).toBe("identical-hash");
+    expect(result.get("copy1.md")?.hash).toBe("identical-hash");
+    expect(result.get("copy2.md")?.hash).toBe("identical-hash");
+  });
+
+  it("should only include .md files when using various pattern types", async () => {
+    // Create a mix of file types
+    await createFile(path.join(projectPath, ".cursorrules"), "Not markdown");
+    await createFile(
+      path.join(projectPath, ".cursorrules.md"),
+      "# Cursor Rules",
+    );
+    await createFile(path.join(projectPath, ".clinerules.json"), "{}");
+    await createFile(path.join(projectPath, ".clinerules.md"), "# CLI Rules");
+    await createFile(
+      path.join(projectPath, ".kilocode/rules.yml"),
+      "rules: true",
+    );
+    await createFile(
+      path.join(projectPath, ".kilocode/rules.md"),
+      "# Kilocode Rules",
+    );
+    await createFile(path.join(projectPath, "README.md"), "# Readme");
+    await createFile(
+      path.join(projectPath, "config.js"),
+      "module.exports = {};",
+    );
+
+    const result = await scan({
+      projectDir: projectPath,
+      rulePatterns: [".cursorrules", ".clinerules*", ".kilocode", "**"],
+      excludePatterns: [],
+    });
+
+    // Only .md files should be included
+    expect(result.size).toBe(4);
+    expect(result.has(".cursorrules.md")).toBe(true);
+    expect(result.has(".clinerules.md")).toBe(true);
+    expect(result.has(".kilocode/rules.md")).toBe(true);
+    expect(result.has("README.md")).toBe(true);
+
+    // Non-.md files should be excluded
+    expect(result.has(".cursorrules")).toBe(false);
+    expect(result.has(".clinerules.json")).toBe(false);
+    expect(result.has(".kilocode/rules.yml")).toBe(false);
+    expect(result.has("config.js")).toBe(false);
   });
 });
