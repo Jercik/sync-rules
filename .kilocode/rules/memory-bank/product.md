@@ -1,43 +1,29 @@
-# Product Context: sync-rules
+# Product: sync-rules
 
-## Problem Statement
+## Purpose and Problems Solved
 
-Developers using AI coding assistants face a common challenge: keeping rule configurations synchronized across multiple projects. As teams refine their coding standards and AI assistant rules in one project, they need an efficient way to propagate these improvements to other projects.
+sync-rules exists to address the pain of maintaining consistent AI coding rules across multiple projects. Developers often use AI assistants like Claude, Gemini, or Kilocode, which require custom rule files for styles, best practices, and configurations. Manually copying and updating these rules leads to inconsistencies, errors, and wasted time. sync-rules provides a centralized, automated, one-way propagation tool that ensures rules stay aligned from a single source of truth, reducing manual effort while emphasizing safety (e.g., no automatic syncing without explicit config) and control.
 
-## Current Pain Points
+## High-Level User Stories
 
-- **Manual Process**: Developers manually copy rule files between projects, which is time-consuming and error-prone
-- **Inconsistency**: Different projects end up with different versions of rules, leading to inconsistent AI assistant behavior
-- **Conflict Resolution**: When rules have been modified in both source and target projects, manual merging is complex and risky
-- **Discovery**: Developers often forget which projects need rule updates or miss new rule files entirely
-- **System File Pollution**: System files like `.DS_Store` could interfere with rule synchronization (resolved via global .md constraint)
+- As a developer managing multiple repos, I want to define rules once in a central repo and propagate them easily, so I avoid duplication.
+- As a team lead, I want config-based selection of rules and adapters per project, so tailoring is deliberate and auditable.
+- As a user concerned with security, I want path validation and file filters, so the tool can't be exploited or overwrite unintended files.
+- As a tester, I want 100% coverage and dry-run previews, so changes are verifiable without risk.
 
-## Target Users
+## Functional Requirements and Behaviors
 
-- **Individual Developers**: Working across multiple personal projects
-- **Development Teams**: Maintaining consistent coding standards across team repositories
-- **Open Source Maintainers**: Sharing best practices across related projects
-- **Consultants/Freelancers**: Applying proven rule sets to new client projects
+- Read user config (~/.config/sync-rules/config.json) validated by Zod.
+- Glob and filter rules from central repo (~/Developer/agent-rules/rules).
+- Apply adapters (claude: concat to CLAUDE.md; gemini: concat to GEMINI.md; kilocode: copy to .kilocode/rules/).
+- Support flags: --dry-run (preview), --verbose (logs).
+- Parallel processing of projects, atomic file operations.
+- Error handling: Skip invalid files, informative messages for issues.
+- Non-interactive, overwrite generated files (central is truth).
 
-## Value Proposition
+## Non-Technical Success Criteria
 
-`sync-rules` transforms rule synchronization from a manual, error-prone process into an automated, reliable workflow. Users can confidently propagate rule improvements across their entire project ecosystem with a single command.
-
-### Key Features
-
-- **Markdown-Only Processing**: Global .md constraint ensures clean, consistent rule handling
-- **CLAUDE.md Generation**: Automatically generates consolidated rule files for Claude Code (auto-generated, manual edits will be lost)
-- **Interactive Decision Making**: Smart prompts for conflict resolution with multiple options
-- **Auto-Confirm Mode**: Deterministic newest-file selection for automated workflows
-- **Local File Support**: Project-specific *.local.* files are automatically excluded from sync
-- **Per-Project Rule Control**: Simple manifest.txt files allow each project to specify which rules it wants to include
-- **Comprehensive Testing**: 193 tests covering all scenarios, edge cases, and security
-- **Security Hardened**: Path traversal protection prevents unauthorized file access
-
-## User Experience Vision
-
-- **One Command**: `sync-rules [projects...]` handles 90% of use cases with smart defaults
-- **Safe by Default**: Never lose work. Preview changes and handle conflicts gracefully through interactive prompts, or use the deterministic `--auto-confirm` flag to automatically sync to the newest version of a file. Auto-confirm never deletes files.
-- **Immediate Feedback**: Clear progress indicators, actionable error messages, and warnings for non-.md patterns
-- **Familiar Tools**: Leverages the command line for all interactions with comprehensive help
-- **CLAUDE.md Integration**: Seamless generation of consolidated rule files for Claude Code after sync (overwrites existing CLAUDE.md)
+- Usability: Single command execution <5s for typical use (small rules).
+- Reliability: 100% test coverage, no crashes on edge cases (e.g., missing repo).
+- Maintainability: Modular adapters for easy extension.
+- Performance: Handle up to 100 rules/projects without noticeable delay.
