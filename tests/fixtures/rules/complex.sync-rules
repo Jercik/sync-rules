@@ -1,7 +1,0 @@
-# Complex rule files with nested patterns
-.clinerules.md
-.cursorrules.md
-.kilocode
-src/.clinerules.md
-tests/.cursorrules.md
-docs/.kilocode
