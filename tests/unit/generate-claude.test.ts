@@ -31,10 +31,7 @@ describe("generateClaudeMd", () => {
 
     const content = await generateClaudeMd(projectPath, options);
 
-    expect(content).toContain("# CLAUDE.md - Generated Rules for Claude Code");
-    expect(content).toContain(
-      "This file is auto-generated. Do not edit manually.",
-    );
+    expect(content).toContain("# CLAUDE.md - Rules for Claude Code");
 
     // With minimal concatenation, there should be no "## Rules from" headers
     expect(content).not.toContain("## Rules from");
@@ -159,11 +156,8 @@ describe("generateClaudeMd", () => {
 
     const content = await generateClaudeMd(emptyPath, options);
 
-    expect(content).toContain("# CLAUDE.md - Generated Rules for Claude Code");
-    expect(content).toContain(
-      "This file is auto-generated. Do not edit manually.",
-    );
-    // With no .md files matching the patterns, should just have the header and warning
-    expect(content.trim().split("\n").length).toBeLessThanOrEqual(6); // Header + warning (3 lines) + 2 empty lines
+    expect(content).toContain("# CLAUDE.md - Rules for Claude Code");
+    // With no .md files matching the patterns, should just have the header
+    expect(content.trim()).toBe("# CLAUDE.md - Rules for Claude Code");
   });
 });

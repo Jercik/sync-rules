@@ -135,67 +135,37 @@ This is useful for:
 - Temporary or experimental rules
 - Client-specific customizations
 
-### Conditional Rule Synchronization (Manifest-Based)
+### Per-Project Manifest
 
-The conditional rule synchronization feature allows you to define when specific rules should be applied to projects based on their content. This is controlled through manifest files.
+Each project can have a `.kilocode/rules/manifest.txt` file containing a simple list of rule files to include, one per line. If a project has no manifest, no rules will be synced to it.
 
-#### Manifest Files
-
-- **`.kilocode/manifest.json`**: Central manifest that defines conditions for rule files. This file is synchronized across all projects.
-- **`.kilocode/manifest.local.json`**: Local overrides specific to each project. This file is never synchronized.
-
-#### Manifest Structure
-
-```json
-{
-  "rules": {
-    ".kilocode/ansible.md": {
-      "condition": "**/*.yml"
-    },
-    ".kilocode/terraform.md": {
-      "condition": "**/*.tf"
-    },
-    ".kilocode/python.md": {
-      "condition": "**/*.{py,pyx,pyi}"
-    }
-  }
-}
+Example `.kilocode/rules/manifest.txt`:
+```
+.kilocode/ansible.md
+.kilocode/terraform.md
+.cursorrules.md
 ```
 
-Each rule file can have a `condition` - a glob pattern that must match at least one file in the target project for the rule to be applied.
+- Only listed rules will be synchronized to this project
+- Paths are relative to the project root
+- Comments and empty lines are ignored
+- If manifest doesn't exist, skip sync for this project
 
-#### Local Overrides
+This allows fine-grained control over which rules apply to each project.
 
-Create a `.kilocode/manifest.local.json` to override manifest conditions for a specific project:
+#### Orphaned Rule Detection
 
-```json
-{
-  "include": [".kilocode/ansible.md"],  // Force include even if condition not met
-  "exclude": [".kilocode/terraform.md"]  // Force exclude even if condition is met
-}
+The tool automatically detects and reports rules listed in manifests that no longer exist in any project:
+
+```
+⚠️  Found orphaned rules in manifests:
+  - project-a: .kilocode/deleted-rule.md (not found in any project)
+  - project-b: .cursorrules-old.md (not found in any project)
+
+Consider updating manifest files to remove these entries.
 ```
 
-#### How It Works
-
-1. **Manifest Synchronization**: When manifests differ across projects, sync-rules first prompts you to choose which manifest version to use as the source of truth.
-2. **Condition Evaluation**: During rule synchronization, each rule's condition is evaluated against the target project's files.
-3. **Smart Filtering**: Rules are only added to projects where their conditions are met.
-4. **Extraneous File Detection**: After sync, the tool identifies files that exist in projects but don't meet their conditions and offers to remove them.
-
-#### Example Workflow
-
-```bash
-# Project A has ansible playbooks (.yml files)
-# Project B is a Python project (no .yml files)
-# Both have .kilocode/manifest.json with ansible rule condition "**/*.yml"
-
-sync-rules ./project-a ./project-b
-
-# Result: ansible.md will exist in Project A but not Project B
-# because Project B doesn't meet the condition
-```
-
-This feature is completely optional - if no manifest exists, sync-rules behaves as before, syncing all rules to all projects.
+This helps keep manifest files up-to-date as your rule files evolve.
 
 ### CLAUDE.md Generation
 

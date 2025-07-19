@@ -146,3 +146,6 @@ CLAUDE.md
 # excluding memory bank
 !.kilocode/rules/memory-bank/
 !.kilocode/rules/memory-bank/**
+
+repomix-output.*
+repomix.config.json

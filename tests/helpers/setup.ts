@@ -72,3 +72,18 @@ export async function fileExists(
     return false;
   }
 }
+
+/**
+ * Creates a manifest file for a project to specify which rules should be synced.
+ * This is essential for the new manifest system where projects without manifests receive no rules.
+ */
+export async function createManifestFile(
+  projectPath: string,
+  ruleFiles: string[],
+): Promise<void> {
+  const manifestDir = path.join(projectPath, ".kilocode/rules");
+  await fs.mkdir(manifestDir, { recursive: true });
+  
+  const manifestContent = ruleFiles.join('\n') + '\n';
+  await fs.writeFile(path.join(manifestDir, "manifest.txt"), manifestContent, "utf8");
+}

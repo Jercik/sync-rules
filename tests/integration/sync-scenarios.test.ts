@@ -11,6 +11,7 @@ import {
   fileExists,
   readTestFile,
   testContext,
+  createManifestFile,
 } from "../helpers/setup.ts";
 import { createDirectoryStructure } from "../helpers/fs-utils.ts";
 import { CONTENT } from "../fixtures/scenarios/index.ts";
@@ -127,9 +128,15 @@ describe("Sync Scenarios", () => {
       const projects: string[] = [];
       for (let i = 0; i < projectCount; i++) {
         const projectName = `project-${String.fromCharCode(97 + i)}`; // a, b, c...
-        projects.push(
-          await createTestProject(projectName, projectFiles[i] || {})
-        );
+        const projectPath = await createTestProject(projectName, projectFiles[i] || {});
+        projects.push(projectPath);
+        
+        // Create manifest for each project listing all rule files that exist in any project
+        const allRuleFiles = new Set<string>();
+        projectFiles.forEach(files => {
+          Object.keys(files || {}).forEach(file => allRuleFiles.add(file));
+        });
+        await createManifestFile(projectPath, Array.from(allRuleFiles));
       }
 
       const result = await runCLI(["--auto-confirm", ...projects]);
@@ -141,6 +148,7 @@ describe("Sync Scenarios", () => {
   describe("Five Project Sync", () => {
     it("should handle large-scale sync", async () => {
       const projects: string[] = [];
+      const allRuleFiles = [".cursorrules.md", ".clinerules.md", ".kilocode/setup.md"];
 
       for (let i = 1; i <= 5; i++) {
         const projectPath = await createTestProject(`project-${i}`, {
@@ -155,6 +163,9 @@ describe("Sync Scenarios", () => {
               }
             : {}),
         });
+        
+        // Create manifest for each project listing all possible rule files
+        await createManifestFile(projectPath, allRuleFiles);
         projects.push(projectPath);
       }
 
@@ -183,6 +194,11 @@ describe("Sync Scenarios", () => {
         ".cursorrules.md": CONTENT.cursor.v1,
         ".clinerules.md": CONTENT.cli.jsCallbacks,
       });
+      
+      // Create manifests for both projects
+      const ruleFiles = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLIWithInput(
         [pathA, pathB],
@@ -201,6 +217,11 @@ describe("Sync Scenarios", () => {
         ".cursorrules.md": CONTENT.cursor.v1,
         ".clinerules.md": CONTENT.cli.jsCallbacks,
       });
+      
+      // Create manifests for both projects
+      const ruleFiles = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLIWithInput(
         [pathA, pathB],
@@ -231,6 +252,11 @@ describe("Sync Scenarios", () => {
         ".clinerules.md": CONTENT.cli.v2AsyncAwait, // Identical
         ".kilocode/setup.md": CONTENT.kilocode.documentation, // Missing in A
       });
+      
+      // Create manifests for both projects
+      const allRuleFiles = [".cursorrules.md", ".clinerules.md", ".kilocode/rules.md", ".kilocode/setup.md"];
+      await createManifestFile(pathA, allRuleFiles);
+      await createManifestFile(pathB, allRuleFiles);
 
       const result = await runCLI(["--auto-confirm", pathA, pathB]);
 
@@ -258,6 +284,11 @@ describe("Sync Scenarios", () => {
         ".cursorrules.md": CONTENT.cursor.basic,
         // Missing .clinerules.md - should be copied, not deleted from A
       });
+      
+      // Create manifests for both projects
+      const ruleFiles = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([pathA, pathB, "--auto-confirm"]);
 
@@ -281,6 +312,11 @@ describe("Sync Scenarios", () => {
         ".cursorrules.local.md": CONTENT.local.apiEndpoints,
         ".clinerules.local.md": CONTENT.local.debugConsole,
       });
+      
+      // Create manifests - note: local files are automatically excluded by the system
+      const ruleFiles = [".cursorrules.md", ".clinerules.local.md"]; // Include local file to test exclusion
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI(["--auto-confirm", pathA, pathB]);
 
@@ -316,6 +352,11 @@ describe("Sync Scenarios", () => {
         },
         ".cursorrules.local.md": CONTENT.local.apiEndpoints,
       });
+      
+      // Create manifests for both projects (only non-local files)
+      const ruleFiles = [".cursorrules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI(["--auto-confirm", pathA, pathB]);
 

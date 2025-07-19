@@ -1,7 +1,7 @@
 import * as logger from "./core.ts";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { z } from "zod";
+import type { SyncAction } from "../multi-sync.ts";
 
 /**
  * Logs a dry-run action in a consistent format.
@@ -72,31 +72,60 @@ export function handleFsError(err: unknown, context: string, filePath?: string):
 }
 
 /**
- * Formats Zod validation errors in a consistent way.
+ * Logs a standardized sync summary with counts and totals.
  * 
- * @param error The Zod error to format
- * @returns Formatted error messages as an array of strings
+ * @param title The title for the summary (e.g., "Planned Changes Summary", "Synchronization Summary")
+ * @param totalActions Total number of actions planned or executed
+ * @param updates Number of update actions
+ * @param additions Number of addition actions  
+ * @param deletions Number of deletion actions
+ * @param skips Optional number of skipped actions (for execution summaries)
+ * @param errors Optional number of errors (for execution summaries)
  */
-export function formatZodErrors(error: z.ZodError): string[] {
-  return error.issues.map(issue => {
-    const path = issue.path.length > 0 ? issue.path.join('.') : 'root';
-    return `${path}: ${issue.message}`;
-  });
+export function logSyncSummary(
+  title: string,
+  totalActions: number,
+  updates: number,
+  additions: number,
+  deletions: number,
+  skips?: number,
+  errors?: number
+): void {
+  logger.log(`\n=== ${title} ===`);
+  logger.log(`Total actions: ${totalActions}`);
+  logger.log(`Updates: ${updates}`);
+  logger.log(`Additions: ${additions}`);
+  logger.log(`Deletions: ${deletions}`);
+  
+  if (skips !== undefined) {
+    logger.log(`Skipped: ${skips}`);
+  }
+  
+  if (errors !== undefined && errors > 0) {
+    logger.warn(
+      `\n⚠️  Synchronization complete with ${errors} errors detected.`,
+    );
+    logger.warn("Please review the affected files and resolve any issues.");
+  } else if (errors !== undefined) {
+    logger.log("\n✅ Synchronization completed successfully!");
+  }
 }
 
 /**
- * Logs Zod validation errors in a consistent format.
+ * Calculates action counts from a list of sync actions.
  * 
- * @param error The Zod error to log
- * @param prefix Optional prefix for the error messages
+ * @param syncActions Array of sync actions to count
+ * @returns Object containing counts for each action type
  */
-export function logZodErrors(error: z.ZodError, prefix?: string): void {
-  const errors = formatZodErrors(error);
-  errors.forEach(err => {
-    if (prefix) {
-      logger.error(`${prefix} - ${err}`);
-    } else {
-      logger.error(`  - ${err}`);
-    }
-  });
+export function calculateActionCounts(syncActions: SyncAction[]): {
+  updates: number;
+  additions: number;
+  deletions: number;
+} {
+  return {
+    updates: syncActions.filter((a) => a.type === "update").length,
+    additions: syncActions.filter((a) => a.type === "add").length,
+    deletions: syncActions.filter((a) => a.type === "delete").length,
+  };
 }
+

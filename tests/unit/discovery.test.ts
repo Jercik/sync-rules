@@ -13,6 +13,24 @@ vi.mock("../../src/utils/core.ts", () => ({
   log: vi.fn(),
   debug: vi.fn(),
   normalizePath: (p: string) => p.replace(/\\/g, "/"),
+  validatePathSecurity: (userPath: string, baseDir: string) => {
+    const path = require("node:path");
+    return path.resolve(baseDir, userPath);
+  },
+  generateEffectiveMdPatterns: async (patterns: string[]) => {
+    // Simple mock that handles the common test cases
+    return patterns.flatMap(pattern => {
+      if (pattern.endsWith(".md")) {
+        return [pattern];
+      } else if (!pattern.includes("*") && !pattern.includes("/")) {
+        // Directory pattern - check both file and directory patterns
+        return [`${pattern}.md`, `${pattern}/**/*.md`];
+      } else {
+        return [pattern];
+      }
+    });
+  },
+  filterMdFiles: (files: string[]) => files.filter(file => file.endsWith(".md")),
 }));
 
 describe("discoverProjects", () => {

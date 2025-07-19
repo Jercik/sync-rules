@@ -7,7 +7,7 @@
 ## Primary Goals
 
 1. **Automated Synchronization**: Synchronize rule files between multiple projects by establishing a single source of truth for each file.
-2. **Change Detection**: Use SHA-1 hashing to identify file differences efficiently.
+2. **Change Detection**: Use SHA-256 hashing to identify file differences efficiently.
 3. **Conflict Resolution**: When files differ, interactively prompt the user to choose which version should be used to overwrite the others.
 4. **Developer-Friendly**: Simple CLI interface with clear feedback and error messages
 5. **Zero Configuration**: Work out-of-the-box with sensible defaults

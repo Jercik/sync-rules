@@ -5,6 +5,32 @@ import { promises as fs } from "node:fs";
 import type { Stats } from "node:fs";
 import path from "node:path";
 import { findProjectByPath } from "./project-utils.ts";
+import * as logger from "./core.ts";
+
+const MANIFEST_PATH = '.kilocode/rules/manifest.txt';
+
+/**
+ * Loads and parses a project's manifest file.
+ * Returns an array of rule file paths that the project wants to receive.
+ * Returns empty array if no manifest exists or if manifest is empty.
+ * 
+ * @param projectPath The absolute path to the project directory
+ * @returns Array of relative rule file paths listed in the manifest
+ */
+async function loadProjectManifest(projectPath: string): Promise<string[]> {
+  const manifestPath = path.join(projectPath, MANIFEST_PATH);
+  try {
+    const manifestContent = await fs.readFile(manifestPath, 'utf8');
+    const desiredRules = manifestContent.split('\n')
+      .map(line => line.trim())
+      .filter(Boolean); // Remove empty lines and whitespace-only lines
+    return desiredRules;
+  } catch {
+    // No manifest file or error reading it - return empty array
+    // This means the project receives no rule synchronization
+    return [];
+  }
+}
 
 /**
  * Interface for providing file data for state building.
@@ -88,6 +114,7 @@ export async function buildGlobalFileState(
 /**
  * Builds GlobalFileStates for multiple files from scan results.
  * Used by scanAllProjects to process scanned files from all projects.
+ * Now filters files based on each project's manifest before building global states.
  * 
  * @param projects Array of project information
  * @param filesByProject Map of project name to scanned files
@@ -100,17 +127,32 @@ export async function buildGlobalFileStates(
   const globalStates = new Map<string, GlobalFileState>();
   const allFiles = new Set<string>();
   
-  // Collect all unique file paths (excluding local files)
+  // Load manifests for all projects
+  const projectManifests = new Map<string, string[]>();
+  for (const project of projects) {
+    const manifest = await loadProjectManifest(project.path);
+    projectManifests.set(project.name, manifest);
+    logger.log(`[DEBUG] Project ${project.name} manifest: ${JSON.stringify(manifest)}`);
+  }
+  
+  // Collect all unique file paths from scanned projects (excluding local files)
+  // We need to consider all files that exist, then filter based on manifests later
   for (const files of filesByProject.values()) {
     for (const [relativePath, fileInfo] of files) {
-      if (!fileInfo.isLocal) {
-        allFiles.add(relativePath);
+      // Skip local files (these are never synchronized)
+      if (fileInfo.isLocal) {
+        continue;
       }
+      allFiles.add(relativePath);
     }
   }
+  
+  // Process all files found in any project
+  // This ensures we can delete files from projects that don't want them
+  const filesToProcess = allFiles;
 
-  // Build state for each unique file
-  for (const relativePath of allFiles) {
+  // Build state for each file that passed manifest filtering
+  for (const relativePath of filesToProcess) {
     const provider: FileDataProvider = {
       async getFileData(projectPath: string, relPath: string) {
         // Find project by path
@@ -120,7 +162,10 @@ export async function buildGlobalFileStates(
         // Get files for this project
         const files = filesByProject.get(project.name);
         const fileInfo = files?.get(relPath);
-        if (!fileInfo) return null;
+        if (!fileInfo) return null; // File doesn't exist in this project
+        
+        // All projects can contribute files to the global state
+        // The manifest filtering happens later when determining sync actions
         
         // Get file stats
         const stats = await fs.stat(fileInfo.absolutePath);
@@ -136,12 +181,17 @@ export async function buildGlobalFileStates(
     globalStates.set(relativePath, state);
   }
   
-  // Update missingFrom for all states (some projects might not have been scanned)
-  const allProjectNames = projects.map(p => p.name);
-  for (const state of globalStates.values()) {
-    state.missingFrom = allProjectNames.filter(
-      name => !state.versions.has(name)
-    );
+  // Update missingFrom for all states
+  // Include all projects that want the file according to their manifests
+  for (const [relativePath, state] of globalStates) {
+    const projectsWantingFile = projects.filter(project => {
+      const manifest = projectManifests.get(project.name) || [];
+      return manifest.includes(relativePath);
+    });
+    
+    state.missingFrom = projectsWantingFile
+      .map(p => p.name)
+      .filter(name => !state.versions.has(name));
   }
   
   return globalStates;

@@ -10,7 +10,7 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
 - **CLAUDE.md generation** with minimal concatenation for Claude Code integration
 - **Interactive and auto-confirm modes** for different workflow preferences
 - **Local file support** (*.local.* pattern) for project-specific configurations
-- **Conditional rule synchronization** via manifest-based system for applying rules based on project content
+- **Per-project rule control** via simple manifest.txt files for project-specific rule inclusion
 - **Comprehensive testing** with 193 tests covering all scenarios including security
 - **Path traversal protection** preventing unauthorized access to files outside project boundaries
 
@@ -86,12 +86,12 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
    - Ensures users understand that manual edits to CLAUDE.md will be lost on regeneration
    - Clear guidance to edit source .md files instead
 
-10. **Added manifest-based conditional rule synchronization**
-   - Implemented `.kilocode/manifest.json` and `.kilocode/manifest.local.json` support
-   - Rules now sync conditionally based on glob pattern matches in target projects
-   - Added Zod validation for type-safe manifest parsing
-   - Two-phase sync: manifests sync first, then rules based on conditions
-   - New utility modules for enhanced file handling and decision strategies
+10. **Simplified to per-project manifest system (2025-07-13)**
+   - Replaced complex conditional manifest system with simple `.kilocode/manifest.txt` files
+   - Each project controls which rules to accept via plain text file (one rule path per line)
+   - Removed Zod dependency and complex validation logic
+   - Projects without manifests receive no rule synchronization
+   - Streamlined architecture focusing on simplicity and project autonomy
 
 ### Major Improvements (2025-07-13)
 
@@ -119,8 +119,7 @@ The `sync-rules` project is feature-complete with robust functionality, comprehe
 
 5. **Improved Error Handling**
    - User-friendly error messages for duplicate project names
-   - Better Zod validation error formatting for manifest files
-   - Graceful handling of invalid manifests (treated as missing)
+   - Graceful handling of missing or invalid manifest files
    - Extracted common error handling functions for consistency
 
 ### Critical Security Fix (2025-07-12)
@@ -217,7 +216,7 @@ The project has reached a high level of maturity with comprehensive functionalit
 - **Interactive and auto-confirm modes** for different workflow preferences
 - **CLAUDE.md generation** with minimal concatenation
 - **Local file support** for project-specific configurations
-- **Conditional rule synchronization** via manifest files
+- **Per-project rule control** via simple manifest.txt files
 - **Comprehensive error handling** with graceful degradation
 - **Path traversal protection** for secure multi-user operation
 

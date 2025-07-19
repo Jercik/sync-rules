@@ -11,6 +11,7 @@ import {
   fileExists,
   readTestFile,
   testContext,
+  createManifestFile,
 } from "../helpers/setup";
 import { createDirectoryStructure } from "../helpers/fs-utils";
 import { CONTENT } from "../fixtures/scenarios/index";
@@ -32,6 +33,11 @@ describe("CLI Options", () => {
       const pathB = await createTestProject("project-b", {
         ".cursorrules.md": CONTENT.cursor.v1,
       });
+      
+      // Create manifests for both projects
+      const ruleFiles = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([pathA, pathB, "--dry-run"]);
 
@@ -52,6 +58,11 @@ describe("CLI Options", () => {
       const pathB = await createTestProject("project-b", {
         ".cursorrules.md": CONTENT.cursor.v1,
       });
+      
+      // Create manifests for both projects
+      const ruleFiles = [".cursorrules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([
         "--dry-run",
@@ -80,6 +91,11 @@ describe("CLI Options", () => {
           mtime: new Date("2024-01-01"),
         },
       });
+      
+      // Create manifests for both projects
+      const ruleFiles = [".cursorrules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI(["--auto-confirm", pathA, pathB]);
 
@@ -99,6 +115,11 @@ describe("CLI Options", () => {
       const pathB = await createTestProject("project-b", {
         ".cursorrules.md": CONTENT.cursor.basic,
       });
+      
+      // Create manifests for both projects
+      const ruleFiles = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([pathA, pathB, "--auto-confirm"]);
 
@@ -116,6 +137,11 @@ describe("CLI Options", () => {
         ".cursorrules.md": CONTENT.cursor.basic,
         ".clinerules.md": CONTENT.cli.basic, // File only in pathB
       });
+      
+      // Create manifests for both projects - note: pathA doesn't include .clinerules.md
+      // so it won't be copied from pathB to pathA, preserving it in pathB
+      await createManifestFile(pathA, [".cursorrules.md"]);
+      await createManifestFile(pathB, [".cursorrules.md", ".clinerules.md"]);
 
       const result = await runCLI([pathA, pathB, "--auto-confirm"]);
 
@@ -136,6 +162,11 @@ describe("CLI Options", () => {
       });
 
       const pathB = await createTestProject("project-b", {});
+      
+      // Create manifests - include all files including .test.md to test exclusion
+      const allRuleFiles = [".cursorrules.md", ".clinerules.md", ".kilocode/setup.md", ".kilocode/example.test.md"];
+      await createManifestFile(pathA, allRuleFiles);
+      await createManifestFile(pathB, allRuleFiles);
 
       const result = await runCLI([
         pathA,
@@ -162,6 +193,11 @@ describe("CLI Options", () => {
       });
 
       const pathB = await createTestProject("project-b", {});
+      
+      // Create manifests - include all files to test exclusion behavior
+      const allRuleFiles = [".cursorrules.md", ".cursorrules.local.md", ".temp-rules.md"];
+      await createManifestFile(pathA, allRuleFiles);
+      await createManifestFile(pathB, allRuleFiles);
 
       const result = await runCLI([
         "--exclude",
@@ -191,6 +227,11 @@ describe("CLI Options", () => {
       });
 
       const pathB = await createTestProject("project-b", {});
+      
+      // Create manifests with only the rules specified by --rules argument
+      const specifiedRules = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, specifiedRules);
+      await createManifestFile(pathB, specifiedRules);
 
       const result = await runCLI([
         pathA,
@@ -219,6 +260,11 @@ describe("CLI Options", () => {
       });
 
       const pathB = await createTestProject("project-b", {});
+      
+      // Create manifests - don't include .test.md since it will be excluded anyway
+      const ruleFiles = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([
         pathA,
@@ -245,6 +291,11 @@ describe("CLI Options", () => {
       });
 
       const pathB = await createTestProject("project-b", {});
+      
+      // Create manifests - include only .md files as non-.md won't be processed
+      const mdRuleFiles = [".cursorrules.md"];
+      await createManifestFile(pathA, mdRuleFiles);
+      await createManifestFile(pathB, mdRuleFiles);
 
       const result = await runCLI([
         pathA,

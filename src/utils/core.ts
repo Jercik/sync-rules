@@ -311,3 +311,45 @@ export function validatePathSecurity(userPath: string, baseDir: string): string 
   
   return normalizedUser;
 }
+
+/**
+ * Safely checks file or directory access permissions with consistent error handling.
+ * Provides standardized permission checking for dry-run operations.
+ *
+ * @param targetPath The file or directory path to check.
+ * @param mode The access mode to check (e.g., fs.constants.W_OK for write permissions).
+ * @param operation Description of the operation for error messages (e.g., "update", "generate CLAUDE.md").
+ * @param projectName Optional project name for context in error messages.
+ * @returns Promise that resolves to true if access is allowed, false otherwise.
+ */
+export async function safeAccess(
+  targetPath: string,
+  mode: number,
+  operation: string,
+  projectName?: string
+): Promise<boolean> {
+  const { promises: fs, constants } = await import("node:fs");
+  const path = await import("node:path");
+  
+  try {
+    await fs.access(targetPath, mode);
+    return true;
+  } catch (error) {
+    // Determine appropriate error message based on mode
+    let permissionType = "accessible";
+    if (mode === constants.W_OK) {
+      permissionType = "writable";
+    } else if (mode === constants.R_OK) {
+      permissionType = "readable";
+    } else if (mode === constants.X_OK) {
+      permissionType = "executable";
+    }
+    
+    const contextMsg = projectName ? ` in ${projectName}` : "";
+    const pathType = targetPath.includes(".") ? "file" : "directory";
+    
+    debug(`Permission check failed for ${operation}: ${targetPath} is not ${permissionType}`);
+    
+    return false;
+  }
+}

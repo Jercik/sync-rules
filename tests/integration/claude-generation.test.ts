@@ -5,8 +5,11 @@ import {
   fileExists,
   readTestFile,
   testContext,
+  createManifestFile,
 } from "../helpers/setup";
 import { CONTENT } from "../fixtures/scenarios/index";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 
 describe("CLAUDE.md Generation", () => {
   let projectsPath: string;
@@ -25,6 +28,11 @@ describe("CLAUDE.md Generation", () => {
       const pathB = await createTestProject("project-b", {
         ".cursorrules.md": CONTENT.cursor.v1,
       });
+      
+      // Create manifests for sync
+      const ruleFiles = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       // Run sync with auto-confirm to avoid prompts
       const result = await runCLI([pathA, pathB, "--auto-confirm"]);
@@ -53,6 +61,11 @@ describe("CLAUDE.md Generation", () => {
       const pathB = await createTestProject("project-b", {
         ".cursorrules.md": CONTENT.cursor.v1,
       });
+      
+      // Create manifests for sync
+      const ruleFiles = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([
         pathA,
@@ -80,6 +93,11 @@ describe("CLAUDE.md Generation", () => {
       const pathB = await createTestProject("project-b", {
         ".cursorrules.md": CONTENT.cursor.v1,
       });
+      
+      // Create manifests for sync
+      const ruleFiles = [".cursorrules.md", ".clinerules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([
         pathA,
@@ -137,6 +155,11 @@ describe("CLAUDE.md Generation", () => {
         ".cursorrules.md": CONTENT.cursor.v1,
         "CLAUDE.md": "# Different CLAUDE.md in project B",
       });
+      
+      // Create manifests - only include .cursorrules.md, not CLAUDE.md
+      const ruleFiles = [".cursorrules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([
         pathA,
@@ -171,6 +194,12 @@ describe("CLAUDE.md Generation", () => {
       const pathC = await createTestProject("project-c", {
         ".cursorrules.md": CONTENT.cursor.basic,
       });
+      
+      // Create manifests for all projects (identical content means no sync needed)
+      const ruleFiles = [".cursorrules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
+      await createManifestFile(pathC, ruleFiles);
 
       // Import runCLIInteractive
       const { runCLIInteractive } = await import("../helpers/cli-runner");
@@ -201,6 +230,41 @@ describe("CLAUDE.md Generation", () => {
       expect(await fileExists(pathC, "CLAUDE.md")).toBe(true);
     });
 
+    it("should correctly detect permission failures in dry-run mode", async () => {
+      const pathA = await createTestProject("project-a", {
+        ".cursorrules.md": CONTENT.cursor.basic,
+      });
+
+      // Make the project directory read-only to simulate permission failure
+      await fs.chmod(pathA, 0o555); // Read-only directory
+
+      try {
+        const result = await runCLI([pathA, "--dry-run", "--auto-confirm"]);
+
+        // Should fail with exit code 1 due to permission error
+        expect(result.exitCode).toBe(1);
+        expect(containsInOutput(result, "DRY RUN")).toBe(true);
+        
+        // Should detect permission failure and report it
+        expect(
+          containsInOutput(result, "[DRY RUN] Would fail to generate CLAUDE.md")
+        ).toBe(true);
+        expect(
+          containsInOutput(result, "directory is not writable")
+        ).toBe(true);
+
+        // CLAUDE.md should not exist since it couldn't be created
+        expect(await fileExists(pathA, "CLAUDE.md")).toBe(false);
+      } finally {
+        // Cleanup: restore permissions so directory can be deleted
+        try {
+          await fs.chmod(pathA, 0o755);
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    });
+
     it("should concatenate multiple rule files correctly with minimal concatenation", async () => {
       const pathA = await createTestProject("project-a", {
         ".cursorrules.md": {
@@ -219,6 +283,11 @@ describe("CLAUDE.md Generation", () => {
           mtime: new Date("2024-01-01"), // Older
         },
       });
+      
+      // Create manifests for sync
+      const ruleFiles = [".cursorrules.md", ".clinerules.md", ".kilocode/rules.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       // Run with auto-confirm to sync and generate CLAUDE.md
       const result = await runCLI([pathA, pathB, "--auto-confirm"]);
@@ -230,7 +299,7 @@ describe("CLAUDE.md Generation", () => {
 
       const claudeMd = await readTestFile(pathA, "CLAUDE.md");
       expect(claudeMd).toContain(
-        "# CLAUDE.md - Generated Rules for Claude Code",
+        "# CLAUDE.md - Rules for Claude Code",
       );
 
       // With minimal concatenation, no "## Rules from" headers

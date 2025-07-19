@@ -10,16 +10,12 @@
 
 ## Dependencies
 
-### Core Dependencies (3 total)
+### Core Dependencies (2 total)
 
 - **commander**: CLI argument parsing and help generation (v14.0.0)
 - **fast-glob**: Efficient file pattern matching with glob support (v3.3.3)
   - Configured with .md constraint for consistent file filtering
   - Used in both scanning and discovery phases
-- **zod**: Runtime type validation and schema parsing (v4.0.5)
-  - Used for manifest file validation (manifest.json and manifest.local.json)
-  - Ensures type-safe parsing of conditional rule configurations
-  - Provides detailed error messages for invalid manifest schemas
 
 ### Node.js Built-ins
 

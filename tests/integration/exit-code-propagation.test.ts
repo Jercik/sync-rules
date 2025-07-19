@@ -52,8 +52,15 @@ describe("Exit Code Propagation", () => {
     const project1 = path.join(testDir, "project1");
     const project2 = path.join(testDir, "project2");
     
+    await fs.mkdir(path.join(project1, ".kilocode"), { recursive: true });
+    await fs.mkdir(path.join(project2, ".kilocode"), { recursive: true });
     await fs.mkdir(path.join(project1, ".kilocode/rules"), { recursive: true });
     await fs.mkdir(path.join(project2, ".kilocode/rules"), { recursive: true });
+    
+    // Create manifests
+    const manifestContent = ".kilocode/rules/test.md\n";
+    await fs.writeFile(path.join(project1, ".kilocode/rules/manifest.txt"), manifestContent);
+    await fs.writeFile(path.join(project2, ".kilocode/rules/manifest.txt"), manifestContent);
     
     // Create identical files (no sync needed)
     const content = "# Test Rule\nContent";
@@ -84,9 +91,18 @@ describe("Exit Code Propagation", () => {
     const project2 = path.join(testDir, "project2");
     const project3 = path.join(testDir, "project3");
     
+    await fs.mkdir(path.join(project1, ".kilocode"), { recursive: true });
+    await fs.mkdir(path.join(project2, ".kilocode"), { recursive: true });
+    await fs.mkdir(path.join(project3, ".kilocode"), { recursive: true });
     await fs.mkdir(path.join(project1, ".kilocode/rules"), { recursive: true });
     await fs.mkdir(path.join(project2, ".kilocode/rules"), { recursive: true });
     await fs.mkdir(path.join(project3, ".kilocode/rules"), { recursive: true });
+    
+    // Create manifests
+    const manifestContent = ".kilocode/rules/test.md\n";
+    await fs.writeFile(path.join(project1, ".kilocode/rules/manifest.txt"), manifestContent);
+    await fs.writeFile(path.join(project2, ".kilocode/rules/manifest.txt"), manifestContent);
+    await fs.writeFile(path.join(project3, ".kilocode/rules/manifest.txt"), manifestContent);
     
     // Create a file only in project1 - it will need to sync to project2 and project3
     await fs.writeFile(
@@ -131,8 +147,15 @@ describe("Exit Code Propagation", () => {
     const project1 = path.join(testDir, "project1");
     const project2 = path.join(testDir, "project2");
     
+    await fs.mkdir(path.join(project1, ".kilocode"), { recursive: true });
+    await fs.mkdir(path.join(project2, ".kilocode"), { recursive: true });
     await fs.mkdir(path.join(project1, ".kilocode/rules"), { recursive: true });
     await fs.mkdir(path.join(project2, ".kilocode/rules"), { recursive: true });
+    
+    // Create manifests
+    const manifestContent = ".kilocode/rules/test.md\n";
+    await fs.writeFile(path.join(project1, ".kilocode/rules/manifest.txt"), manifestContent);
+    await fs.writeFile(path.join(project2, ".kilocode/rules/manifest.txt"), manifestContent);
     
     // Only project1 has a file (will sync to project2)
     await fs.writeFile(
@@ -170,8 +193,15 @@ describe("Exit Code Propagation", () => {
     const project1 = path.join(testDir, "project1");
     const project2 = path.join(testDir, "project2");
     
+    await fs.mkdir(path.join(project1, ".kilocode"), { recursive: true });
+    await fs.mkdir(path.join(project2, ".kilocode"), { recursive: true });
     await fs.mkdir(path.join(project1, ".kilocode/rules"), { recursive: true });
     await fs.mkdir(path.join(project2, ".kilocode/rules"), { recursive: true });
+    
+    // Create manifests
+    const manifestContent = ".kilocode/rules/test.md\n";
+    await fs.writeFile(path.join(project1, ".kilocode/rules/manifest.txt"), manifestContent);
+    await fs.writeFile(path.join(project2, ".kilocode/rules/manifest.txt"), manifestContent);
     
     // Create files
     await fs.writeFile(
@@ -219,9 +249,18 @@ describe("Exit Code Propagation", () => {
     const project2 = path.join(testDir, "project2");
     const project3 = path.join(testDir, "project3");
     
+    await fs.mkdir(path.join(project1, ".kilocode"), { recursive: true });
+    await fs.mkdir(path.join(project2, ".kilocode"), { recursive: true });
+    await fs.mkdir(path.join(project3, ".kilocode"), { recursive: true });
     await fs.mkdir(path.join(project1, ".kilocode/rules"), { recursive: true });
     await fs.mkdir(path.join(project2, ".kilocode/rules"), { recursive: true });
     await fs.mkdir(path.join(project3, ".kilocode/rules"), { recursive: true });
+    
+    // Create manifests
+    const manifestContent = ".kilocode/rules/test.md\n";
+    await fs.writeFile(path.join(project1, ".kilocode/rules/manifest.txt"), manifestContent);
+    await fs.writeFile(path.join(project2, ".kilocode/rules/manifest.txt"), manifestContent);
+    await fs.writeFile(path.join(project3, ".kilocode/rules/manifest.txt"), manifestContent);
     
     // Create a file only in project1
     await fs.writeFile(

@@ -76,15 +76,12 @@ CLI Input → Validation → Scanning → Comparison → Action Execution → Re
   - `logDryRunAction()`: Consistent dry-run output formatting
   - `ensureFilePath()`: Safe directory creation for file operations
   - `handleFsError()`: User-friendly file system error messages
-  - `formatZodErrors()`: Readable Zod validation error formatting
 - **Prompt utilities** (`prompts.ts`): Interactive user input handling (confirm, select, input)
 - **Formatters** (`formatters.ts`): Time formatting for user-friendly output
-- **File Scanner** (`file-scanner.ts`): Scans specific files across projects (used for manifest scanning)
 - **File State Builder** (`file-state-builder.ts`): Builds global file state from project data
 - **File Decision Strategies** (`file-decision-strategies.ts`): Implements decision logic for file synchronization
 - **Project Utilities** (`project-utils.ts`): Project-related utility functions
 - **Sync Phases** (`sync-phases.ts`): Manages synchronization phases
-- **Manifest Validator** (`manifest-validator.ts`): Zod schemas for manifest validation
 
 ### 7. Test Infrastructure (`tests/`)
 
@@ -149,32 +146,29 @@ The tool does not merge file contents. Instead, it resolves conflicts by designa
 - **Memory Management**: Files larger than 1MB are automatically skipped
 - **I/O Optimization**: Efficient glob patterns and minimal file reads
 
-## Manifest System (`manifest.json`)
+## Per-Project Manifest System
 
-### 8. Conditional Rule Application
+### 8. Per-Project Rule Control
 
-- **Responsibility**: Apply rules only when specific file patterns exist in target projects
+- **Responsibility**: Allow each project to specify which rules it wants to include
 - **Key Patterns**:
-  - **Condition-based filtering**: Rules sync only if glob patterns match project content
-  - **Two-file system**: 
-    - `.kilocode/manifest.json`: Shared manifest defining rule conditions
-    - `.kilocode/manifest.local.json`: Local overrides for project-specific includes/excludes
-  - **Zod validation**: Runtime type safety ensures manifest files conform to schema
-  - **Two-phase sync**: Manifest files sync first, then rules sync based on conditions
-  - **Pattern matching**: Uses same glob patterns as main sync for consistency
-  - **Graceful fallback**: Missing or invalid manifests don't break sync
+  - **Simple text format**: `.kilocode/manifest.txt` contains one rule path per line
+  - **Per-project only**: No global manifest syncing between projects
+  - **Explicit control**: If no manifest exists, no rules are synced to that project
+  - **Orphaned rule detection**: Reports rules listed in manifests but not found in any project
+  - **Simple validation**: Basic text parsing, no complex schemas needed
 
-### Manifest Schema
+### Manifest Format
 
-```typescript
-{
-  rules: {
-    [ruleName: string]: {
-      include?: string[];  // Glob patterns - rule applies if ANY match
-      exclude?: string[];  // Glob patterns - rule excluded if ANY match
-    }
-  }
-}
+Each project can have a `.kilocode/manifest.txt` file:
+
+```
+.kilocode/ansible.md
+.kilocode/terraform.md
+.cursorrules.md
 ```
 
-Local manifest can override with additional includes/excludes that merge with base manifest.
+- Only listed rules will be synchronized to this project
+- Paths are relative to the project root
+- Comments and empty lines are ignored
+- If manifest doesn't exist, skip sync for this project

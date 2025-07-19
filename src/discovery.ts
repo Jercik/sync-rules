@@ -3,7 +3,7 @@ import fg from "fast-glob";
 import path from "node:path";
 import { homedir } from "node:os";
 import * as logger from "./utils/core.ts";
-import { normalizePath, validatePathSecurity } from "./utils/core.ts";
+import { normalizePath, validatePathSecurity, generateEffectiveMdPatterns, filterMdFiles } from "./utils/core.ts";
 
 /**
  * Represents a discovered project directory.
@@ -141,7 +141,8 @@ export async function discoverProjects(
 
 /**
  * Checks if a directory contains any rule files matching the patterns.
- * Respects the .md constraint to match scan behavior.
+ * Uses the same pattern transformation logic as the scanning module
+ * to ensure consistent behavior across the system.
  *
  * @param dirPath The directory path to check
  * @param rulePatterns Array of rule patterns to look for
@@ -152,34 +153,9 @@ async function hasRuleFiles(
   rulePatterns: string[],
 ): Promise<boolean> {
   try {
-    // Build effective patterns that only match .md files
-    const effectivePatterns: string[] = [];
-    
-    for (const pattern of rulePatterns) {
-      if (pattern.endsWith(".md")) {
-        // Already .md file
-        effectivePatterns.push(pattern);
-      } else if (!pattern.includes("*") && !pattern.includes("/")) {
-        // Check if it's a directory
-        try {
-          const stats = await fs.stat(path.join(dirPath, pattern));
-          if (stats.isDirectory()) {
-            // Directory pattern - search for .md files recursively
-            effectivePatterns.push(`${pattern}/**/*.md`);
-          } else if (stats.isFile() && pattern.endsWith(".md")) {
-            effectivePatterns.push(pattern);
-          }
-        } catch (e) {
-          // If stat fails, treat as a file pattern
-          if (pattern.endsWith(".md")) {
-            effectivePatterns.push(pattern);
-          }
-        }
-      } else if (pattern.includes("*") && pattern.endsWith(".md")) {
-        // Glob pattern already ending in .md
-        effectivePatterns.push(pattern);
-      }
-    }
+    // Use the shared pattern transformation logic from core.ts
+    // This ensures consistent .md constraint behavior across scanning and discovery
+    const effectivePatterns = await generateEffectiveMdPatterns(rulePatterns, dirPath);
 
     if (effectivePatterns.length === 0) {
       return false;
@@ -195,7 +171,10 @@ async function hasRuleFiles(
       deep: Infinity, // Match scan.ts behavior for consistency
     });
 
-    return entries.length > 0;
+    // Apply the same post-processing filter as scan.ts for additional safety
+    const mdFiles = filterMdFiles(entries);
+
+    return mdFiles.length > 0;
   } catch (error) {
     logger.debug(
       `Could not check rule files in ${dirPath}: ${

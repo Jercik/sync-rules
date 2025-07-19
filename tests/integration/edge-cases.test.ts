@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import * as path from "path";
 import { runCLI, expectSuccess, containsInOutput } from "../helpers/cli-runner";
-import { createTestProject, fileExists, testContext } from "../helpers/setup";
+import { createTestProject, fileExists, testContext, createManifestFile } from "../helpers/setup";
 import {
   createBinaryFile,
   createLargeFile,
@@ -87,6 +87,17 @@ describe("Edge Cases", () => {
         ".kilocode/style.md": CONTENT.style.basic,
         ".kilocode/rules/docs.md": CONTENT.kilocode.documentation,
       });
+      
+      // Create manifests for both projects with all nested files
+      const allRuleFiles = [
+        ".cursorrules.md",
+        ".clinerules.md",
+        ".kilocode/style.md",
+        ".kilocode/rules/functional.md",
+        ".kilocode/rules/docs.md"
+      ];
+      await createManifestFile(pathA, allRuleFiles);
+      await createManifestFile(pathB, allRuleFiles);
 
       const result = await runCLI(["--auto-confirm", pathA, pathB]);
 
@@ -110,6 +121,16 @@ describe("Edge Cases", () => {
       });
 
       const pathB = await createTestProject("project-b", {});
+      
+      // Create manifests with all special character files
+      const specialFiles = [
+        "file with spaces.md",
+        "file-with-dashes.md",
+        "file_with_underscores.md",
+        "file.with.dots.md"
+      ];
+      await createManifestFile(pathA, specialFiles);
+      await createManifestFile(pathB, specialFiles);
 
       const result = await runCLI([
         "--auto-confirm",
@@ -187,6 +208,12 @@ describe("Edge Cases", () => {
       const pathB = await createTestProject("project-b", {});
 
       await setup(pathA);
+      
+      // Create manifests for both projects - use wildcard to include any .md files
+      // Note: large files will be excluded by the system due to size limit
+      const ruleFiles = ["*.md", "empty.md", "large.md", "binary-data.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([
         pathA,
@@ -215,6 +242,11 @@ describe("Edge Cases", () => {
         // Skip test if symlinks are not supported
         return;
       }
+      
+      // Create manifests - include all .md files (symlinks will be excluded by system)
+      const ruleFiles = ["*.md", "target.md", "link.md"];
+      await createManifestFile(pathA, ruleFiles);
+      await createManifestFile(pathB, ruleFiles);
 
       const result = await runCLI([
         pathA,

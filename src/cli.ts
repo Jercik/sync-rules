@@ -3,15 +3,16 @@
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import * as logger from "./utils/core.ts";
+import { safeAccess } from "./utils/core.ts";
 import { discoverProjects, validateProjects } from "./discovery.ts";
 import type { ProjectInfo } from "./discovery.ts";
-import { scanAllProjects, getUserConfirmations, handleManifestSync, handleExtraneousFiles } from "./multi-sync.ts";
+import { scanAllProjects, getUserConfirmations } from "./multi-sync.ts";
 import type { MultiSyncOptions, SyncAction } from "./multi-sync.ts";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { homedir } from "node:os";
 import { createProjectMap } from "./utils/project-utils.ts";
-import { preparationPhase, planningPhase, executionPhase, generationPhase, handleExtraneousFilesPhase } from "./utils/sync-phases.ts";
+import { preparationPhase, planningPhase, executionPhase, generationPhase } from "./utils/sync-phases.ts";
 
 /**
  * Main entry point for the `sync-rules` CLI application.
@@ -182,7 +183,7 @@ export async function executeUnifiedSync(
     return prepResult.errors ? 1 : 0;
   }
 
-  const { consistentManifest, globalFileStates } = prepResult.data!;
+  const { globalFileStates } = prepResult.data!;
   const multiSyncOptions: MultiSyncOptions = {
     rulePatterns: options.rules,
     excludePatterns: options.exclude,
@@ -196,7 +197,6 @@ export async function executeUnifiedSync(
   const planResult = await planningPhase(
     projects,
     globalFileStates,
-    consistentManifest,
     multiSyncOptions,
   );
   
@@ -210,15 +210,8 @@ export async function executeUnifiedSync(
       return 0; // User cancelled, exit cleanly
     }
     
-    // No sync needed - handle extraneous files and generate CLAUDE.md
-    const extraneousResult = await handleExtraneousFilesPhase(
-      projects,
-      consistentManifest,
-      multiSyncOptions,
-    );
-    
-    const errors = extraneousResult.data?.errors || 0;
-    const genResult = await generationPhase(projects, options, errors);
+    // No sync needed - generate CLAUDE.md
+    const genResult = await generationPhase(projects, options, 0);
     return genResult.data || 0;
   }
 
@@ -228,7 +221,6 @@ export async function executeUnifiedSync(
   const execResult = await executionPhase(
     projects,
     syncActions,
-    consistentManifest,
     multiSyncOptions,
   );
   
@@ -334,12 +326,13 @@ async function executeUpdate(
   } else {
     // Dry-run mode - check write permissions
     const destDir = path.dirname(targetPath);
-    try {
-      await fs.access(destDir, fs.constants.W_OK);
+    const canWrite = await safeAccess(destDir, fs.constants.W_OK, "update", action.targetProject);
+    
+    if (canWrite) {
       logger.log(
         `[DRY RUN] Would update: ${action.relativePath} in ${action.targetProject} from ${action.sourceProject}`,
       );
-    } catch {
+    } else {
       logger.warn(
         `[DRY RUN] Would fail to update: ${action.relativePath} in ${action.targetProject} - directory is not writable`,
       );
@@ -408,12 +401,7 @@ async function executeAdd(
 
     // Check write permissions on the destination directory
     const destDir = path.dirname(targetPath);
-    let canWrite = true;
-    try {
-      await fs.access(destDir, fs.constants.W_OK);
-    } catch {
-      canWrite = false;
-    }
+    const canWrite = await safeAccess(destDir, fs.constants.W_OK, "add", action.targetProject);
 
     if (!canWrite) {
       logger.warn(
@@ -456,12 +444,13 @@ async function executeDelete(
     await fs.unlink(action.targetFile.absolutePath);
   } else {
     // Dry-run mode - check if we can delete the file
-    try {
-      await fs.access(action.targetFile.absolutePath, fs.constants.W_OK);
+    const canDelete = await safeAccess(action.targetFile.absolutePath, fs.constants.W_OK, "delete", action.targetProject);
+    
+    if (canDelete) {
       logger.log(
         `[DRY RUN] Would delete: ${action.relativePath} from ${action.targetProject}`,
       );
-    } catch {
+    } else {
       logger.warn(
         `[DRY RUN] Would fail to delete: ${action.relativePath} from ${action.targetProject} - file is not writable`,
       );

@@ -17,11 +17,7 @@ export async function generateClaudeMd(
   projectDir: string,
   options: MultiSyncOptions,
 ): Promise<string> {
-  let concatenated = "# CLAUDE.md - Generated Rules for Claude Code\n\n";
-  concatenated +=
-    "⚠️ **This file is auto-generated. Do not edit manually.**\n" +
-    "Any manual changes will be lost on the next regeneration.\n" +
-    "To modify rules, edit the source `.md` files and run `sync-rules` to regenerate.\n\n";
+  let concatenated = "# CLAUDE.md - Rules for Claude Code\n\n";
 
   // Find all rule files using fast-glob
   // Global .md constraint: ensure all patterns only match .md files
