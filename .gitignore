@@ -140,6 +140,8 @@ dist
 
 # Claude Code
 CLAUDE.md
+# Gemini CLI
+GEMINI.md
 
 # Kilo Code agent rules
 .kilocode/rules/**
