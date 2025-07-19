@@ -28,5 +28,9 @@
 
 ## High-Level Source Code Structure
 
-- src/: cli.ts, config.ts, filesystem.ts, globLogic.ts, utils.ts, adapters/ (index.ts + per-adapter).
-- tests/: Per-module .test.ts, integration/ for E2E.
+- src/: cli.ts, config.ts, filesystem.ts, globLogic.ts, utils.ts, adapters/ (index.ts + per-adapter)
+- tests/: Per-module .test.ts, integration/ for E2E
+- Implemented files:
+  - src/utils.ts: Path validation, file checks, logging (100% test coverage)
+  - tests/utils.test.ts: 20 comprehensive tests using Vitest
+  - src/cli.ts: Basic Commander.js structure (placeholder)
