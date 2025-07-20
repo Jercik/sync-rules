@@ -1,21 +1,19 @@
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
+// TODO: Phase 6 - Full CLI integration with adapters
+// import { getAdapter } from "./adapters/index.ts";
 
 export async function main(argv: string[]) {
   const program = new Command();
-  const version = packageJson.version || "unknown";
 
   program
-    .name("sync-rules")
-    .version(version, "-v, --version", "Output the current version")
-    .description("A simple CLI to greet the world");
-
-  program
-    .command("hello-world")
-    .description("A simple command to print hello world")
-    .action(() => {
-      console.log("hello world");
-    });
+    .name(packageJson.name)
+    .description(packageJson.description)
+    .version(
+      packageJson.version,
+      "-v, --version",
+      "Output the current version",
+    );
 
   try {
     await program.parseAsync(argv);

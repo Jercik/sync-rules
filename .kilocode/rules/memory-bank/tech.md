@@ -18,15 +18,17 @@
 - Vitest config: Coverage enabled with @vitest/coverage-v8
 - Installation: npm install (dependencies already configured)
 - Testing: Package can be linked with npm link for global execution testing
-- TypeScript configured with tsconfig.json for type checking (noEmit mode)
+- TypeScript configured with tsconfig.json for type checking (noEmit mode, lib: "esnext" for Array.fromAsync support)
 
 ## Technical Constraints and Environment Specifics
 
 - OS: Agnostic (uses ~ for home dir)
-- Constraints: No internet/build steps; file sizes <1MB; absolute paths in config
+- Constraints: No internet/build steps; file sizes <1MB; paths automatically normalized to absolute
+- Security: Path validation prevents directory traversal attacks
 - Versions: Pin to Node >=24.0 for native TypeScript execution and fs.glob stability
 - Module system: ESM only (no CommonJS support)
 - Direct TypeScript execution without transpilation
+- File extensions: Use .ts extensions for imports (required for native TypeScript execution)
 
 ## Integration Details
 

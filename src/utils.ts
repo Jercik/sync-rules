@@ -1,5 +1,7 @@
-import { resolve, normalize } from "path";
+import { resolve, normalize, relative, isAbsolute } from "path";
 import { homedir } from "os";
+import { realpathSync } from "fs";
+import { MAX_MD_SIZE, getAllowedRoots } from "./constants.ts";
 
 /**
  * File system action types for testability
@@ -26,29 +28,38 @@ export function normalizePath(input: string): string {
     expandedPath = input.replace(/^~/, homedir());
   }
 
-  // Check if path contains .. before resolving
-  if (input.includes("..")) {
-    throw new Error("Path traversal detected");
-  }
-
-  // Resolve to absolute path
+  // Resolve to absolute path first (allows .. in safe paths like ~/projects/../my-safe-dir)
   const absolutePath = resolve(expandedPath);
   const normalizedPath = normalize(absolutePath);
 
-  // Define allowed root directories
-  const home = homedir();
-  const centralRepo = resolve(home, "Developer/agent-rules");
+  // Resolve symlinks to prevent bypass attempts
+  let realPath: string;
+  try {
+    realPath = realpathSync(normalizedPath);
+  } catch {
+    // If path doesn't exist yet, use the normalized path
+    // This allows creating new files/directories
+    realPath = normalizedPath;
+  }
 
-  // Check if path is within allowed directories
-  const isInHome = normalizedPath.startsWith(home);
-  const isInCentral = normalizedPath.startsWith(centralRepo);
-  const isInCwd = normalizedPath.startsWith(process.cwd());
+  // Check if path is within allowed directories using relative path method
+  const allowedRoots = getAllowedRoots();
+  const isAllowed = allowedRoots.some((root) => {
+    const relativePath = relative(root, realPath);
+    // Path is inside root if relative path doesn't start with .. or /
+    // and isn't an absolute path
+    return (
+      !relativePath.startsWith("..") &&
+      !relativePath.startsWith("/") &&
+      !isAbsolute(relativePath)
+    );
+  });
 
-  if (!isInHome && !isInCentral && !isInCwd) {
+  if (!isAllowed) {
     throw new Error("Path is outside allowed directories");
   }
 
-  return normalizedPath;
+  return realPath;
 }
 
 /**
@@ -63,13 +74,14 @@ export function isValidMdFile(path: string, size: number): boolean {
     return false;
   }
 
-  // Check size limit (1MB = 1024 * 1024 bytes)
-  if (size >= 1024 * 1024) {
+  // Check size limit
+  if (size >= MAX_MD_SIZE) {
     return false;
   }
 
-  // Check markdown extension (case sensitive)
-  return path.endsWith(".md");
+  // Check markdown extension (case insensitive)
+  const lowerCasePath = path.toLowerCase();
+  return lowerCasePath.endsWith(".md") && lowerCasePath.length > 3;
 }
 
 /**
