@@ -12,13 +12,19 @@ export const CONFIG_SCHEMA_URL = "https://example.com/sync-rules.schema.json";
 export const MAX_MD_SIZE = 1024 * 1024;
 
 /**
- * Allowed root directories for project paths
- * Returns an array of absolute paths that projects are allowed to reside in
+ * Central repository path where all rules are stored
  */
-export function getAllowedRoots(): string[] {
-  const home = homedir();
-  const centralRepo = resolve(home, "Developer/agent-rules");
-  const cwd = process.cwd();
+export const CENTRAL_REPO_PATH = resolve(homedir(), "Developer/agent-rules");
 
-  return [home, centralRepo, cwd];
-}
+/**
+ * Rules subdirectory within the central repository
+ */
+export const CENTRAL_RULES_PATH = resolve(CENTRAL_REPO_PATH, "rules");
+
+/**
+ * Default configuration file path
+ */
+export const DEFAULT_CONFIG_PATH = resolve(
+  homedir(),
+  ".config/sync-rules-config.json",
+);

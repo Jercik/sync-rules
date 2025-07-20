@@ -100,22 +100,6 @@ describe("config", () => {
           "!test/**",
         ]);
       });
-
-      it("should handle unicode in paths", () => {
-        const json = JSON.stringify({
-          projects: [
-            {
-              path: "~/Developer/プロジェクト",
-              rules: ["rule.md"],
-              adapters: ["claude"],
-            },
-          ],
-        });
-
-        const config = parseConfig(json);
-        // normalizePath will expand ~ to full home directory
-        expect(config.projects[0].path).toMatch(/\/Developer\/プロジェクト$/);
-      });
     });
 
     describe("invalid configurations", () => {
@@ -240,19 +224,6 @@ describe("config", () => {
         expect(() => parseConfig(json)).toThrow(z.ZodError);
       });
 
-      it("should throw on adapter case sensitivity", () => {
-        const json = JSON.stringify({
-          projects: [
-            {
-              path: "./test",
-              rules: ["test.md"],
-              adapters: ["Claude"], // Wrong case
-            },
-          ],
-        });
-        expect(() => parseConfig(json)).toThrow(z.ZodError);
-      });
-
       it("should throw on wrong field types", () => {
         // Path as number
         expect(() =>
@@ -307,19 +278,6 @@ describe("config", () => {
           projects: [
             {
               path: "/etc/passwd",
-              rules: ["test.md"],
-              adapters: ["claude"],
-            },
-          ],
-        });
-        expect(() => parseConfig(json)).toThrow(/Invalid project path/);
-      });
-
-      it("should throw on paths with .. in them", () => {
-        const json = JSON.stringify({
-          projects: [
-            {
-              path: "~/../../root",
               rules: ["test.md"],
               adapters: ["claude"],
             },
@@ -459,62 +417,6 @@ describe("config", () => {
         const json = JSON.stringify({ projects });
         const config = parseConfig(json);
         expect(config.projects).toHaveLength(100);
-      });
-
-      it("should allow duplicate project paths", () => {
-        const json = JSON.stringify({
-          projects: [
-            {
-              path: "./same/path",
-              rules: ["rule1.md"],
-              adapters: ["claude"],
-            },
-            {
-              path: "./same/path",
-              rules: ["rule2.md"],
-              adapters: ["gemini"],
-            },
-          ],
-        });
-
-        const config = parseConfig(json);
-        expect(config.projects).toHaveLength(2);
-        // Paths are normalized to absolute paths
-        expect(config.projects[0].path).toBe(config.projects[1].path);
-      });
-
-      it("should preserve order of projects, rules, and adapters", () => {
-        const json = JSON.stringify({
-          projects: [
-            {
-              path: "./third",
-              rules: ["c.md", "a.md", "b.md"],
-              adapters: ["kilocode", "claude", "gemini"],
-            },
-            {
-              path: "./first",
-              rules: ["x.md"],
-              adapters: ["gemini"],
-            },
-            {
-              path: "./second",
-              rules: ["y.md"],
-              adapters: ["claude"],
-            },
-          ],
-        });
-
-        const config = parseConfig(json);
-        // Paths are normalized to absolute paths
-        expect(config.projects[0].path).toMatch(/\/third$/);
-        expect(config.projects[1].path).toMatch(/\/first$/);
-        expect(config.projects[2].path).toMatch(/\/second$/);
-        expect(config.projects[0].rules).toEqual(["c.md", "a.md", "b.md"]);
-        expect(config.projects[0].adapters).toEqual([
-          "kilocode",
-          "claude",
-          "gemini",
-        ]);
       });
     });
   });

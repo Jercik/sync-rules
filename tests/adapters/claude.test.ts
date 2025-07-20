@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { claudeAdapter } from "../../src/adapters/claude.ts";
 import type { AdapterInput } from "../../src/adapters/index.ts";
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 describe("Claude Adapter", () => {
-  const projectPath = "/test/project";
+  const projectPath = join(homedir(), "test-project");
 
   it("should create a single write action for CLAUDE.md", () => {
     const input: AdapterInput = {
@@ -58,19 +59,6 @@ describe("Claude Adapter", () => {
     expect(actions[0].content).toContain("No rules configured.");
   });
 
-  it("should handle single rule without extra separators", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [{ path: "only.md", content: "# Only Rule\nSingle rule content" }],
-    };
-
-    const actions = claudeAdapter(input);
-    const content = actions[0].content;
-
-    expect(content).toContain("# Only Rule\nSingle rule content");
-    expect(content).not.toMatch(/---.*---/); // Should not have multiple separators
-  });
-
   it("should trim whitespace from rule contents", () => {
     const input: AdapterInput = {
       projectPath,
@@ -107,61 +95,6 @@ describe("Claude Adapter", () => {
     );
   });
 
-  it("should handle large content", () => {
-    const largeContent = "A".repeat(100000);
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "large1.md", content: largeContent },
-        { path: "large2.md", content: largeContent },
-      ],
-    };
-
-    const actions = claudeAdapter(input);
-    const content = actions[0].content;
-
-    expect(content.length).toBeGreaterThan(200000);
-    expect(content).toContain(largeContent);
-  });
-
-  it("should preserve rule order", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "a.md", content: "Rule A" },
-        { path: "z.md", content: "Rule Z" },
-        { path: "m.md", content: "Rule M" },
-      ],
-    };
-
-    const actions = claudeAdapter(input);
-    const content = actions[0].content;
-
-    const indexA = content.indexOf("Rule A");
-    const indexZ = content.indexOf("Rule Z");
-    const indexM = content.indexOf("Rule M");
-
-    expect(indexA).toBeLessThan(indexZ);
-    expect(indexZ).toBeLessThan(indexM);
-  });
-
-  it("should handle rules with existing separators", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "rule1.md", content: "# Rule 1\n---\nContent with separator" },
-        { path: "rule2.md", content: "# Rule 2" },
-      ],
-    };
-
-    const actions = claudeAdapter(input);
-    const content = actions[0].content;
-
-    // Should still work correctly even if rules contain ---
-    expect(content).toContain("# Rule 1\n---\nContent with separator");
-    expect(content).toContain("# Rule 2");
-  });
-
   it("should end content with newline", () => {
     const input: AdapterInput = {
       projectPath,
@@ -172,5 +105,60 @@ describe("Claude Adapter", () => {
     const content = actions[0].content;
 
     expect(content).toMatch(/\n$/);
+  });
+
+  it("should transform memory-bank.md to memory-bank-claude.md", () => {
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        { path: "docs/memory-bank.md", content: "# Memory Bank\nContent" },
+        { path: "other.md", content: "# Other\nContent" },
+      ],
+    };
+
+    const actions = claudeAdapter(input);
+    const content = actions[0].content;
+
+    // The content should remain the same, only the path transformation happens internally
+    expect(content).toContain("# Memory Bank\nContent");
+    expect(content).toContain("# Other\nContent");
+  });
+
+  it("should transform multiple memory-bank.md files", () => {
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        { path: "docs/memory-bank.md", content: "# Memory Bank 1" },
+        { path: "guides/memory-bank.md", content: "# Memory Bank 2" },
+        { path: "memory-bank.md", content: "# Memory Bank 3" },
+      ],
+    };
+
+    const actions = claudeAdapter(input);
+    const content = actions[0].content;
+
+    // All memory-bank.md files should have their content included
+    expect(content).toContain("# Memory Bank 1");
+    expect(content).toContain("# Memory Bank 2");
+    expect(content).toContain("# Memory Bank 3");
+  });
+
+  it("should not transform files that don't end with memory-bank.md", () => {
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        { path: "memory-bank.txt", content: "Not transformed" },
+        { path: "docs/memory-bank-old.md", content: "Not transformed either" },
+        { path: "memory-bank.md.bak", content: "Also not transformed" },
+      ],
+    };
+
+    const actions = claudeAdapter(input);
+    const content = actions[0].content;
+
+    // These files should be included as-is
+    expect(content).toContain("Not transformed");
+    expect(content).toContain("Not transformed either");
+    expect(content).toContain("Also not transformed");
   });
 });

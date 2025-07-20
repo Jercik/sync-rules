@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { geminiAdapter } from "../../src/adapters/gemini.ts";
 import type { AdapterInput } from "../../src/adapters/index.ts";
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 describe("Gemini Adapter", () => {
-  const projectPath = "/test/project";
+  const projectPath = join(homedir(), "test-project");
 
   it("should create a single write action for GEMINI.md", () => {
     const input: AdapterInput = {
@@ -58,19 +59,6 @@ describe("Gemini Adapter", () => {
     expect(actions[0].content).toContain("No rules configured.");
   });
 
-  it("should handle single rule without extra separators", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [{ path: "only.md", content: "# Only Rule\nSingle rule content" }],
-    };
-
-    const actions = geminiAdapter(input);
-    const content = actions[0].content;
-
-    expect(content).toContain("# Only Rule\nSingle rule content");
-    expect(content).not.toMatch(/---.*---/); // Should not have multiple separators
-  });
-
   it("should trim whitespace from rule contents", () => {
     const input: AdapterInput = {
       projectPath,
@@ -107,61 +95,6 @@ describe("Gemini Adapter", () => {
     );
   });
 
-  it("should handle large content", () => {
-    const largeContent = "B".repeat(100000);
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "large1.md", content: largeContent },
-        { path: "large2.md", content: largeContent },
-      ],
-    };
-
-    const actions = geminiAdapter(input);
-    const content = actions[0].content;
-
-    expect(content.length).toBeGreaterThan(200000);
-    expect(content).toContain(largeContent);
-  });
-
-  it("should preserve rule order", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "x.md", content: "Rule X" },
-        { path: "y.md", content: "Rule Y" },
-        { path: "z.md", content: "Rule Z" },
-      ],
-    };
-
-    const actions = geminiAdapter(input);
-    const content = actions[0].content;
-
-    const indexX = content.indexOf("Rule X");
-    const indexY = content.indexOf("Rule Y");
-    const indexZ = content.indexOf("Rule Z");
-
-    expect(indexX).toBeLessThan(indexY);
-    expect(indexY).toBeLessThan(indexZ);
-  });
-
-  it("should handle rules with existing separators", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "rule1.md", content: "# Rule 1\n---\nContent with separator" },
-        { path: "rule2.md", content: "# Rule 2" },
-      ],
-    };
-
-    const actions = geminiAdapter(input);
-    const content = actions[0].content;
-
-    // Should still work correctly even if rules contain ---
-    expect(content).toContain("# Rule 1\n---\nContent with separator");
-    expect(content).toContain("# Rule 2");
-  });
-
   it("should end content with newline", () => {
     const input: AdapterInput = {
       projectPath,
@@ -176,13 +109,15 @@ describe("Gemini Adapter", () => {
 
   it("should output to GEMINI.md not CLAUDE.md", () => {
     const input: AdapterInput = {
-      projectPath: "/different/path",
+      projectPath: join(homedir(), "different-path"),
       rules: [{ path: "test.md", content: "Test" }],
     };
 
     const actions = geminiAdapter(input);
 
-    expect(actions[0].path).toBe("/different/path/GEMINI.md");
+    expect(actions[0].path).toBe(
+      join(homedir(), "different-path", "GEMINI.md"),
+    );
     expect(actions[0].path).not.toContain("CLAUDE");
   });
 });

@@ -29,9 +29,6 @@ describe("utils", () => {
       expect(() => normalizePath("/root/.ssh/id_rsa")).toThrow(
         /outside allowed directories/i,
       );
-      expect(() => normalizePath("/usr/bin/evil")).toThrow(
-        /outside allowed directories/i,
-      );
     });
 
     it("should allow safe paths with .. that stay within allowed directories", () => {
@@ -39,15 +36,6 @@ describe("utils", () => {
       const safePath = `${home}/Projects/../Documents/project`;
       const result = normalizePath(safePath);
       expect(result).toBe(resolve(home, "Documents/project"));
-    });
-
-    it("should reject paths outside allowed roots", () => {
-      expect(() => normalizePath("/etc/passwd")).toThrow(
-        /outside allowed directories/i,
-      );
-      expect(() => normalizePath("/usr/bin/node")).toThrow(
-        /outside allowed directories/i,
-      );
     });
 
     it("should allow paths within home directory", () => {

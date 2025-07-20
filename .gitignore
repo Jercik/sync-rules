@@ -151,3 +151,6 @@ GEMINI.md
 
 repomix-output.*
 repomix.config.json
+
+# Test temporary directories
+.test-tmp/

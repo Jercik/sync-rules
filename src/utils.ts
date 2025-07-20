@@ -1,7 +1,5 @@
-import { resolve, normalize, relative, isAbsolute } from "path";
-import { homedir } from "os";
-import { realpathSync } from "fs";
-import { MAX_MD_SIZE, getAllowedRoots } from "./constants.ts";
+import { MAX_MD_SIZE } from "./constants.ts";
+import { createDefaultPathGuard } from "./pathGuard.ts";
 
 /**
  * File system action types for testability
@@ -11,55 +9,23 @@ export type FSAction =
   | { type: "mkdir"; path: string; recursive?: boolean }
   | { type: "copy"; from: string; to: string };
 
+// Create a singleton instance of PathGuard with default allowed roots
+const defaultPathGuard = createDefaultPathGuard();
+
 /**
  * Normalizes and validates a file path, preventing directory traversal attacks
+ *
+ * SECURITY NOTE: This function is critical for preventing path traversal attacks.
+ * All file system operations in adapters MUST use this function to normalize paths
+ * before writing or creating directories. This ensures that malicious input cannot
+ * escape the intended project directory.
+ *
  * @param input - The path to normalize (supports ~ for home directory)
  * @returns The normalized absolute path
  * @throws Error if path contains traversal attempts or is outside allowed directories
  */
 export function normalizePath(input: string): string {
-  if (!input || input.trim() === "") {
-    throw new Error("Invalid path: empty string");
-  }
-
-  // Expand home directory
-  let expandedPath = input;
-  if (input.startsWith("~")) {
-    expandedPath = input.replace(/^~/, homedir());
-  }
-
-  // Resolve to absolute path first (allows .. in safe paths like ~/projects/../my-safe-dir)
-  const absolutePath = resolve(expandedPath);
-  const normalizedPath = normalize(absolutePath);
-
-  // Resolve symlinks to prevent bypass attempts
-  let realPath: string;
-  try {
-    realPath = realpathSync(normalizedPath);
-  } catch {
-    // If path doesn't exist yet, use the normalized path
-    // This allows creating new files/directories
-    realPath = normalizedPath;
-  }
-
-  // Check if path is within allowed directories using relative path method
-  const allowedRoots = getAllowedRoots();
-  const isAllowed = allowedRoots.some((root) => {
-    const relativePath = relative(root, realPath);
-    // Path is inside root if relative path doesn't start with .. or /
-    // and isn't an absolute path
-    return (
-      !relativePath.startsWith("..") &&
-      !relativePath.startsWith("/") &&
-      !isAbsolute(relativePath)
-    );
-  });
-
-  if (!isAllowed) {
-    throw new Error("Path is outside allowed directories");
-  }
-
-  return realPath;
+  return defaultPathGuard.validatePath(input);
 }
 
 /**

@@ -1,9 +1,10 @@
-import { join, basename } from "node:path";
+import { join, dirname } from "node:path";
 import type { AdapterFunction } from "./index.ts";
 import type { FSAction } from "../utils.ts";
 
 /**
  * Kilocode adapter - writes individual rule files to .kilocode/rules directory
+ * Preserves directory structure to avoid name collisions
  */
 export const kilocodeAdapter: AdapterFunction = ({ projectPath, rules }) => {
   const actions: FSAction[] = [];
@@ -16,14 +17,37 @@ export const kilocodeAdapter: AdapterFunction = ({ projectPath, rules }) => {
     recursive: true,
   });
 
-  // Create write actions for each rule file
-  for (const rule of rules) {
-    // Use basename to flatten directory structure and avoid nesting issues
-    const filename = basename(rule.path);
+  // Track directories that need to be created
+  const dirsToCreate = new Set<string>();
 
+  // Collect all parent directories
+  for (const rule of rules) {
+    const relDir = dirname(rule.path);
+    if (relDir !== ".") {
+      // Add all parent directories in the path
+      let currentDir = "";
+      for (const part of relDir.split("/")) {
+        currentDir = currentDir ? join(currentDir, part) : part;
+        dirsToCreate.add(join(rulesDir, currentDir));
+      }
+    }
+  }
+
+  // Create mkdir actions for all needed directories (sorted for proper order)
+  const sortedDirs = Array.from(dirsToCreate).sort();
+  for (const dir of sortedDirs) {
+    actions.push({
+      type: "mkdir",
+      path: dir,
+      recursive: true,
+    });
+  }
+
+  // Create write actions for each rule file (preserving directory structure)
+  for (const rule of rules) {
     actions.push({
       type: "write",
-      path: join(rulesDir, filename),
+      path: join(rulesDir, rule.path),
       content: rule.content,
     });
   }

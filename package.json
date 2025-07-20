@@ -24,6 +24,7 @@
     "ai-coding-assistant"
   ],
   "dependencies": {
+    "chalk": "^5.4.1",
     "commander": "^14.0.0",
     "zod": "^4.0.5"
   },

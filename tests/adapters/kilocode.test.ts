@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { kilocodeAdapter } from "../../src/adapters/kilocode.ts";
 import type { AdapterInput } from "../../src/adapters/index.ts";
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 describe("Kilocode Adapter", () => {
-  const projectPath = "/test/project";
+  const projectPath = join(homedir(), "test-project");
   const rulesDir = join(projectPath, ".kilocode/rules");
 
   it("should create mkdir action and write actions for each rule", () => {
@@ -52,7 +53,7 @@ describe("Kilocode Adapter", () => {
     });
   });
 
-  it("should flatten nested paths using basename", () => {
+  it("should preserve directory structure", () => {
     const input: AdapterInput = {
       projectPath,
       rules: [
@@ -64,14 +65,47 @@ describe("Kilocode Adapter", () => {
 
     const actions = kilocodeAdapter(input);
 
-    expect(actions).toHaveLength(4); // 1 mkdir + 3 writes
-    expect(actions[1].path).toBe(join(rulesDir, "rule1.md"));
-    expect(actions[2].path).toBe(join(rulesDir, "rule2.md"));
-    expect(actions[3].path).toBe(join(rulesDir, "rule3.md"));
-    // Should not include directory structure
-    expect(actions[1].path).not.toContain("dir1");
-    expect(actions[2].path).not.toContain("dir2");
-    expect(actions[2].path).not.toContain("subdir");
+    // 1 root mkdir + 3 subdirs + 3 writes = 7 actions
+    expect(actions).toHaveLength(7);
+
+    // Check mkdir actions
+    expect(actions[0]).toEqual({
+      type: "mkdir",
+      path: rulesDir,
+      recursive: true,
+    });
+    expect(actions[1]).toEqual({
+      type: "mkdir",
+      path: join(rulesDir, "dir1"),
+      recursive: true,
+    });
+    expect(actions[2]).toEqual({
+      type: "mkdir",
+      path: join(rulesDir, "dir2"),
+      recursive: true,
+    });
+    expect(actions[3]).toEqual({
+      type: "mkdir",
+      path: join(rulesDir, "dir2/subdir"),
+      recursive: true,
+    });
+
+    // Check write actions
+    expect(actions[4]).toEqual({
+      type: "write",
+      path: join(rulesDir, "dir1/rule1.md"),
+      content: "Content 1",
+    });
+    expect(actions[5]).toEqual({
+      type: "write",
+      path: join(rulesDir, "dir2/subdir/rule2.md"),
+      content: "Content 2",
+    });
+    expect(actions[6]).toEqual({
+      type: "write",
+      path: join(rulesDir, "rule3.md"),
+      content: "Content 3",
+    });
   });
 
   it("should preserve original content without modification", () => {
@@ -111,80 +145,59 @@ describe("Kilocode Adapter", () => {
     }
   });
 
-  it("should handle files with same basename", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "dir1/same.md", content: "Content 1" },
-        { path: "dir2/same.md", content: "Content 2" },
-      ],
-    };
-
-    const actions = kilocodeAdapter(input);
-
-    // Both will write to same.md, second one will overwrite
-    expect(actions).toHaveLength(3); // 1 mkdir + 2 writes
-    expect(actions[1].path).toBe(join(rulesDir, "same.md"));
-    expect(actions[2].path).toBe(join(rulesDir, "same.md"));
-    expect(actions[1].content).toBe("Content 1");
-    expect(actions[2].content).toBe("Content 2");
-  });
-
   it("should use .kilocode/rules directory", () => {
     const input: AdapterInput = {
-      projectPath: "/custom/path",
+      projectPath: join(homedir(), "custom-path"),
       rules: [{ path: "test.md", content: "Test" }],
     };
 
     const actions = kilocodeAdapter(input);
 
-    expect(actions[0].path).toBe("/custom/path/.kilocode/rules");
-    expect(actions[1].path).toBe("/custom/path/.kilocode/rules/test.md");
+    expect(actions[0].path).toBe(
+      join(homedir(), "custom-path", ".kilocode/rules"),
+    );
+    expect(actions[1].path).toBe(
+      join(homedir(), "custom-path", ".kilocode/rules/test.md"),
+    );
   });
 
-  it("should handle special characters in filenames", () => {
+  it("should handle name collisions by preserving directory structure", () => {
     const input: AdapterInput = {
       projectPath,
       rules: [
-        { path: "file-with-dashes.md", content: "Content 1" },
-        { path: "file_with_underscores.md", content: "Content 2" },
-        { path: "file.with.dots.md", content: "Content 3" },
+        { path: "frontend/react.md", content: "Frontend React rules" },
+        { path: "backend/react.md", content: "Backend React rules" },
+        { path: "devops/ansible.md", content: "DevOps Ansible rules" },
+        { path: "frontend/ansible.md", content: "Frontend Ansible rules" },
       ],
     };
 
     const actions = kilocodeAdapter(input);
 
-    expect(actions[1].path).toBe(join(rulesDir, "file-with-dashes.md"));
-    expect(actions[2].path).toBe(join(rulesDir, "file_with_underscores.md"));
-    expect(actions[3].path).toBe(join(rulesDir, "file.with.dots.md"));
-  });
+    // Should create necessary directories and preserve all files
+    const writeActions = actions.filter((a) => a.type === "write");
+    expect(writeActions).toHaveLength(4);
 
-  it("should create recursive directory", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [{ path: "test.md", content: "Test" }],
-    };
-
-    const actions = kilocodeAdapter(input);
-
-    expect(actions[0]).toMatchObject({
-      type: "mkdir",
-      recursive: true,
+    // Check that all files are written with their full paths
+    expect(writeActions[0]).toEqual({
+      type: "write",
+      path: join(rulesDir, "frontend/react.md"),
+      content: "Frontend React rules",
     });
-  });
-
-  it("should handle empty content", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "empty.md", content: "" },
-        { path: "nonempty.md", content: "Content" },
-      ],
-    };
-
-    const actions = kilocodeAdapter(input);
-
-    expect(actions[1].content).toBe("");
-    expect(actions[2].content).toBe("Content");
+    expect(writeActions[1]).toEqual({
+      type: "write",
+      path: join(rulesDir, "backend/react.md"),
+      content: "Backend React rules",
+    });
+    expect(writeActions[2]).toEqual({
+      type: "write",
+      path: join(rulesDir, "devops/ansible.md"),
+      content: "DevOps Ansible rules",
+    });
+    expect(writeActions[3]).toEqual({
+      type: "write",
+      path: join(rulesDir, "frontend/ansible.md"),
+      content: "Frontend Ansible rules",
+    });
   });
 });
