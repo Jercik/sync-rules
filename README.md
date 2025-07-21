@@ -59,3 +59,38 @@ Here's an example config:
 ```bash
 sync-rules --help
 ```
+
+### Claude Memory Bank Alias (`claudemb`)
+
+To streamline using Claude with the Memory Bank startup procedure, you can use the `claudemb` shell function. It's a wrapper around the `claude` CLI that automatically injects the global memory bank rule into the system prompt.
+
+This ensures Claude always starts with the required instructions for re-establishing context, regardless of the project you're working on.
+
+**Setup**
+
+Add the following function to your shell's configuration file (e.g., `~/.bashrc` or `~/.zshrc`):
+
+```bash
+claudemb() {
+  # Path to your central AI rules repository.
+  # The '~' will be expanded by your shell to your home directory.
+  local rules_file="~/Developer/agent-rules/rules/ai-coding-workflow/memory-bank.md"
+
+  # Evaluate the path to handle the tilde expansion correctly.
+  local expanded_rules_file
+  eval expanded_rules_file="$rules_file"
+
+  if [[ ! -f "$expanded_rules_file" ]]; then
+    echo "Error: Memory Bank rule file not found at: $expanded_rules_file" >&2
+    echo "Hint: Make sure your central 'agent-rules' repository is cloned at '~/Developer/agent-rules'." >&2
+    return 1
+  fi
+
+  # Forwards all arguments to the claude command, appending the rules file content.
+  claude --append-system-prompt "$(< "$expanded_rules_file")" "$@"
+}
+```
+
+**Usage**
+
+You can now use `claudemb` as a drop-in replacement for `claude`.
