@@ -107,7 +107,7 @@ describe("Claude Adapter", () => {
     expect(content).toMatch(/\n$/);
   });
 
-  it("should transform memory-bank.md to memory-bank-claude.md", () => {
+  it("should filter out files containing memory-bank in path", () => {
     const input: AdapterInput = {
       projectPath,
       rules: [
@@ -119,46 +119,67 @@ describe("Claude Adapter", () => {
     const actions = claudeAdapter(input);
     const content = actions[0].content;
 
-    // The content should remain the same, only the path transformation happens internally
-    expect(content).toContain("# Memory Bank\nContent");
+    // Memory bank files should be filtered out
+    expect(content).not.toContain("# Memory Bank");
     expect(content).toContain("# Other\nContent");
   });
 
-  it("should transform multiple memory-bank.md files", () => {
+  it("should filter out multiple memory-bank files", () => {
     const input: AdapterInput = {
       projectPath,
       rules: [
         { path: "docs/memory-bank.md", content: "# Memory Bank 1" },
         { path: "guides/memory-bank.md", content: "# Memory Bank 2" },
         { path: "memory-bank.md", content: "# Memory Bank 3" },
+        { path: "regular-rule.md", content: "# Regular Rule" },
       ],
     };
 
     const actions = claudeAdapter(input);
     const content = actions[0].content;
 
-    // All memory-bank.md files should have their content included
-    expect(content).toContain("# Memory Bank 1");
-    expect(content).toContain("# Memory Bank 2");
-    expect(content).toContain("# Memory Bank 3");
+    // All memory-bank files should be filtered out
+    expect(content).not.toContain("# Memory Bank 1");
+    expect(content).not.toContain("# Memory Bank 2");
+    expect(content).not.toContain("# Memory Bank 3");
+    expect(content).toContain("# Regular Rule");
   });
 
-  it("should not transform files that don't end with memory-bank.md", () => {
+  it("should filter any file with memory-bank in the path", () => {
     const input: AdapterInput = {
       projectPath,
       rules: [
-        { path: "memory-bank.txt", content: "Not transformed" },
-        { path: "docs/memory-bank-old.md", content: "Not transformed either" },
-        { path: "memory-bank.md.bak", content: "Also not transformed" },
+        { path: "memory-bank.txt", content: "Memory bank text" },
+        { path: "docs/memory-bank-old.md", content: "Old memory bank" },
+        { path: "memory-bank.md.bak", content: "Backup memory bank" },
+        { path: "some-memory-bank-file.md", content: "Some memory bank" },
+        { path: "normal-file.md", content: "Normal content" },
       ],
     };
 
     const actions = claudeAdapter(input);
     const content = actions[0].content;
 
-    // These files should be included as-is
-    expect(content).toContain("Not transformed");
-    expect(content).toContain("Not transformed either");
-    expect(content).toContain("Also not transformed");
+    // All files with memory-bank in the path should be filtered out
+    expect(content).not.toContain("Memory bank text");
+    expect(content).not.toContain("Old memory bank");
+    expect(content).not.toContain("Backup memory bank");
+    expect(content).not.toContain("Some memory bank");
+    expect(content).toContain("Normal content");
+  });
+
+  it("should show 'No rules configured' when all rules are memory-bank files", () => {
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        { path: "memory-bank.md", content: "# Memory Bank" },
+        { path: "docs/memory-bank-claude.md", content: "# Memory Bank Claude" },
+      ],
+    };
+
+    const actions = claudeAdapter(input);
+    const content = actions[0].content;
+
+    expect(content).toContain("No rules configured.");
   });
 });
