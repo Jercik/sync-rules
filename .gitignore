@@ -145,9 +145,6 @@ GEMINI.md
 
 # Kilo Code agent rules
 .kilocode/rules/**
-# excluding memory bank
-!.kilocode/rules/memory-bank/
-!.kilocode/rules/memory-bank/**
 
 repomix-output.*
 repomix.config.json
