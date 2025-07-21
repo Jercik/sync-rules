@@ -70,7 +70,7 @@
 ### Filesystem Integration
 
 - **Central Repository**: Hardcoded at `~/Developer/agent-rules`
-- **Config Location**: User config at `~/.config/sync-rules/config.json`
+- **Config Location**: User config at `~/.config/sync-rules-config.json`
 - **Target Projects**: Any accessible directory on the filesystem
 
 ### No External Dependencies

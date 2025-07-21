@@ -17,7 +17,7 @@ The tool provides automated one-way synchronization from a central repository to
 
 ### Core Functionality
 
-- Reads configuration from `~/.config/sync-rules/config.json`
+- Reads configuration from `~/.config/sync-rules-config.json`
 - Sources rules from central repository at `~/Developer/agent-rules/rules/`
 - Supports glob patterns for flexible rule selection
 - Transforms rules through adapters for different AI tools
@@ -63,8 +63,8 @@ The tool provides automated one-way synchronization from a central repository to
 ### Getting Started
 
 1. Install globally: `npm install -g sync-rules`
-2. Create config at `~/.config/sync-rules/config.json`
-3. Run: `sync-rules -c ~/.config/sync-rules/config.json`
+2. Create config at `~/.config/sync-rules-config.json`
+3. Run: `sync-rules -c ~/.config/sync-rules-config.json`
 
 ### Output Format
 

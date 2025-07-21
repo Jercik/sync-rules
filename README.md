@@ -10,11 +10,11 @@
 
 ### How it Works
 
-The tool operates as a centralized propagator. You define rules in a central repository (`~/Developer/agent-rules/rules/`). A user-maintained configuration file (`~/.config/sync-rules/config.json`) specifies which projects receive which rules and how they are adapted for different AI tools (e.g., `CLAUDE.md`, `GEMINI.md`, or copied to `.kilocode/rules/`). The process is non-interactive, with the central repository always being the source of truth.
+The tool operates as a centralized propagator. You define rules in a central repository (`~/Developer/agent-rules/rules/`). A user-maintained configuration file (`~/.config/sync-rules-config.json`) specifies which projects receive which rules and how they are adapted for different AI tools (e.g., `CLAUDE.md`, `GEMINI.md`, or copied to `.kilocode/rules/`). The process is non-interactive, with the central repository always being the source of truth.
 
 ### Configuration
 
-You run `sync-rules`, which reads a user-maintained configuration file at `~/.config/sync-rules/config.json`. This JSON file, validated via Zod against a schema (with a `$schema` reference for editor support), lists projects to sync, along with which rules to select (via glob patterns like `"python.md"` or `"frontend/**"`) and which adapters to apply (from a supported list: `claude`, `gemini`, `kilocode`). If a project isn't listed in the config, it's ignored—users must manually add entries to start syncing a repository, making the process deliberate and human-editable.
+You run `sync-rules`, which reads a user-maintained configuration file at `~/.config/sync-rules-config.json`. This JSON file, validated via Zod against a schema (with a `$schema` reference for editor support), lists projects to sync, along with which rules to select (via glob patterns like `"python.md"` or `"frontend/**"`) and which adapters to apply (from a supported list: `claude`, `gemini`, `kilocode`). If a project isn't listed in the config, it's ignored—users must manually add entries to start syncing a repository, making the process deliberate and human-editable.
 
 Here's an example config:
 
