@@ -124,56 +124,80 @@ describe("Claude Adapter", () => {
     expect(content).toContain("# Other\nContent");
   });
 
-  it("should filter out multiple memory-bank files", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "docs/memory-bank.md", content: "# Memory Bank 1" },
-        { path: "guides/memory-bank.md", content: "# Memory Bank 2" },
-        { path: "memory-bank.md", content: "# Memory Bank 3" },
-        { path: "regular-rule.md", content: "# Regular Rule" },
-      ],
-    };
-
-    const actions = claudeAdapter(input);
-    const content = actions[0].content;
-
-    // All memory-bank files should be filtered out
-    expect(content).not.toContain("# Memory Bank 1");
-    expect(content).not.toContain("# Memory Bank 2");
-    expect(content).not.toContain("# Memory Bank 3");
-    expect(content).toContain("# Regular Rule");
-  });
-
-  it("should filter any file with memory-bank in the path", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "memory-bank.txt", content: "Memory bank text" },
-        { path: "docs/memory-bank-old.md", content: "Old memory bank" },
-        { path: "memory-bank.md.bak", content: "Backup memory bank" },
-        { path: "some-memory-bank-file.md", content: "Some memory bank" },
-        { path: "normal-file.md", content: "Normal content" },
-      ],
-    };
-
-    const actions = claudeAdapter(input);
-    const content = actions[0].content;
-
-    // All files with memory-bank in the path should be filtered out
-    expect(content).not.toContain("Memory bank text");
-    expect(content).not.toContain("Old memory bank");
-    expect(content).not.toContain("Backup memory bank");
-    expect(content).not.toContain("Some memory bank");
-    expect(content).toContain("Normal content");
-  });
-
   it("should show 'No rules configured' when all rules are memory-bank files", () => {
     const input: AdapterInput = {
       projectPath,
       rules: [
         { path: "memory-bank.md", content: "# Memory Bank" },
         { path: "docs/memory-bank-claude.md", content: "# Memory Bank Claude" },
+      ],
+    };
+
+    const actions = claudeAdapter(input);
+    const content = actions[0].content;
+
+    expect(content).toContain("No rules configured.");
+  });
+
+  it("should filter out files containing self-reflection in path", () => {
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        {
+          path: "ai-coding-workflow/self-reflection.md",
+          content: "# Self Reflection\nContent",
+        },
+        { path: "other.md", content: "# Other\nContent" },
+      ],
+    };
+
+    const actions = claudeAdapter(input);
+    const content = actions[0].content;
+
+    // Self-reflection files should be filtered out
+    expect(content).not.toContain("# Self Reflection");
+    expect(content).toContain("# Other\nContent");
+  });
+
+  it("should filter both memory-bank and self-reflection files", () => {
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        { path: "memory-bank.md", content: "# Memory Bank" },
+        { path: "self-reflection.md", content: "# Self Reflection" },
+        { path: "docs/memory-bank-guide.md", content: "# Memory Bank Guide" },
+        {
+          path: "ai/self-reflection-rule.md",
+          content: "# Self Reflection Rule",
+        },
+        { path: "regular-rule.md", content: "# Regular Rule" },
+        { path: "another-rule.md", content: "# Another Rule" },
+      ],
+    };
+
+    const actions = claudeAdapter(input);
+    const content = actions[0].content;
+
+    // Both memory-bank and self-reflection files should be filtered out
+    expect(content).not.toContain("# Memory Bank");
+    expect(content).not.toContain("# Self Reflection");
+    expect(content).not.toContain("# Memory Bank Guide");
+    expect(content).not.toContain("# Self Reflection Rule");
+    expect(content).toContain("# Regular Rule");
+    expect(content).toContain("# Another Rule");
+  });
+
+  it("should show 'No rules configured' when all rules are filtered out", () => {
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        { path: "memory-bank.md", content: "# Memory Bank" },
+        { path: "self-reflection.md", content: "# Self Reflection" },
+        { path: "docs/memory-bank-claude.md", content: "# Memory Bank Claude" },
+        {
+          path: "ai/self-reflection-rule.md",
+          content: "# Self Reflection Rule",
+        },
       ],
     };
 

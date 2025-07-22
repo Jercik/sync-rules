@@ -1,6 +1,19 @@
-import { join } from "node:path";
+import { join, matchesGlob } from "node:path";
 import type { AdapterFunction } from "./index.ts";
 import type { FSAction } from "../utils.ts";
+
+/**
+ * List of patterns to ignore in Claude adapter.
+ * These rules are handled separately or should not be included in CLAUDE.md.
+ *
+ * Uses Node.js native glob patterns.
+ */
+const IGNORED_PATTERNS = [
+  "**/*memory-bank*", // Memory bank rules are injected via claudemb shell function
+  "**/*memory-bank*/**", // Also match if memory-bank is in a directory name
+  "**/*self-reflection*", // Self-reflection rule is not applicable to Claude
+  "**/*self-reflection*/**", // Also match if self-reflection is in a directory name
+] as const;
 
 /**
  * Claude adapter - concatenates all rules into a single CLAUDE.md file
@@ -8,10 +21,10 @@ import type { FSAction } from "../utils.ts";
 export const claudeAdapter: AdapterFunction = ({ projectPath, rules }) => {
   const actions: FSAction[] = [];
 
-  // Filter out memory-bank files
+  // Filter out ignored rules
   const filteredRules = rules.filter((rule) => {
-    // Skip any file that contains "memory-bank" in its path
-    return !rule.path.includes("memory-bank");
+    // Skip any file that matches ignored patterns
+    return !IGNORED_PATTERNS.some((pattern) => matchesGlob(rule.path, pattern));
   });
 
   // Create the CLAUDE.md content
