@@ -1,6 +1,7 @@
 import type { Adapter } from "../config.ts";
 import type { FSAction } from "../utils.ts";
 import { claudeAdapter } from "./claude.ts";
+import { clineAdapter } from "./cline.ts";
 import { geminiAdapter } from "./gemini.ts";
 import { kilocodeAdapter } from "./kilocode.ts";
 
@@ -22,6 +23,7 @@ export type AdapterFunction = (input: AdapterInput) => FSAction[];
  */
 const adapterRegistry = new Map<Adapter, AdapterFunction>([
   ["claude", claudeAdapter],
+  ["cline", clineAdapter],
   ["gemini", geminiAdapter],
   ["kilocode", kilocodeAdapter],
 ]);

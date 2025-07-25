@@ -138,13 +138,11 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# Claude Code
+# AI coding assistants
 CLAUDE.md
-# Gemini CLI
 GEMINI.md
-
-# Kilo Code agent rules
-.kilocode/rules/**
+.kilocode
+.clinerules
 
 repomix-output.*
 repomix.config.json

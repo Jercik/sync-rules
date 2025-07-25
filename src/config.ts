@@ -10,7 +10,7 @@ export { CONFIG_SCHEMA_URL };
 /**
  * Adapter enum - supported AI coding assistant tools
  */
-export const Adapter = z.enum(["claude", "gemini", "kilocode"]);
+export const Adapter = z.enum(["claude", "cline", "gemini", "kilocode"]);
 
 /**
  * Project configuration schema
