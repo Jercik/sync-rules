@@ -14,13 +14,12 @@ The tool operates as a centralized propagator. You define rules in a central rep
 
 ### Configuration
 
-You run `sync-rules`, which reads a user-maintained configuration file at `~/.config/sync-rules-config.json`. This JSON file, validated via Zod against a schema (with a `$schema` reference for editor support), lists projects to sync, along with which rules to select (via glob patterns like `"python.md"` or `"frontend/**"`) and which adapters to apply (from a supported list: `claude`, `gemini`, `kilocode`). If a project isn't listed in the config, it's ignored—users must manually add entries to start syncing a repository, making the process deliberate and human-editable.
+You run `sync-rules`, which reads a user-maintained configuration file at `~/.config/sync-rules-config.json`. This JSON file, validated via Zod, lists projects to sync, along with which rules to select (via glob patterns like `"python.md"` or `"frontend/**"`) and which adapters to apply (from a supported list: `claude`, `cline`, `gemini`, `kilocode`). If a project isn't listed in the config, it's ignored—users must manually add entries to start syncing a repository, making the process deliberate and human-editable.
 
 Here's an example config:
 
 ```json
 {
-  "$schema": "https://example.com/sync-rules.schema.json",
   "projects": [
     {
       "path": "/home/alice/Work/awesome-service",
@@ -54,7 +53,19 @@ Here's an example config:
 
 ### Usage
 
-(This section will be expanded with concrete examples once the CLI is fully implemented.)
+Basic:
+
+```bash
+sync-rules -c ~/.config/sync-rules-config.json
+```
+
+Dry-run and verbose:
+
+```bash
+sync-rules -c ~/.config/sync-rules-config.json -d --verbose
+```
+
+Show help:
 
 ```bash
 sync-rules --help

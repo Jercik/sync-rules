@@ -23,6 +23,12 @@
     "rules",
     "ai-coding-assistant"
   ],
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "chalk": "^5.4.1",
     "commander": "^14.0.0",

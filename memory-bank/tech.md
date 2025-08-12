@@ -38,7 +38,7 @@
 ### Testing Infrastructure
 
 - **Framework**: Vitest with @vitest/coverage-v8
-- **Coverage**: 100% across 201 tests (all lines, branches, functions, and statements)
+- **Coverage**: Comprehensive across modules
 - **Structure**: One test file per module (`*.test.ts`)
 - **Approach**: Test-Driven Development (TDD)
 
@@ -93,6 +93,6 @@
 
 - **Unit Tests**: Pure functions tested in isolation
 - **Integration Tests**: Full workflow tests with real files
-- **Coverage**: Natural 100% coverage through TDD approach
+- **Coverage**: Broad coverage through TDD approach
 - **Fast Execution**: ~400ms for entire test suite
 - **Test Files**: 14 test files covering all modules (including PathGuard)

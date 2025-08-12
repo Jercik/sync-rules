@@ -109,7 +109,7 @@ sync-rules/
 
 ### Testing Architecture
 
-- 100% code coverage across 201 tests
+- Comprehensive tests across all modules
 - Unit tests for pure functions
 - Integration tests for I/O operations
 - Proper mocking with vi.hoisted() for ESM modules

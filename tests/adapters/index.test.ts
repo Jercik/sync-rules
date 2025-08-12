@@ -3,6 +3,7 @@ import { getAdapter, adapterRegistry } from "../../src/adapters/index.ts";
 import { claudeAdapter } from "../../src/adapters/claude.ts";
 import { geminiAdapter } from "../../src/adapters/gemini.ts";
 import { kilocodeAdapter } from "../../src/adapters/kilocode.ts";
+import { clineAdapter } from "../../src/adapters/cline.ts";
 import type { Adapter } from "../../src/config.ts";
 
 describe("Adapter Registry", () => {
@@ -20,6 +21,11 @@ describe("Adapter Registry", () => {
     it("should return kilocode adapter when requested", () => {
       const adapter = getAdapter("kilocode");
       expect(adapter).toBe(kilocodeAdapter);
+    });
+
+    it("should return cline adapter when requested", () => {
+      const adapter = getAdapter("cline");
+      expect(adapter).toBe(clineAdapter);
     });
 
     it("should throw error for unknown adapter", () => {
@@ -41,17 +47,19 @@ describe("Adapter Registry", () => {
   });
 
   describe("adapterRegistry", () => {
-    it("should contain all three adapters", () => {
-      expect(adapterRegistry.size).toBe(3);
+    it("should contain all four adapters", () => {
+      expect(adapterRegistry.size).toBe(4);
       expect(adapterRegistry.has("claude")).toBe(true);
       expect(adapterRegistry.has("gemini")).toBe(true);
       expect(adapterRegistry.has("kilocode")).toBe(true);
+      expect(adapterRegistry.has("cline")).toBe(true);
     });
 
     it("should have correct adapter functions", () => {
       expect(adapterRegistry.get("claude")).toBe(claudeAdapter);
       expect(adapterRegistry.get("gemini")).toBe(geminiAdapter);
       expect(adapterRegistry.get("kilocode")).toBe(kilocodeAdapter);
+      expect(adapterRegistry.get("cline")).toBe(clineAdapter);
     });
 
     it("should be a Map instance", () => {

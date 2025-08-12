@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import { parseConfig, CONFIG_SCHEMA_URL } from "../src/config.ts";
+import { parseConfig } from "../src/config.ts";
 
 describe("config", () => {
   describe("parseConfig", () => {
@@ -46,9 +46,10 @@ describe("config", () => {
         expect(config.projects[1].rules).toEqual(["frontend/**/*.md"]);
       });
 
-      it("should parse config with $schema property", () => {
+      // $schema support removed intentionally; configs with $schema should be rejected
+      it("should reject config containing $schema property", () => {
         const json = JSON.stringify({
-          $schema: CONFIG_SCHEMA_URL,
+          $schema: "https://placeholder/schema.json",
           projects: [
             {
               path: "~/Developer/my-project",
@@ -58,9 +59,7 @@ describe("config", () => {
           ],
         });
 
-        const config = parseConfig(json);
-        expect(config.$schema).toBe(CONFIG_SCHEMA_URL);
-        expect(config.projects).toHaveLength(1);
+        expect(() => parseConfig(json)).toThrow(z.ZodError);
       });
 
       it("should handle all three adapter types", () => {

@@ -26,6 +26,7 @@ The tool provides automated one-way synchronization from a central repository to
 ### Supported Adapters
 
 - **claude**: Concatenates rules into `CLAUDE.md` with section separators
+- **cline**: Copies individual rule files to `.clinerules/` directory
 - **gemini**: Concatenates rules into `GEMINI.md` with section separators
 - **kilocode**: Copies individual rule files to `.kilocode/rules/` directory
 
@@ -46,7 +47,7 @@ The tool provides automated one-way synchronization from a central repository to
 
 ### Reliability
 
-- 100% test coverage ensures robustness
+- Comprehensive automated test suite ensures robustness
 - Graceful error handling with clear messages
 - Atomic operations prevent partial updates
 - Path validation prevents security vulnerabilities

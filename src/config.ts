@@ -1,9 +1,5 @@
 import { z } from "zod";
 import { normalizePath } from "./utils.ts";
-import { CONFIG_SCHEMA_URL } from "./constants.ts";
-
-// Re-export for backward compatibility
-export { CONFIG_SCHEMA_URL };
 
 // Using Zod's default error formatting - no custom error map needed
 
@@ -41,7 +37,7 @@ export const Project = z
  */
 export const Config = z
   .object({
-    $schema: z.string().optional(),
+    // $schema intentionally omitted to avoid dangling/placeholder schema URLs
     projects: z
       .array(Project)
       .nonempty("At least one project must be specified"),
