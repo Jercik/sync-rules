@@ -111,7 +111,7 @@ describe("executeActions - integration tests", () => {
       expect(nestedContent).toBe("Nested content");
     });
 
-    it("should execute actions in parallel groups for performance", async () => {
+    it("should complete quickly with many independent groups", async () => {
       const startTime = Date.now();
 
       // Create actions that would take longer if executed sequentially
