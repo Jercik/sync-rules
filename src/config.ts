@@ -6,7 +6,13 @@ import { normalizePath } from "./utils.ts";
 /**
  * Adapter enum - supported AI coding assistant tools
  */
-export const Adapter = z.enum(["claude", "cline", "gemini", "kilocode"]);
+export const Adapter = z.enum([
+  "claude",
+  "cline",
+  "gemini",
+  "kilocode",
+  "codex",
+]);
 
 /**
  * Project configuration schema

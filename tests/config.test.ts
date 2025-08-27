@@ -62,13 +62,13 @@ describe("config", () => {
         expect(() => parseConfig(json)).toThrow(z.ZodError);
       });
 
-      it("should handle all three adapter types", () => {
+      it("should handle all adapter types", () => {
         const json = JSON.stringify({
           projects: [
             {
               path: "./project",
               rules: ["rule.md"],
-              adapters: ["claude", "gemini", "kilocode"],
+              adapters: ["claude", "gemini", "kilocode", "cline", "codex"],
             },
           ],
         });
@@ -78,6 +78,8 @@ describe("config", () => {
           "claude",
           "gemini",
           "kilocode",
+          "cline",
+          "codex",
         ]);
       });
 

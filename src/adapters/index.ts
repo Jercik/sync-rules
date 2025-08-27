@@ -4,6 +4,7 @@ import { claudeAdapter } from "./claude.ts";
 import { clineAdapter } from "./cline.ts";
 import { geminiAdapter } from "./gemini.ts";
 import { kilocodeAdapter } from "./kilocode.ts";
+import { codexAdapter } from "./codex.ts";
 
 /**
  * Input structure for adapter functions
@@ -26,6 +27,7 @@ const adapterRegistry = new Map<Adapter, AdapterFunction>([
   ["cline", clineAdapter],
   ["gemini", geminiAdapter],
   ["kilocode", kilocodeAdapter],
+  ["codex", codexAdapter],
 ]);
 
 /**
