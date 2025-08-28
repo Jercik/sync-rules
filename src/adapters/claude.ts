@@ -1,6 +1,5 @@
-import { join, matchesGlob } from "node:path";
+import { matchesGlob } from "node:path";
 import type { AdapterFunction } from "./index.ts";
-import type { FSAction } from "../utils.ts";
 import { makeSingleFileAdapter } from "./shared.ts";
 
 /**
