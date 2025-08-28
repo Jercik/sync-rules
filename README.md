@@ -71,6 +71,24 @@ Show help:
 sync-rules --help
 ```
 
+## Known Issues
+
+### Deleted Rules Not Removed from Projects
+
+When a rule file is deleted from the central repository (`~/Developer/agent-rules/rules/`), the corresponding file in project directories is **not** automatically removed during sync. This is a known limitation of the current implementation.
+
+**Impact:**
+
+- Projects will show as "out of sync" with extra files
+- The verification step identifies these files but cannot remove them
+- Manual intervention is required to clean up deleted rules
+
+**Workaround:**
+Manually delete the outdated rule files from your project directories when rules are removed from the central repository:
+
+- For single-file adapters: Remove the specific file (e.g., `CLAUDE.md`, `GEMINI.md`)
+- For multi-file adapters: Remove files from the rules directory (e.g., `.kilocode/rules/*.md`, `.clinerules/*.md`)
+
 ### Claude Memory Bank Alias (`claudemb`)
 
 To streamline using Claude with the Memory Bank startup procedure, you can use the `claudemb` shell function. It's a wrapper around the `claude` CLI that automatically injects the global memory bank rule into the system prompt.
