@@ -123,3 +123,12 @@ export class EditorOpenError extends Error {
     this.originalError = originalError;
   }
 }
+
+/**
+ * Ensures that an unknown caught value is an Error object.
+ * @param e - The unknown value to ensure is an Error
+ * @returns An Error object
+ */
+export function ensureError(e: unknown): Error {
+  return e instanceof Error ? e : new Error(String(e));
+}

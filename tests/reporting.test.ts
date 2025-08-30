@@ -19,9 +19,7 @@ describe("printProjectReport", () => {
         projectPath: "/tmp/project1",
         report: {
           success: true,
-          changes: {
-            written: ["/tmp/project1/file.md"],
-          },
+          written: ["/tmp/project1/file.md"],
           errors: [],
         },
       },
@@ -36,7 +34,7 @@ describe("printProjectReport", () => {
     expect(output).toContain("📋 Sync Rules Report");
     expect(output).toContain("Project: /tmp/project1");
     expect(output).toContain("✓ Success");
-    expect(output).toContain("📝 Written: 1 files");
+    expect(output).toContain("📝 Written: 1 file");
   });
 
   it("should print failure report with errors", () => {
@@ -45,9 +43,7 @@ describe("printProjectReport", () => {
         projectPath: "/tmp/project1",
         report: {
           success: false,
-          changes: {
-            written: [],
-          },
+          written: [],
           errors: [new Error("Test error"), new Error("Another error")],
         },
       },
@@ -71,9 +67,7 @@ describe("printProjectReport", () => {
         projectPath: "/tmp/project1",
         report: {
           success: true,
-          changes: {
-            written: ["/tmp/file1.md", "/tmp/file2.md"],
-          },
+          written: ["/tmp/file1.md", "/tmp/file2.md"],
           errors: [],
         },
       },
@@ -95,9 +89,7 @@ describe("printProjectReport", () => {
         projectPath: "/tmp/project1",
         report: {
           success: true,
-          changes: {
-            written: ["/tmp/file1.md", "/tmp/file2.md"],
-          },
+          written: ["/tmp/file1.md", "/tmp/file2.md"],
           errors: [],
         },
       },
@@ -118,9 +110,7 @@ describe("printProjectReport", () => {
         projectPath: "/tmp/project1",
         report: {
           success: true,
-          changes: {
-            written: [],
-          },
+          written: [],
           errors: [],
         },
       },
@@ -138,9 +128,7 @@ describe("printProjectReport", () => {
         projectPath: "/tmp/project1",
         report: {
           success: true,
-          changes: {
-            written: ["/tmp/p1/file.md"],
-          },
+          written: ["/tmp/p1/file.md"],
           errors: [],
         },
       },
@@ -148,9 +136,7 @@ describe("printProjectReport", () => {
         projectPath: "/tmp/project2",
         report: {
           success: false,
-          changes: {
-            written: [],
-          },
+          written: [],
           errors: [new Error("Failed")],
         },
       },
@@ -173,9 +159,7 @@ describe("printProjectReport", () => {
         projectPath: "/tmp/project1",
         report: {
           success: true,
-          changes: {
-            written: [],
-          },
+          written: [],
           errors: [],
         },
       },

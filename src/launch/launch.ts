@@ -1,22 +1,22 @@
-import { adapters } from "../adapters/adapters.ts";
+import { adapterNames } from "../adapters/registry.ts";
 import { verifyRules, openConfigForEditing } from "../core/verification.ts";
-import { loadConfig } from "../config/config-loader.ts";
+import { loadConfig } from "../config/loader.ts";
 import { createPathGuardFromConfig } from "../core/path-guard.ts";
 import { findProjectForPath } from "../config/config.ts";
 import { syncProject } from "../core/sync.ts";
 import { promptYesNo } from "./prompts.ts";
-import { spawnProcess } from "./process.ts";
+import { spawnProcess } from "./spawn.ts";
 import type { AdapterName } from "../config/config.ts";
 
 const isSupportedAdapter = (name: string): name is AdapterName =>
-  Object.prototype.hasOwnProperty.call(adapters, name);
+  adapterNames.includes(name as AdapterName);
 
 async function detectProjectContext(configPath: string) {
   const config = await loadConfig(configPath);
   const pathGuard = createPathGuardFromConfig(config);
   const project = findProjectForPath(process.cwd(), config);
 
-  return { config, pathGuard, project };
+  return { pathGuard, project };
 }
 
 // Result types for decoupled logic
@@ -39,9 +39,9 @@ interface SyncAction {
 }
 
 /**
- * Checks configuration and returns status without performing I/O
+ * Summarizes configuration status without performing I/O
  */
-function checkConfiguration(
+function summarizeConfiguration(
   project: ReturnType<typeof findProjectForPath>,
   toolName: AdapterName,
   configPath: string,
@@ -66,9 +66,9 @@ function checkConfiguration(
 }
 
 /**
- * Checks sync status and performs sync if needed, returning results without I/O
+ * Assesses sync state and performs sync if needed, returning results
  */
-async function checkSyncStatus(
+async function assessSyncState(
   project: NonNullable<ReturnType<typeof findProjectForPath>>,
   toolName: AdapterName,
   pathGuard: ReturnType<typeof createPathGuardFromConfig>,
@@ -89,7 +89,7 @@ async function checkSyncStatus(
     });
     return {
       status: "forced",
-      fileCount: syncResult.report.changes.written.length,
+      fileCount: syncResult.report.written.length,
     };
   }
 
@@ -121,7 +121,7 @@ async function performSync(
 
   return {
     type: "sync",
-    fileCount: syncResult.report.changes.written.length,
+    fileCount: syncResult.report.written.length,
   };
 }
 
@@ -164,7 +164,7 @@ export async function launchTool(
   const { pathGuard, project } = await detectProjectContext(options.configPath);
 
   // Check configuration status
-  const configStatus = checkConfiguration(
+  const configStatus = summarizeConfiguration(
     project,
     adapterName,
     options.configPath,
@@ -217,7 +217,7 @@ export async function launchTool(
   }
 
   // Check sync status
-  const syncStatus = await checkSyncStatus(
+  const syncStatus = await assessSyncState(
     project,
     adapterName,
     pathGuard,

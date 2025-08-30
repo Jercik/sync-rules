@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { globby } from "globby";
 import { normalizePath, isValidMdFile } from "../utils/paths.ts";
-import { ensureError } from "../utils/logger.ts";
+import { ensureError } from "../utils/errors.ts";
 
 /**
  * Finds all paths in the rules directory that match the given glob patterns.

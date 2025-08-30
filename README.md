@@ -179,6 +179,7 @@ When a rule file is deleted from the central repository (`~/Developer/agent-rule
 
 - Projects will show as "out of sync" with extra files
 - The verification step identifies these files but cannot remove them
+- For multi-file adapters (cline, kilocode), verification will flag these as "extra" files
 - Manual intervention is required to clean up deleted rules
 
 **Workaround:**
@@ -191,7 +192,7 @@ Manually delete the outdated rule files from your project directories when rules
 
 - **Actions**: Adapters generate a single action type: `write` with `path` and `content`. Parent directories are created automatically during execution.
 - **Execution**: The executor validates paths via `PathGuard` and writes files using `fs-extra.outputFile`.
-- **Report**: The execution report includes a `changes.written` array and any errors encountered. There are no copy or mkdir actions.
+  - **Report**: The execution report includes a `written` array and any errors encountered. There are no copy or mkdir actions.
 
 ### Claude Memory Bank Alias (`claudemb`)
 

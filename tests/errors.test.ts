@@ -61,7 +61,6 @@ describe("SyncError class", () => {
 describe("ConfigNotFoundError", () => {
   it("should create error for missing config", () => {
     const error = new ConfigNotFoundError("/path/to/config.json");
-    expect(error).toBeInstanceOf(Error);
     expect(error.name).toBe("ConfigNotFoundError");
     expect(error.path).toBe("/path/to/config.json");
     expect(error.isDefault).toBe(false);

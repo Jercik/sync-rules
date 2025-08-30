@@ -1,9 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { parseConfig } from "./config.ts";
 import { normalizePath } from "../utils/paths.ts";
-import { isNodeError, ensureError } from "../utils/logger.ts";
+import { isNodeError } from "../utils/logger.ts";
 import { DEFAULT_CONFIG_PATH } from "./constants.ts";
-import { ConfigNotFoundError, ConfigParseError } from "../utils/errors.ts";
+import {
+  ConfigNotFoundError,
+  ConfigParseError,
+  ensureError,
+} from "../utils/errors.ts";
 import type { Config } from "./config.ts";
 
 /**

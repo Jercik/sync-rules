@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { createPathGuard, type PathGuard } from "../src/core/path-guard.ts";
+import {
+  createPathGuard,
+  createPathGuardForPlannedWrites,
+  type PathGuard,
+} from "../src/core/path-guard.ts";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
@@ -240,6 +244,102 @@ describe("PathGuard", () => {
       expect(() => guard.validatePath("/safe/parent/newfile.txt")).toThrow(
         "Path is outside allowed directories",
       );
+    });
+  });
+
+  describe("createPathGuardForPlannedWrites", () => {
+    it("should only allow exact planned paths", () => {
+      const plannedPaths = [
+        "/project/file1.ts",
+        "/project/src/file2.ts",
+        "/project/config.json",
+      ];
+      const guard = createPathGuardForPlannedWrites(plannedPaths);
+
+      // Should allow exact planned paths
+      expect(guard.validatePath("/project/file1.ts")).toBe("/project/file1.ts");
+      expect(guard.validatePath("/project/src/file2.ts")).toBe(
+        "/project/src/file2.ts",
+      );
+      expect(guard.validatePath("/project/config.json")).toBe(
+        "/project/config.json",
+      );
+
+      // Should reject any path not in the planned list
+      expect(() => guard.validatePath("/project/file3.ts")).toThrow(
+        "Path not in planned writes",
+      );
+      expect(() => guard.validatePath("/project/src/other.ts")).toThrow(
+        "Path not in planned writes",
+      );
+      expect(() => guard.validatePath("/project/")).toThrow(
+        "Path not in planned writes",
+      );
+    });
+
+    it("should normalize paths before comparison", () => {
+      const plannedPaths = ["/project/src/../file.ts"]; // Will normalize to /project/file.ts
+      const guard = createPathGuardForPlannedWrites(plannedPaths);
+
+      // Should match normalized path
+      expect(guard.validatePath("/project/file.ts")).toBe("/project/file.ts");
+      expect(guard.validatePath("/project/./file.ts")).toBe("/project/file.ts");
+    });
+
+    it("should reject empty path list", () => {
+      expect(() => createPathGuardForPlannedWrites([])).toThrow(
+        "At least one planned path must be provided",
+      );
+    });
+
+    it("should handle tilde expansion in planned paths", () => {
+      const homedir =
+        process.env.HOME || process.env.USERPROFILE || "/home/user";
+      const plannedPaths = ["~/project/file.ts"];
+      const guard = createPathGuardForPlannedWrites(plannedPaths);
+
+      // Should expand and match tilde paths
+      expect(guard.validatePath("~/project/file.ts")).toBe(
+        `${homedir}/project/file.ts`,
+      );
+    });
+
+    it("should return planned paths as allowed roots", () => {
+      const plannedPaths = ["/project/file1.ts", "/project/file2.ts"];
+      const guard = createPathGuardForPlannedWrites(plannedPaths);
+
+      const roots = guard.getAllowedRoots();
+      expect(roots).toHaveLength(2);
+      expect(roots).toContain("/project/file1.ts");
+      expect(roots).toContain("/project/file2.ts");
+    });
+
+    it("should check exact path matches with isInsideAllowedRoot", () => {
+      const plannedPaths = ["/project/file1.ts", "/project/src/file2.ts"];
+      const guard = createPathGuardForPlannedWrites(plannedPaths);
+
+      // Only exact matches should return true
+      expect(guard.isInsideAllowedRoot("/project/file1.ts")).toBe(true);
+      expect(guard.isInsideAllowedRoot("/project/src/file2.ts")).toBe(true);
+
+      // Non-matches should return false
+      expect(guard.isInsideAllowedRoot("/project/file3.ts")).toBe(false);
+      expect(guard.isInsideAllowedRoot("/project/")).toBe(false);
+      expect(guard.isInsideAllowedRoot("/project/src/")).toBe(false);
+    });
+
+    it("should be immutable", () => {
+      const plannedPaths = ["/project/file1.ts"];
+      const guard = createPathGuardForPlannedWrites(plannedPaths);
+
+      // Guard should be frozen
+      expect(Object.isFrozen(guard)).toBe(true);
+
+      // Getting allowed roots should return a copy
+      const roots1 = guard.getAllowedRoots();
+      const roots2 = guard.getAllowedRoots();
+      expect(roots1).not.toBe(roots2);
+      expect(roots1).toEqual(roots2);
     });
   });
 });

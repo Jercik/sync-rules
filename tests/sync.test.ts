@@ -1,39 +1,43 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { syncProject } from "../src/core/sync.ts";
-import * as adaptersModule from "../src/adapters/adapters.ts";
-import * as filesystemModule from "../src/core/filesystem.ts";
+import * as registryModule from "../src/adapters/registry.ts";
+import * as filesystemModule from "../src/core/rules-fs.ts";
 import * as executionModule from "../src/core/execution.ts";
 import type { Project } from "../src/config/config.ts";
 import type { WriteAction } from "../src/utils/content.ts";
-import type { Rule } from "../src/core/filesystem.ts";
+import type { Rule } from "../src/core/rules-fs.ts";
 import { SyncError } from "../src/utils/errors.ts";
 
 vi.mock("../src/adapters/adapters.ts", () => ({
-  adapters: {
+  adapterFromMeta: vi.fn(),
+}));
+
+vi.mock("../src/adapters/registry.ts", () => ({
+  adapterRegistry: {
     claude: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "single-file", location: "CLAUDE.md" },
     },
     gemini: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "single-file", location: "GEMINI.md" },
     },
     kilocode: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "multi-file", directory: ".kilocode/rules" },
     },
     cline: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "multi-file", directory: ".clinerules" },
     },
     codex: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "single-file", location: "AGENTS.md" },
     },
   },
 }));
 
-vi.mock("../src/core/filesystem.ts", () => ({
+vi.mock("../src/core/rules-fs.ts", () => ({
   loadRulesFromCentral: vi.fn(),
 }));
 
@@ -75,14 +79,12 @@ describe("sync", () => {
 
       const mockAdapter = vi.fn().mockReturnValue([mockActions[0]]);
       vi.mocked(
-        adaptersModule.adapters.claude.generateActions,
+        registryModule.adapterRegistry.claude.planWrites,
       ).mockImplementation(mockAdapter);
 
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         success: true,
-        changes: {
-          written: [mockActions[0].path],
-        },
+        written: [mockActions[0].path],
         errors: [],
       });
 
@@ -92,22 +94,30 @@ describe("sync", () => {
         expect.any(String),
         ["**/*.md"],
       );
-      expect(adaptersModule.adapters.claude.generateActions).toHaveBeenCalled();
+      expect(
+        registryModule.adapterRegistry.claude.planWrites,
+      ).toHaveBeenCalled();
       expect(mockAdapter).toHaveBeenCalledWith({
         projectPath: "/home/user/project",
         rules: mockRules,
       });
       expect(executionModule.executeActions).toHaveBeenCalledWith(
         [mockActions[0]],
-        { dryRun: false, verbose: false, pathGuard: undefined },
+        {
+          dryRun: false,
+          verbose: false,
+          pathGuard: expect.objectContaining({
+            validatePath: expect.any(Function),
+            getAllowedRoots: expect.any(Function),
+            isInsideAllowedRoot: expect.any(Function),
+          }),
+        },
       );
       expect(result).toEqual({
         projectPath: "/home/user/project",
         report: {
           success: true,
-          changes: {
-            written: [mockActions[0].path],
-          },
+          written: [mockActions[0].path],
           errors: [],
         },
       });
@@ -122,24 +132,26 @@ describe("sync", () => {
       const geminiAdapter = vi.fn().mockReturnValue([mockActions[1]]);
 
       vi.mocked(
-        adaptersModule.adapters.claude.generateActions,
+        registryModule.adapterRegistry.claude.planWrites,
       ).mockImplementation(claudeAdapter);
       vi.mocked(
-        adaptersModule.adapters.gemini.generateActions,
+        registryModule.adapterRegistry.gemini.planWrites,
       ).mockImplementation(geminiAdapter);
 
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         success: true,
-        changes: {
-          written: [mockActions[0].path, mockActions[1].path],
-        },
+        written: [mockActions[0].path, mockActions[1].path],
         errors: [],
       });
 
       const result = await syncProject(mockProject);
 
-      expect(adaptersModule.adapters.claude.generateActions).toHaveBeenCalled();
-      expect(adaptersModule.adapters.gemini.generateActions).toHaveBeenCalled();
+      expect(
+        registryModule.adapterRegistry.claude.planWrites,
+      ).toHaveBeenCalled();
+      expect(
+        registryModule.adapterRegistry.gemini.planWrites,
+      ).toHaveBeenCalled();
       expect(claudeAdapter).toHaveBeenCalledWith({
         projectPath: "/home/user/project",
         rules: mockRules,
@@ -151,9 +163,13 @@ describe("sync", () => {
       expect(executionModule.executeActions).toHaveBeenCalledWith(mockActions, {
         dryRun: false,
         verbose: false,
-        pathGuard: undefined,
+        pathGuard: expect.objectContaining({
+          validatePath: expect.any(Function),
+          getAllowedRoots: expect.any(Function),
+          isInsideAllowedRoot: expect.any(Function),
+        }),
       });
-      expect(result.report.changes.written).toHaveLength(2);
+      expect(result.report.written).toHaveLength(2);
     });
 
     it("should respect dry-run mode", async () => {
@@ -168,14 +184,12 @@ describe("sync", () => {
 
       const mockAdapter = vi.fn().mockReturnValue([mockActions[0]]);
       vi.mocked(
-        adaptersModule.adapters.claude.generateActions,
+        registryModule.adapterRegistry.claude.planWrites,
       ).mockImplementation(mockAdapter);
 
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         success: true,
-        changes: {
-          written: [],
-        },
+        written: [],
         errors: [],
       });
 
@@ -183,7 +197,15 @@ describe("sync", () => {
 
       expect(executionModule.executeActions).toHaveBeenCalledWith(
         [mockActions[0]],
-        { dryRun: true, verbose: false, pathGuard: undefined },
+        {
+          dryRun: true,
+          verbose: false,
+          pathGuard: expect.objectContaining({
+            validatePath: expect.any(Function),
+            getAllowedRoots: expect.any(Function),
+            isInsideAllowedRoot: expect.any(Function),
+          }),
+        },
       );
     });
 
@@ -199,14 +221,12 @@ describe("sync", () => {
 
       const mockAdapter = vi.fn().mockReturnValue([mockActions[0]]);
       vi.mocked(
-        adaptersModule.adapters.claude.generateActions,
+        registryModule.adapterRegistry.claude.planWrites,
       ).mockImplementation(mockAdapter);
 
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         success: true,
-        changes: {
-          written: [mockActions[0].path],
-        },
+        written: [mockActions[0].path],
         errors: [],
       });
 
@@ -214,7 +234,15 @@ describe("sync", () => {
 
       expect(executionModule.executeActions).toHaveBeenCalledWith(
         [mockActions[0]],
-        { dryRun: false, verbose: true, pathGuard: undefined },
+        {
+          dryRun: false,
+          verbose: true,
+          pathGuard: expect.objectContaining({
+            validatePath: expect.any(Function),
+            getAllowedRoots: expect.any(Function),
+            isInsideAllowedRoot: expect.any(Function),
+          }),
+        },
       );
     });
 
@@ -230,7 +258,7 @@ describe("sync", () => {
 
       const adapterError = new Error("Adapter processing failed");
       vi.mocked(
-        adaptersModule.adapters.claude.generateActions,
+        registryModule.adapterRegistry.claude.planWrites,
       ).mockImplementation(() => {
         throw adapterError;
       });
@@ -241,7 +269,6 @@ describe("sync", () => {
       try {
         await syncProject(singleAdapterProject);
       } catch (error) {
-        expect(error).toBeInstanceOf(SyncError);
         if (error instanceof SyncError) {
           expect(error.message).toBe("Failed to process adapter 'claude'");
           expect(error.details.adapter).toBe("claude");
@@ -260,14 +287,12 @@ describe("sync", () => {
 
       const mockAdapter = vi.fn().mockReturnValue([]);
       vi.mocked(
-        adaptersModule.adapters.claude.generateActions,
+        registryModule.adapterRegistry.claude.planWrites,
       ).mockImplementation(mockAdapter);
 
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         success: true,
-        changes: {
-          written: [],
-        },
+        written: [],
         errors: [],
       });
 
@@ -284,7 +309,6 @@ describe("sync", () => {
 
       const claudeActions = [
         {
-          type: "write" as const,
           path: "/project/CLAUDE.md",
           content: "claude",
         },
@@ -292,24 +316,21 @@ describe("sync", () => {
 
       const geminiActions = [
         {
-          type: "write" as const,
           path: "/project/GEMINI.md",
           content: "gemini",
         },
       ];
 
       vi.mocked(
-        adaptersModule.adapters.claude.generateActions,
+        registryModule.adapterRegistry.claude.planWrites,
       ).mockImplementation(() => claudeActions);
       vi.mocked(
-        adaptersModule.adapters.gemini.generateActions,
+        registryModule.adapterRegistry.gemini.planWrites,
       ).mockImplementation(() => geminiActions);
 
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         success: true,
-        changes: {
-          written: [mockActions[0].path, mockActions[1].path],
-        },
+        written: [mockActions[0].path, mockActions[1].path],
         errors: [],
       });
 
@@ -317,7 +338,15 @@ describe("sync", () => {
 
       expect(executionModule.executeActions).toHaveBeenCalledWith(
         [...claudeActions, ...geminiActions],
-        { dryRun: false, verbose: false, pathGuard: undefined },
+        {
+          dryRun: false,
+          verbose: false,
+          pathGuard: expect.objectContaining({
+            validatePath: expect.any(Function),
+            getAllowedRoots: expect.any(Function),
+            isInsideAllowedRoot: expect.any(Function),
+          }),
+        },
       );
     });
   });

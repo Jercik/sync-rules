@@ -6,7 +6,7 @@ import {
   globRulePaths,
   filterValidMdPaths,
   readRuleContents,
-} from "../src/core/filesystem.ts";
+} from "../src/core/rules-fs.ts";
 
 describe("filesystem operations", () => {
   let tempDir: string;

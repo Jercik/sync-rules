@@ -1,13 +1,13 @@
-import { adapters } from "../adapters/adapters.ts";
+import { adapterRegistry } from "../adapters/registry.ts";
 import { CENTRAL_RULES_DIR } from "../config/constants.ts";
 import { executeActions } from "./execution.ts";
 import type { ExecutionReport } from "./execution.ts";
-import { loadRulesFromCentral } from "./filesystem.ts";
+import { loadRulesFromCentral } from "./rules-fs.ts";
 import type { Project } from "../config/config.ts";
-import { ensureError } from "../utils/logger.ts";
 import type { WriteAction } from "../utils/content.ts";
-import { SyncError } from "../utils/errors.ts";
+import { SyncError, ensureError } from "../utils/errors.ts";
 import type { PathGuard } from "./path-guard.ts";
+import { createPathGuardForPlannedWrites } from "./path-guard.ts";
 
 export interface SyncOptions {
   dryRun?: boolean;
@@ -50,13 +50,13 @@ export async function syncProject(
   for (const adapterName of project.adapters) {
     try {
       // Get the adapter definition from the registry
-      const adapterDef = adapters[adapterName];
+      const adapterDef = adapterRegistry[adapterName];
       if (!adapterDef) {
         throw new Error(`Unknown adapter: ${adapterName}`);
       }
 
       // Generate actions for this adapter using pre-loaded rules
-      const actions = adapterDef.generateActions({
+      const actions = adapterDef.planWrites({
         projectPath: project.path,
         rules,
       });
@@ -76,11 +76,16 @@ export async function syncProject(
     }
   }
 
-  // Execute actions for this project
+  // Execute only the planned writes (defense-in-depth)
+  // If no pathGuard is provided, create one from the planned actions
+  // This ensures we only write to explicitly planned paths
+  const plannedGuard =
+    pathGuard ?? createPathGuardForPlannedWrites(allActions.map((a) => a.path));
+
   const report = await executeActions(allActions, {
     dryRun,
     verbose,
-    pathGuard,
+    pathGuard: plannedGuard,
   });
 
   return { projectPath: project.path, report };

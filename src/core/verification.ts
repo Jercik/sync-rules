@@ -1,15 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { adapters } from "../adapters/adapters.ts";
+import { adapterRegistry } from "../adapters/registry.ts";
 import open from "open";
 import { globby } from "globby";
 import { normalizePath } from "../utils/paths.ts";
-import { ensureError } from "../utils/logger.ts";
 import { normalizeContent } from "../utils/content.ts";
-import { loadRulesFromCentral } from "./filesystem.ts";
+import type { WriteAction } from "../utils/content.ts";
+import { loadRulesFromCentral } from "./rules-fs.ts";
 import { CENTRAL_RULES_DIR } from "../config/constants.ts";
 import type { AdapterName } from "../config/config.ts";
-import { EditorOpenError } from "../utils/errors.ts";
+import { EditorOpenError, ensureError } from "../utils/errors.ts";
 
 export interface VerificationIssue {
   type: "missing" | "modified" | "extra";
@@ -23,20 +23,6 @@ export interface VerificationResult {
 
 // Path comparisons are uniformly case-sensitive across all platforms.
 // Use absolute paths from `normalizePath` for consistent comparison.
-
-/**
- * Finds all files in a directory using globby
- * Returns absolute paths for consistent comparison with expected actions
- */
-async function findAllFiles(dir: string): Promise<string[]> {
-  try {
-    const files = await globby("**/*", { cwd: dir, absolute: true });
-    return files.map(normalizePath);
-  } catch {
-    // Directory doesn't exist - return empty array
-    return [];
-  }
-}
 
 /**
  * Verifies that on-disk rule files for a given adapter and project match the
@@ -56,12 +42,12 @@ export async function verifyRules(
   rulePatterns: string[],
 ): Promise<VerificationResult> {
   // Get adapter definition and generate expected actions
-  const adapterDef = adapters[adapterName];
+  const adapterDef = adapterRegistry[adapterName];
   if (!adapterDef) {
     throw new Error(`Unknown adapter: ${adapterName}`);
   }
   const rules = await loadRulesFromCentral(CENTRAL_RULES_DIR, rulePatterns);
-  const expectedActions = adapterDef.generateActions({ projectPath, rules });
+  const expectedActions = adapterDef.planWrites({ projectPath, rules });
 
   const issues: VerificationIssue[] = [];
 
@@ -88,12 +74,21 @@ export async function verifyRules(
     // Normalize expected paths for comparison
     // All paths are absolute thanks to normalizePath in actions and findAllFiles
     const expectedPaths = new Set(
-      expectedActions.map((a) => normalizePath(a.path).replace(/\/$/, "")),
+      expectedActions.map((a: WriteAction) =>
+        normalizePath(a.path).replace(/\/$/, ""),
+      ),
     );
 
-    const actualFiles = await findAllFiles(rulesDir);
+    let actualFiles: string[] = [];
+    try {
+      const files = await globby("**/*", { cwd: rulesDir, absolute: true });
+      actualFiles = files.map(normalizePath);
+    } catch {
+      // Directory doesn't exist - continue with empty array
+    }
+
     for (const file of actualFiles) {
-      // file is already absolute from findAllFiles
+      // file is already absolute and normalized
       const normalizedFile = normalizePath(file).replace(/\/$/, "");
       if (!expectedPaths.has(normalizedFile)) {
         issues.push({ type: "extra", path: file });

@@ -46,8 +46,6 @@ describe("executeActions - integration tests", () => {
       expect(content2).toBe("Content 2");
     });
 
-    // Copy actions removed; only write actions are supported
-
     it("should overwrite existing files", async () => {
       const filePath = join(testDir, "overwrite.txt");
       await fs.writeFile(filePath, "Old content");
@@ -77,7 +75,7 @@ describe("executeActions - integration tests", () => {
       const result = await executeActions(actions, { dryRun: false });
 
       expect(result.success).toBe(true);
-      expect(result.changes.written).toHaveLength(2);
+      expect(result.written).toHaveLength(2);
 
       // Verify files exist
       const writtenContent1 = await fs.readFile(

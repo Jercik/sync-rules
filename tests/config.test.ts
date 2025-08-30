@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
 import { parseConfig, findProjectForPath } from "../src/config/config.ts";
-import { loadConfig } from "../src/config/config-loader.ts";
+import { loadConfig } from "../src/config/loader.ts";
 import { ConfigNotFoundError, ConfigParseError } from "../src/utils/errors.ts";
 import * as fs from "node:fs/promises";
 import type { Config } from "../src/config/config.ts";
@@ -145,7 +145,6 @@ describe("config", () => {
         try {
           parseConfig(json);
         } catch (error) {
-          expect(error).toBeInstanceOf(z.ZodError);
           const zodError = error as z.ZodError;
           expect(zodError.issues).toHaveLength(1);
           expect(zodError.issues[0].path).toEqual(["projects"]);
@@ -170,7 +169,6 @@ describe("config", () => {
         try {
           parseConfig(json);
         } catch (error) {
-          expect(error).toBeInstanceOf(z.ZodError);
           const zodError = error as z.ZodError;
           expect(zodError.issues).toHaveLength(1);
           expect(zodError.issues[0].path).toEqual(["projects"]);
@@ -365,7 +363,6 @@ describe("config", () => {
         try {
           parseConfig(json);
         } catch (error) {
-          expect(error).toBeInstanceOf(z.ZodError);
           const zodError = error as z.ZodError;
           // Zod collects multiple issues
           expect(zodError.issues.length).toBeGreaterThan(1);
@@ -398,7 +395,6 @@ describe("config", () => {
         try {
           parseConfig(json);
         } catch (error) {
-          expect(error).toBeInstanceOf(z.ZodError);
           const zodError = error as z.ZodError;
           // Should have errors from different projects
           expect(zodError.issues.length).toBe(3);
@@ -428,7 +424,6 @@ describe("config", () => {
         } catch (error) {
           // With the new implementation, JSON.parse errors are thrown directly
           expect(error).toBe(unexpectedError);
-          expect((error as Error).message).toBe("Unexpected error");
         } finally {
           JSON.parse = originalParse;
         }

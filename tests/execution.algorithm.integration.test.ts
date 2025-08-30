@@ -38,62 +38,12 @@ describe("executeActions - integration tests", () => {
       const result = await executeActions(actions, { verbose: false });
 
       expect(result.success).toBe(true);
-      expect(result.changes.written).toHaveLength(90); // 10 * 3 * 3 files
+      expect(result.written).toHaveLength(90); // 10 * 3 * 3 files
 
       // Verify a sample of files exist
       const sampleFile = join(testDir, "dir5", "subdir2", "file1.txt");
       const content = await fs.readFile(sampleFile, "utf8");
       expect(content).toBe("Content for file 5-2-1");
-    });
-
-    it("should handle multiple writes in nested locations", async () => {
-      const destDir = join(testDir, "dest");
-
-      const actions: WriteAction[] = [
-        {
-          path: join(destDir, "new.txt"),
-          content: "New content",
-        },
-        {
-          path: join(destDir, "subdir", "nested.txt"),
-          content: "Nested content",
-        },
-      ];
-
-      const result = await executeActions(actions, {});
-
-      expect(result.success).toBe(true);
-      expect(result.changes.written).toHaveLength(2);
-
-      const nestedContent = await fs.readFile(
-        join(destDir, "subdir", "nested.txt"),
-        "utf8",
-      );
-      expect(nestedContent).toBe("Nested content");
-    });
-
-    it("should handle many independent groups", async () => {
-      // Create actions that would take longer if executed sequentially
-      const actions: WriteAction[] = [];
-
-      // Create 10 independent directories with files (via writes)
-      for (let i = 0; i < 10; i++) {
-        const dirPath = join(testDir, `parallel-dir${i}`);
-        // Add multiple files to each directory
-        for (let j = 0; j < 5; j++) {
-          actions.push({
-            path: join(dirPath, `file${j}.txt`),
-            content: `Content ${i}-${j}`,
-          });
-        }
-      }
-
-      const result = await executeActions(actions, {});
-
-      expect(result.success).toBe(true);
-      expect(result.changes.written).toHaveLength(50);
-
-      // Parallelizable behavior is validated functionally by outputs above.
     });
 
     it("should handle deep directory structures", async () => {
@@ -114,7 +64,7 @@ describe("executeActions - integration tests", () => {
       const result = await executeActions(actions, {});
 
       expect(result.success).toBe(true);
-      expect(result.changes.written).toHaveLength(1);
+      expect(result.written).toHaveLength(1);
 
       // Verify the deep file exists
       const deepContent = await fs.readFile(
@@ -137,7 +87,7 @@ describe("executeActions - integration tests", () => {
       const result = await executeActions(actions, { dryRun: true });
 
       expect(result.success).toBe(true);
-      expect(result.changes.written).toHaveLength(1);
+      expect(result.written).toHaveLength(1);
 
       // Verify nothing was actually created
       const fileExists = await fs

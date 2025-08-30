@@ -38,10 +38,13 @@ export function printProjectReport(
     }
 
     // Print changes
-    if (report.changes.written.length > 0) {
-      lines.push(`  📝 Written: ${report.changes.written.length} files`);
+    if (report.written.length > 0) {
+      const fileCount = report.written.length;
+      lines.push(
+        `  📝 Written: ${fileCount} ${fileCount === 1 ? "file" : "files"}`,
+      );
       if (options.verbose) {
-        report.changes.written.forEach((file) => lines.push(`     - ${file}`));
+        report.written.forEach((file) => lines.push(`     - ${file}`));
       }
     }
 
@@ -62,7 +65,7 @@ export function printProjectReport(
   }
 
   // Print all lines at once
-  console.log(lines.join("\n"));
+  console.log(lines.join("\n").trimEnd());
 
   return !hasErrors;
 }

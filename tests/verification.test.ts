@@ -1,45 +1,52 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { verifyRules, openConfigForEditing } from "../src/core/verification.ts";
 import * as fs from "node:fs/promises";
-import * as adaptersModule from "../src/adapters/adapters.ts";
-import * as filesystemModule from "../src/core/filesystem.ts";
+import * as registryModule from "../src/adapters/registry.ts";
+import * as filesystemModule from "../src/core/rules-fs.ts";
 import open from "open";
 import { globby } from "globby";
 import type { WriteAction } from "../src/utils/content.ts";
-import type { Rule } from "../src/core/filesystem.ts";
+import type { Rule } from "../src/core/rules-fs.ts";
 
 vi.mock("node:fs/promises");
 vi.mock("../src/adapters/adapters.ts", () => ({
-  adapters: {
+  adapterFromMeta: vi.fn(),
+}));
+
+vi.mock("../src/adapters/registry.ts", () => ({
+  adapterRegistry: {
     claude: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "single-file", location: "CLAUDE.md" },
     },
     gemini: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "single-file", location: "GEMINI.md" },
     },
     kilocode: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "multi-file", directory: ".kilocode/rules" },
     },
     cline: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "multi-file", directory: ".clinerules" },
     },
     codex: {
-      generateActions: vi.fn(),
+      planWrites: vi.fn(),
       meta: { type: "single-file", location: "AGENTS.md" },
     },
   },
 }));
-vi.mock("../src/core/filesystem.ts", () => ({
+vi.mock("../src/core/rules-fs.ts", () => ({
   loadRulesFromCentral: vi.fn(),
 }));
 vi.mock("open", () => ({
   default: vi.fn(),
 }));
 vi.mock("globby");
+vi.mocked(fs.readdir).mockResolvedValue([
+  { name: "claude.md", isDirectory: () => false } as any,
+]);
 
 // Mock utils to bypass path validation during tests
 vi.mock("../src/utils/paths.ts", async () => {
@@ -85,7 +92,7 @@ describe("verification", () => {
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.claude.generateActions,
+          registryModule.adapterRegistry.claude.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -108,7 +115,7 @@ describe("verification", () => {
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.claude.generateActions,
+          registryModule.adapterRegistry.claude.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -133,7 +140,7 @@ describe("verification", () => {
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.claude.generateActions,
+          registryModule.adapterRegistry.claude.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -162,7 +169,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.claude.generateActions,
+          registryModule.adapterRegistry.claude.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -196,7 +203,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.claude.generateActions,
+          registryModule.adapterRegistry.claude.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -215,7 +222,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.claude.generateActions,
+          registryModule.adapterRegistry.claude.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -244,7 +251,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.claude.generateActions,
+          registryModule.adapterRegistry.claude.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -279,7 +286,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.kilocode.generateActions,
+          registryModule.adapterRegistry.kilocode.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -316,7 +323,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.cline.generateActions,
+          registryModule.adapterRegistry.cline.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -353,7 +360,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.kilocode.generateActions,
+          registryModule.adapterRegistry.kilocode.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -382,7 +389,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.claude.generateActions,
+          registryModule.adapterRegistry.claude.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -392,7 +399,7 @@ With multiple lines`;
         const result = await verifyRules("/project", "claude", ["**/*.md"]);
 
         // Should not call readdir for single-file adapters
-        expect(fs.readdir).not.toHaveBeenCalled();
+        expect(globby).not.toHaveBeenCalled();
         expect(result.synced).toBe(true);
       });
 
@@ -406,7 +413,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.kilocode.generateActions,
+          registryModule.adapterRegistry.kilocode.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,
@@ -434,7 +441,7 @@ With multiple lines`;
 
         const mockAdapter = vi.fn().mockReturnValue(mockActions);
         vi.mocked(
-          adaptersModule.adapters.claude.generateActions,
+          registryModule.adapterRegistry.claude.planWrites,
         ).mockImplementation(mockAdapter);
         vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
           mockRules,

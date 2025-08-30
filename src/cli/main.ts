@@ -1,19 +1,21 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import packageJson from "../package.json" with { type: "json" };
-import { DEFAULT_CONFIG_PATH } from "./config/constants.ts";
-import { loadConfig } from "./config/config-loader.ts";
-import { createPathGuardFromConfig } from "./core/path-guard.ts";
-import { printProjectReport } from "./core/reporting.ts";
-import { ensureError } from "./utils/logger.ts";
-import type { ProjectReport } from "./core/reporting.ts";
+import packageJson from "../../package.json" with { type: "json" };
+import { DEFAULT_CONFIG_PATH } from "../config/constants.ts";
+import { loadConfig } from "../config/loader.ts";
+import { createPathGuardFromConfig } from "../core/path-guard.ts";
+import { printProjectReport } from "../core/reporting.ts";
+import type { ProjectReport } from "../core/reporting.ts";
+import type { Project } from "../config/config.ts";
+import type { SyncResult } from "../core/sync.ts";
 import {
   SyncError,
   ConfigNotFoundError,
   ConfigParseError,
   SpawnError,
   EditorOpenError,
-} from "./utils/errors.ts";
+  ensureError,
+} from "../utils/errors.ts";
 
 async function runSync(options: {
   config: string;
@@ -25,8 +27,8 @@ async function runSync(options: {
   const pathGuard = createPathGuardFromConfig(config);
 
   const results = await Promise.allSettled(
-    config.projects.map(async (project) => {
-      const { syncProject } = await import("./core/sync.ts");
+    config.projects.map(async (project: Project) => {
+      const { syncProject } = await import("../core/sync.ts");
       return await syncProject(project, {
         dryRun: options.dryRun,
         verbose: options.verbose,
@@ -39,7 +41,7 @@ async function runSync(options: {
   const projectReports: ProjectReport[] = [];
   const failedProjects: { project: string; error: unknown }[] = [];
 
-  results.forEach((result, index) => {
+  results.forEach((result: PromiseSettledResult<SyncResult>, index: number) => {
     const project = config.projects[index];
     if (!project) return; // Safety check
 
@@ -58,7 +60,7 @@ async function runSync(options: {
         projectPath: project.path,
         report: {
           success: false,
-          changes: { written: [] },
+          written: [],
           errors: [ensureError(error)],
         },
       });
@@ -144,7 +146,7 @@ export async function main(argv: string[]) {
           verbose: options.verbose,
         });
       } catch (error) {
-        handleError(error);
+        handleError(ensureError(error));
         process.exit(1);
       }
     });
@@ -163,7 +165,7 @@ export async function main(argv: string[]) {
       const parentOpts = program.opts();
       const opts = launchCommand.opts();
 
-      const { launchTool } = await import("./launch/launch.ts");
+      const { launchTool } = await import("../launch/launch.ts");
       const exitCode = await launchTool(tool, toolArgs, {
         configPath: parentOpts.config || DEFAULT_CONFIG_PATH,
         noSync: opts.noSync,
@@ -172,9 +174,10 @@ export async function main(argv: string[]) {
       });
       process.exit(exitCode);
     } catch (error) {
-      handleError(error);
-      if (error instanceof SpawnError) {
-        process.exit(error.exitCode ?? 1);
+      const err = ensureError(error);
+      handleError(err);
+      if (err instanceof SpawnError) {
+        process.exit(err.exitCode ?? 1);
       }
       process.exit(1);
     }
@@ -186,7 +189,7 @@ export async function main(argv: string[]) {
   try {
     await program.parseAsync(argv);
   } catch (error) {
-    handleError(error);
+    handleError(ensureError(error));
     process.exit(1);
   }
 }
@@ -194,12 +197,12 @@ export async function main(argv: string[]) {
 /**
  * Centralized error handler that formats error messages consistently.
  */
-function handleError(error: unknown): void {
+function handleError(error: Error): void {
   if (error instanceof ConfigNotFoundError) {
+    console.error(`${chalk.red("✗ Error:")} ${error.message}`);
+
+    // Add helpful guidance for default config case
     if (error.isDefault) {
-      console.error(
-        `${chalk.red("✗ Error:")} Default config file not found at ${error.path}`,
-      );
       console.error(
         "\nPlease create a config file at the default location or specify one with -c <path>",
       );
@@ -213,29 +216,13 @@ function handleError(error: unknown): void {
     }
   ]
 }`);
-    } else {
-      console.error(
-        `${chalk.red("✗ Error:")} Config file not found at ${error.path}`,
-      );
     }
   } else if (error instanceof ConfigParseError) {
-    console.error(
-      `${chalk.red("✗ Error:")} Failed to load config from ${error.path}:`,
-      error.originalError?.message || error.message,
-    );
+    console.error(`${chalk.red("✗ Error:")} ${error.message}`);
   } else if (error instanceof SpawnError) {
-    if (error.code === "ENOENT") {
-      console.error(`${chalk.red("✗")} ${error.message}`);
-    } else {
-      console.error(
-        `${chalk.red("✗")} Failed to launch "${error.command}": ${error.message}`,
-      );
-    }
+    console.error(`${chalk.red("✗")} ${error.message}`);
   } else if (error instanceof EditorOpenError) {
-    console.error(
-      `${chalk.red("✗ Error:")} Could not open editor for ${error.path}:`,
-      error.originalError?.message || error.message,
-    );
+    console.error(`${chalk.red("✗ Error:")} ${error.message}`);
   } else if (error instanceof Error) {
     console.error(`${chalk.red("✗ Error:")} ${error.message}`);
   } else {

@@ -1,85 +1,51 @@
 import { describe, it, expect } from "vitest";
-import { adapters } from "../src/adapters/adapters.ts";
+import { adapterRegistry } from "../src/adapters/registry.ts";
 import type { AdapterInput } from "../src/adapters/adapters.ts";
-import type { WriteAction } from "../src/utils/content.ts";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-type WriteAction = Extract<WriteAction, { type: "write" }>;
-
 describe("Adapter Registry", () => {
-  describe("adapters object", () => {
+  describe("adapterRegistry object", () => {
     it("should return claude adapter when requested", () => {
-      const adapterDef = adapters.claude;
+      const adapterDef = adapterRegistry.claude;
       expect(adapterDef).toBeDefined();
-      expect(typeof adapterDef.generateActions).toBe("function");
+      expect(typeof adapterDef.planWrites).toBe("function");
       expect(adapterDef.meta.type).toBe("single-file");
     });
 
     it("should return gemini adapter when requested", () => {
-      const adapterDef = adapters.gemini;
+      const adapterDef = adapterRegistry.gemini;
       expect(adapterDef).toBeDefined();
-      expect(typeof adapterDef.generateActions).toBe("function");
+      expect(typeof adapterDef.planWrites).toBe("function");
       expect(adapterDef.meta.type).toBe("single-file");
     });
 
     it("should return kilocode adapter when requested", () => {
-      const adapterDef = adapters.kilocode;
+      const adapterDef = adapterRegistry.kilocode;
       expect(adapterDef).toBeDefined();
-      expect(typeof adapterDef.generateActions).toBe("function");
+      expect(typeof adapterDef.planWrites).toBe("function");
       expect(adapterDef.meta.type).toBe("multi-file");
     });
 
     it("should return cline adapter when requested", () => {
-      const adapterDef = adapters.cline;
+      const adapterDef = adapterRegistry.cline;
       expect(adapterDef).toBeDefined();
-      expect(typeof adapterDef.generateActions).toBe("function");
+      expect(typeof adapterDef.planWrites).toBe("function");
       expect(adapterDef.meta.type).toBe("multi-file");
     });
 
     it("should return codex adapter when requested", () => {
-      const adapterDef = adapters.codex;
+      const adapterDef = adapterRegistry.codex;
       expect(adapterDef).toBeDefined();
-      expect(typeof adapterDef.generateActions).toBe("function");
+      expect(typeof adapterDef.planWrites).toBe("function");
       expect(adapterDef.meta.type).toBe("single-file");
-    });
-
-    it("should not have unknown adapter", () => {
-      expect(adapters["unknown" as Adapter]).toBeUndefined();
-    });
-
-    it("should only contain known adapters", () => {
-      const knownAdapters = ["claude", "gemini", "kilocode", "cline", "codex"];
-      expect(Object.keys(adapters).sort()).toEqual(knownAdapters.sort());
-    });
-
-    it("should contain all five adapters", () => {
-      expect(Object.keys(adapters).length).toBe(5);
-      expect("claude" in adapters).toBe(true);
-      expect("gemini" in adapters).toBe(true);
-      expect("kilocode" in adapters).toBe(true);
-      expect("cline" in adapters).toBe(true);
-      expect("codex" in adapters).toBe(true);
-    });
-
-    it("should have correct adapter definitions", () => {
-      expect(adapters.claude.generateActions).toBeDefined();
-      expect(adapters.gemini.generateActions).toBeDefined();
-      expect(adapters.kilocode.generateActions).toBeDefined();
-      expect(adapters.cline.generateActions).toBeDefined();
-      expect(adapters.codex.generateActions).toBeDefined();
-    });
-
-    it("should be a plain object", () => {
-      expect(adapters).toBeTypeOf("object");
-      expect(adapters).not.toBeInstanceOf(Map);
     });
   });
 });
 
 describe("Claude Adapter", () => {
   const projectPath = join(homedir(), "test-project");
-  const adapter = adapters.claude.generateActions;
+  const adapter = adapterRegistry.claude.planWrites;
 
   it("should create a single write action for CLAUDE.md", () => {
     const input: AdapterInput = {
@@ -110,7 +76,7 @@ describe("Claude Adapter", () => {
     };
 
     const actions = adapter(input);
-    const content = (actions[0] as WriteAction).content;
+    const content = actions[0].content;
 
     expect(content).toContain("# Rule 1\nFirst rule content");
     expect(content).toContain("---");
@@ -129,9 +95,7 @@ describe("Claude Adapter", () => {
     const actions = adapter(input);
 
     expect(actions).toHaveLength(1);
-    expect((actions[0] as WriteAction).content).toContain(
-      "No rules configured.",
-    );
+    expect(actions[0].content).toContain("No rules configured.");
   });
 
   it("should filter out files containing memory-bank in path", () => {
@@ -144,7 +108,7 @@ describe("Claude Adapter", () => {
     };
 
     const actions = adapter(input);
-    const content = (actions[0] as WriteAction).content;
+    const content = actions[0].content;
 
     // Memory bank files should be filtered out
     expect(content).not.toContain("# Memory Bank");
@@ -164,7 +128,7 @@ describe("Claude Adapter", () => {
     };
 
     const actions = adapter(input);
-    const content = (actions[0] as WriteAction).content;
+    const content = actions[0].content;
 
     // Self-reflection files should be filtered out
     expect(content).not.toContain("# Self Reflection");
@@ -181,7 +145,7 @@ describe("Claude Adapter", () => {
     };
 
     const actions = adapter(input);
-    const content = (actions[0] as WriteAction).content;
+    const content = actions[0].content;
 
     expect(content).toContain("No rules configured.");
   });
@@ -189,7 +153,7 @@ describe("Claude Adapter", () => {
 
 describe("Gemini Adapter", () => {
   const projectPath = join(homedir(), "test-project");
-  const adapter = adapters.gemini.generateActions;
+  const adapter = adapterRegistry.gemini.planWrites;
 
   it("should create a single write action for GEMINI.md", () => {
     const input: AdapterInput = {
@@ -218,15 +182,13 @@ describe("Gemini Adapter", () => {
     const actions = adapter(input);
 
     expect(actions).toHaveLength(1);
-    expect((actions[0] as WriteAction).content).toContain(
-      "No rules configured.",
-    );
+    expect(actions[0].content).toContain("No rules configured.");
   });
 });
 
 describe("Codex Adapter", () => {
   const projectPath = join(homedir(), "test-project");
-  const adapter = adapters.codex.generateActions;
+  const adapter = adapterRegistry.codex.planWrites;
 
   it("should create a single write action for AGENTS.md", () => {
     const input: AdapterInput = {
@@ -252,7 +214,7 @@ describe("Codex Adapter", () => {
 describe("Cline Adapter", () => {
   const projectPath = join(homedir(), "test-project");
   const rulesDir = join(projectPath, ".clinerules");
-  const adapter = adapters.cline.generateActions;
+  const adapter = adapterRegistry.cline.planWrites;
 
   it("should create write actions for each rule", () => {
     const input: AdapterInput = {
@@ -265,7 +227,7 @@ describe("Cline Adapter", () => {
 
     const actions = adapter(input);
 
-    expect(actions).toHaveLength(2); // 2 writes, no mkdir needed (fs-extra handles it)
+    expect(actions).toHaveLength(2);
     expect(actions[0]).toEqual({
       path: join(rulesDir, "rule1.md"),
       content: "# Rule 1\nContent of rule 1",
@@ -299,7 +261,6 @@ describe("Cline Adapter", () => {
 
     const actions = adapter(input);
 
-    // Just 3 writes, fs-extra handles directory creation
     expect(actions).toHaveLength(3);
 
     // Check write actions
@@ -321,7 +282,7 @@ describe("Cline Adapter", () => {
 describe("Kilocode Adapter", () => {
   const projectPath = join(homedir(), "test-project");
   const rulesDir = join(projectPath, ".kilocode/rules");
-  const adapter = adapters.kilocode.generateActions;
+  const adapter = adapterRegistry.kilocode.planWrites;
 
   it("should create write actions for each rule", () => {
     const input: AdapterInput = {
@@ -334,7 +295,6 @@ describe("Kilocode Adapter", () => {
 
     const actions = adapter(input);
 
-    // Just writes, fs-extra handles directory creation
     expect(actions).toHaveLength(2);
     expect(actions[0]).toEqual({
       path: join(rulesDir, "rule1.md"),

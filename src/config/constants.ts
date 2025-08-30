@@ -5,10 +5,9 @@ import { homedir } from "node:os";
  * Central repository path where all rules are stored
  * Can be overridden via SYNC_RULES_CENTRAL_REPO environment variable
  */
-export const CENTRAL_REPO_PATH = resolve(
+export const CENTRAL_REPO_PATH =
   process.env.SYNC_RULES_CENTRAL_REPO ||
-    resolve(homedir(), "Developer/agent-rules"),
-);
+  resolve(homedir(), "Developer/agent-rules");
 
 /**
  * Rules subdirectory within the central repository

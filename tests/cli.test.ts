@@ -1,62 +1,28 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { main } from "../src/cli.ts";
+import { main } from "../src/cli/main.ts";
 import { Config } from "../src/config/config.ts";
 import { ConfigParseError } from "../src/utils/errors.ts";
-import type { WriteAction } from "../src/utils/content.ts";
 
 // Mock the modules with vi.hoisted
-const {
-  mockReadFile,
-  mockAdapters,
-  mockGlobRulePaths,
-  mockFilterValidMdPaths,
-  mockReadRuleContents,
-  mockExecuteActions,
-  mockPrintProjectReport,
-  mockLoadConfig,
-} = vi.hoisted(() => {
-  const mockAdapterFunction = vi.fn();
-  return {
-    mockReadFile: vi.fn(),
-    mockAdapters: {
-      claude: mockAdapterFunction,
-      gemini: mockAdapterFunction,
-      kilocode: mockAdapterFunction,
-      cline: mockAdapterFunction,
-      codex: mockAdapterFunction,
-    },
-    mockGlobRulePaths: vi.fn(),
-    mockFilterValidMdPaths: vi.fn(),
-    mockReadRuleContents: vi.fn(),
-    mockExecuteActions: vi.fn(),
-    mockPrintProjectReport: vi.fn(),
-    mockLoadConfig: vi.fn(),
-  };
-});
+const { mockReadFile, mockPrintProjectReport, mockLoadConfig } = vi.hoisted(
+  () => {
+    return {
+      mockReadFile: vi.fn(),
+      mockPrintProjectReport: vi.fn(),
+      mockLoadConfig: vi.fn(),
+    };
+  },
+);
 
 vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
-}));
-
-vi.mock("../src/adapters/adapters.ts", () => ({
-  adapters: mockAdapters,
-}));
-
-vi.mock("../src/core/filesystem.ts", () => ({
-  globRulePaths: mockGlobRulePaths,
-  filterValidMdPaths: mockFilterValidMdPaths,
-  readRuleContents: mockReadRuleContents,
-}));
-
-vi.mock("../src/core/execution.ts", () => ({
-  executeActions: mockExecuteActions,
 }));
 
 vi.mock("../src/core/reporting.ts", () => ({
   printProjectReport: mockPrintProjectReport,
 }));
 
-vi.mock("../src/config/config-loader.ts", () => ({
+vi.mock("../src/config/loader.ts", () => ({
   loadConfig: mockLoadConfig,
 }));
 
@@ -101,38 +67,9 @@ describe("CLI", () => {
       projectPath: "~/test-project",
       report: {
         success: true,
-        changes: {
-          written: ["~/test-project/file.md"],
-        },
+        written: ["~/test-project/file.md"],
         errors: [],
       },
-    });
-
-    // Mock all adapters to return the same function
-    Object.values(mockAdapters).forEach((mockAdapter) => {
-      mockAdapter.mockImplementation(() => {
-        return [
-          {
-            path: "~/test-project/file.md",
-            content: "test content",
-          },
-        ] as WriteAction[];
-      });
-    });
-
-    mockGlobRulePaths.mockResolvedValue(["rule1.md", "rule2.md"]);
-    mockFilterValidMdPaths.mockResolvedValue(["rule1.md", "rule2.md"]);
-    mockReadRuleContents.mockResolvedValue([
-      { path: "rule1.md", content: "# Rule 1" },
-      { path: "rule2.md", content: "# Rule 2" },
-    ]);
-
-    mockExecuteActions.mockResolvedValue({
-      success: true,
-      changes: {
-        written: ["~/test-project/file.md"],
-      },
-      errors: [],
     });
 
     // Default mock for printProjectReport
@@ -164,9 +101,7 @@ describe("CLI", () => {
           projectPath: expect.stringContaining("test-project"),
           report: {
             success: true,
-            changes: {
-              written: ["~/test-project/file.md"],
-            },
+            written: ["~/test-project/file.md"],
             errors: [],
           },
         },
@@ -221,9 +156,7 @@ describe("CLI", () => {
       projectPath: "~/test-project",
       report: {
         success: false,
-        changes: {
-          written: [],
-        },
+        written: [],
         errors: [new Error("Test error")],
       },
     });
@@ -289,8 +222,9 @@ describe("CLI", () => {
     ).rejects.toThrow("Process exited with code 1");
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to load config"),
-      expect.stringContaining("Invalid JSON"),
+      expect.stringContaining(
+        "✗ Error: Failed to load config from ~/test-config.json: Invalid JSON",
+      ),
     );
   });
 });

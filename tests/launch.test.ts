@@ -12,24 +12,21 @@ vi.mock("prompts", () => ({
 
 // Provide explicit mock for adapters module
 vi.mock("../src/adapters/adapters.ts", () => ({
-  adapters: {
-    claude: vi.fn(),
-    gemini: vi.fn(),
-    kilocode: vi.fn(),
-    cline: vi.fn(),
-    codex: vi.fn(),
-  },
+  adapterFromMeta: vi.fn(),
+}));
+
+vi.mock("../src/adapters/registry.ts", () => ({
+  adapterNames: ["claude", "gemini", "kilocode", "cline", "codex"],
 }));
 vi.mock("../src/config/config.ts");
-vi.mock("../src/config/config-loader.ts");
+vi.mock("../src/config/loader.ts");
 vi.mock("../src/core/sync.ts");
 vi.mock("../src/core/verification.ts");
 
 import { launchTool } from "../src/launch/launch.ts";
-import { spawnProcess } from "../src/launch/process.ts";
-import * as adaptersModule from "../src/adapters/adapters.ts";
+import { spawnProcess } from "../src/launch/spawn.ts";
 import * as configModule from "../src/config/config.ts";
-import * as configLoaderModule from "../src/config/config-loader.ts";
+import * as configLoaderModule from "../src/config/loader.ts";
 import * as syncModule from "../src/core/sync.ts";
 import * as verificationModule from "../src/core/verification.ts";
 import type { Config, Project } from "../src/config/config.ts";
@@ -135,7 +132,7 @@ describe("launch", () => {
       // Mock config loader
       vi.mocked(configLoaderModule.loadConfig).mockResolvedValue(mockConfig);
 
-      // adapters object is already mocked in the module mock
+      // adapterNames is already mocked in the module mock
     });
 
     afterEach(() => {
@@ -145,7 +142,7 @@ describe("launch", () => {
 
     describe("tool detection", () => {
       it("should detect managed tools using adapter registry", async () => {
-        // claude is already in adapters object from the mock
+        // claude is in the mocked adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(verificationModule.verifyRules).mockResolvedValue({
           synced: true,
@@ -156,7 +153,8 @@ describe("launch", () => {
           configPath: "config.json",
         });
 
-        expect(Object.keys(adaptersModule.adapters)).toContain("claude");
+        // Tool should be handled as a managed adapter
+        expect(configModule.findProjectForPath).toHaveBeenCalled();
         expect(mockExeca).toHaveBeenCalledWith("claude", ["--chat"], {
           stdio: "inherit",
           reject: true,
@@ -164,13 +162,12 @@ describe("launch", () => {
       });
 
       it("should spawn unmanaged tools directly without verification", async () => {
-        // git is not in adapters object
-
+        // git is not in adapterNames
         await launchTool("git", ["status"], {
           configPath: "config.json",
         });
 
-        expect(Object.keys(adaptersModule.adapters)).not.toContain("git");
+        // Tool should be spawned directly without config checks
         expect(configModule.findProjectForPath).not.toHaveBeenCalled();
         expect(mockExeca).toHaveBeenCalledWith("git", ["status"], {
           stdio: "inherit",
@@ -181,7 +178,7 @@ describe("launch", () => {
 
     describe("argument passing", () => {
       it("should pass through complex arguments unchanged", async () => {
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(verificationModule.verifyRules).mockResolvedValue({
           synced: true,
@@ -200,7 +197,7 @@ describe("launch", () => {
       });
 
       it("should handle arguments with spaces correctly", async () => {
-        // tool is not in ADAPTER_NAMES
+        // tool is not in adapterNames
 
         const args = ["--message", "hello world", "--data", '{"key": "value"}'];
         await launchTool("some-tool", args, {
@@ -216,7 +213,7 @@ describe("launch", () => {
 
     describe("config file handling", () => {
       it("should use loadConfig for consistent config loading", async () => {
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(verificationModule.verifyRules).mockResolvedValue({
           synced: true,
@@ -238,7 +235,7 @@ describe("launch", () => {
         // Use the globally mocked readline interface
         mockPrompts.mockResolvedValue({ value: false });
 
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(undefined);
 
         await launchTool("claude", [], {
@@ -260,7 +257,7 @@ describe("launch", () => {
       it("should skip prompt when project not found (non-TTY)", async () => {
         process.stdin.isTTY = false;
 
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(undefined);
 
         await launchTool("claude", [], {
@@ -289,7 +286,7 @@ describe("launch", () => {
           adapters: ["claude", "gemini"] as ("claude" | "gemini")[],
         };
 
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(
           projectWithoutCline,
         );
@@ -323,7 +320,7 @@ describe("launch", () => {
           exitCode: 1,
         });
 
-        // tool is not in ADAPTER_NAMES
+        // tool is not in adapterNames
 
         await expect(
           launchTool("nonexistent", [], {
@@ -349,7 +346,7 @@ describe("launch", () => {
           message: "Command failed with exit code 42",
         });
 
-        // tool is not in ADAPTER_NAMES
+        // tool is not in adapterNames
 
         await expect(
           launchTool("some-tool", [], {
@@ -371,7 +368,7 @@ describe("launch", () => {
         // Mock execa to return successful execution
         mockExeca.mockResolvedValue({ exitCode: 0 });
 
-        // tool is not in ADAPTER_NAMES
+        // tool is not in adapterNames
 
         const exitCode = await launchTool("some-tool", [], {
           configPath: "config.json",
@@ -383,7 +380,7 @@ describe("launch", () => {
 
     describe("sync behavior", () => {
       it("should skip sync when --no-sync flag is set", async () => {
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
 
         await launchTool("claude", [], {
@@ -397,18 +394,16 @@ describe("launch", () => {
       });
 
       it("should force sync when --force flag is set", async () => {
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(syncModule.syncProject).mockResolvedValue({
           project: "/home/user/project",
           report: {
             success: true,
-            changes: {
-              written: [
-                "/home/user/project/CLAUDE.md",
-                "/home/user/project/rules.md",
-              ],
-            },
+            written: [
+              "/home/user/project/CLAUDE.md",
+              "/home/user/project/rules.md",
+            ],
             errors: [],
           },
         });
@@ -438,7 +433,7 @@ describe("launch", () => {
         // Use the globally mocked readline interface
         mockPrompts.mockResolvedValue({ value: true });
 
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(verificationModule.verifyRules).mockResolvedValue({
           synced: false,
@@ -451,12 +446,10 @@ describe("launch", () => {
           project: "/home/user/project",
           report: {
             success: true,
-            changes: {
-              written: [
-                "/home/user/project/CLAUDE.md",
-                "/home/user/project/rules.md",
-              ],
-            },
+            written: [
+              "/home/user/project/CLAUDE.md",
+              "/home/user/project/rules.md",
+            ],
             errors: [],
           },
         });
@@ -481,7 +474,7 @@ describe("launch", () => {
       it("should skip sync prompt when rules out of sync (non-TTY)", async () => {
         process.stdin.isTTY = false;
 
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(verificationModule.verifyRules).mockResolvedValue({
           synced: false,
@@ -500,7 +493,7 @@ describe("launch", () => {
       });
 
       it("should show verbose output when verbose flag is set", async () => {
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(verificationModule.verifyRules).mockResolvedValue({
           synced: false,
@@ -529,7 +522,7 @@ describe("launch", () => {
       });
 
       it("should handle rules already up to date", async () => {
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(verificationModule.verifyRules).mockResolvedValue({
           synced: true,
@@ -549,7 +542,7 @@ describe("launch", () => {
       });
 
       it("should not log when rules up to date and not verbose", async () => {
-        // claude is in adapters object
+        // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(verificationModule.verifyRules).mockResolvedValue({
           synced: true,

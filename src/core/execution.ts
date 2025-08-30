@@ -1,15 +1,13 @@
 import { outputFile } from "fs-extra";
 import { normalizePath } from "../utils/paths.ts";
-import { logMessage, ensureError } from "../utils/logger.ts";
+import { logMessage } from "../utils/logger.ts";
 import type { PathGuard } from "./path-guard.ts";
 import type { WriteAction } from "../utils/content.ts";
-import { SyncError } from "../utils/errors.ts";
+import { SyncError, ensureError } from "../utils/errors.ts";
 
 export interface ExecutionReport {
   success: boolean;
-  changes: {
-    written: string[];
-  };
+  written: string[];
   errors: Error[];
 }
 
@@ -20,9 +18,7 @@ export async function executeActions(
   const { dryRun = false, verbose = false, pathGuard } = opts;
   const report: ExecutionReport = {
     success: true,
-    changes: {
-      written: [],
-    },
+    written: [],
     errors: [],
   };
 
@@ -49,7 +45,7 @@ export async function executeActions(
         logMessage(`Writing to: ${action.path}`, verbose);
         await outputFile(action.path, action.content, "utf8");
       }
-      report.changes.written.push(action.path);
+      report.written.push(action.path);
     } catch (err) {
       // Wrap with err to provide context
       const error = new SyncError(
@@ -61,12 +57,11 @@ export async function executeActions(
         ensureError(err),
       );
 
+      if (!dryRun) throw error; // fail fast
+
+      // Only reachable in dry-run mode
       report.errors.push(error);
       report.success = false;
-
-      if (!dryRun) {
-        throw error; // Fail fast in non-dry-run mode
-      }
     }
   }
 

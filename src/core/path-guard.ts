@@ -109,3 +109,54 @@ export function createPathGuardFromConfig(config: Config): PathGuard {
   const defaultRoots = [CENTRAL_REPO_PATH, ...projectRoots];
   return createPathGuard(defaultRoots);
 }
+
+/**
+ * Creates a PathGuard that only allows specific planned write paths.
+ * This provides defense-in-depth by narrowing permissions to exact paths
+ * rather than directory roots.
+ */
+export function createPathGuardForPlannedWrites(paths: string[]): PathGuard {
+  if (!paths || paths.length === 0) {
+    throw new Error("At least one planned path must be provided");
+  }
+
+  // Normalize all planned paths into an immutable set
+  const allowedPaths = Object.freeze(
+    new Set(paths.map((path) => normalizePath(path))),
+  );
+
+  // Core validation function that only allows exact path matches
+  const validatePath: PathValidator = (targetPath: string): string => {
+    if (!targetPath || targetPath.trim() === "") {
+      throw new Error("Invalid path: empty string");
+    }
+
+    const normalized = normalizePath(targetPath);
+
+    if (!allowedPaths.has(normalized)) {
+      throw new Error(`Path not in planned writes: ${targetPath}`);
+    }
+
+    return normalized;
+  };
+
+  // Return an immutable PathGuard object
+  return Object.freeze({
+    validatePath,
+
+    getAllowedRoots(): string[] {
+      // Return the allowed paths as "roots" for compatibility
+      return Array.from(allowedPaths);
+    },
+
+    isInsideAllowedRoot(path: string): boolean {
+      // For planned writes, we only allow exact matches
+      try {
+        const normalized = normalizePath(path);
+        return allowedPaths.has(normalized);
+      } catch {
+        return false;
+      }
+    },
+  });
+}

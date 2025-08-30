@@ -1,8 +1,6 @@
-import { join } from "node:path";
-import { matchesGlob } from "node:path";
-import type { AdapterName } from "../config/config.ts";
+import { single, under } from "./paths.ts";
+import type { Rule } from "../core/rules-fs.ts";
 import type { WriteAction } from "../utils/content.ts";
-import type { Rule } from "../core/filesystem.ts";
 
 /**
  * Input structure for adapter functions
@@ -28,107 +26,37 @@ export type AdapterMetadata =
  * Complete adapter definition including function and metadata
  */
 export type AdapterDefinition = {
-  generateActions: AdapterFunction;
+  planWrites: AdapterFunction;
   meta: AdapterMetadata;
 };
 
 /**
- * Factory to create an adapter that writes all rules into a single markdown file
+ * Creates an adapter function from metadata and optional configuration
  */
-function makeSingleFileAdapter(config: {
-  filename: string;
-  headerTitle: string;
-  filterRules?: (rules: Rule[]) => Rule[];
-}): AdapterFunction {
-  const { filename, headerTitle, filterRules } = config;
-
+export function adapterFromMeta(
+  meta: AdapterMetadata,
+  opts?: {
+    headerTitle?: string;
+    filter?: (rules: Rule[]) => Rule[];
+  },
+): AdapterFunction {
   return ({ projectPath, rules }) => {
-    const actions: WriteAction[] = [];
-    const effectiveRules = filterRules ? filterRules(rules) : rules;
+    const selected = opts?.filter ? opts.filter(rules) : [...rules];
 
-    let content: string;
-    if (effectiveRules.length === 0) {
-      content = `# ${headerTitle}\n\nNo rules configured.\n`;
-    } else {
-      const ruleContents = effectiveRules.map((rule) => rule.content.trim());
-      content =
-        `# ${headerTitle}\n\n` +
-        "To modify rules, edit the source `.md` files and run `sync-rules` to regenerate.\n\n" +
-        ruleContents.join("\n\n---\n\n") +
-        "\n";
+    if (meta.type === "single-file") {
+      const title = opts?.headerTitle ?? meta.location;
+      const content = selected.length
+        ? `# ${title}\n\nTo modify rules, edit the source ".md" files and run "sync-rules" to regenerate.\n\n` +
+          selected.map((r) => r.content.trim()).join("\n\n---\n\n") +
+          "\n"
+        : `# ${title}\n\nNo rules configured.\n`;
+      return [{ path: single(projectPath, meta.location), content }];
     }
 
-    actions.push({
-      path: join(projectPath, filename),
-      content,
-    });
-
-    return actions;
+    // multi-file
+    return selected.map((r) => ({
+      path: under(projectPath, meta.directory, r.path),
+      content: r.content,
+    }));
   };
 }
-
-/**
- * Factory to create an adapter that writes individual rule files to a directory
- */
-function makeMultiFileAdapter(dirName: string): AdapterFunction {
-  return ({ projectPath, rules }) => {
-    const actions: WriteAction[] = [];
-    const rulesDir = join(projectPath, dirName);
-
-    // Create write actions for each rule file
-    // fs-extra will automatically create directories
-    for (const rule of rules) {
-      actions.push({
-        path: join(rulesDir, rule.path),
-        content: rule.content,
-      });
-    }
-
-    return actions;
-  };
-}
-
-/**
- * Registry of available adapters with metadata
- */
-export const adapters: Record<AdapterName, AdapterDefinition> = {
-  claude: {
-    generateActions: makeSingleFileAdapter({
-      filename: "CLAUDE.md",
-      headerTitle: "CLAUDE.md - Rules for Claude Code",
-      filterRules: (rules) =>
-        rules.filter(
-          (rule) =>
-            ![
-              "**/*memory-bank*", // Memory bank rules are injected via claudemb shell function
-              "**/*memory-bank*/**", // Also match if memory-bank is in a directory name
-              "**/*self-reflection*", // Self-reflection rule is not applicable to Claude
-              "**/*self-reflection*/**", // Also match if self-reflection is in a directory name
-            ].some((pattern) => matchesGlob(rule.path, pattern)),
-        ),
-    }),
-    meta: { type: "single-file", location: "CLAUDE.md" },
-  },
-  cline: {
-    generateActions: makeMultiFileAdapter(".clinerules"),
-    meta: { type: "multi-file", directory: ".clinerules" },
-  },
-  gemini: {
-    generateActions: makeSingleFileAdapter({
-      filename: "GEMINI.md",
-      headerTitle: "GEMINI.md - Rules for Gemini Code",
-    }),
-    meta: { type: "single-file", location: "GEMINI.md" },
-  },
-  kilocode: {
-    generateActions: makeMultiFileAdapter(".kilocode/rules"),
-    meta: { type: "multi-file", directory: ".kilocode/rules" },
-  },
-  codex: {
-    generateActions: makeSingleFileAdapter({
-      filename: "AGENTS.md",
-      headerTitle: "AGENTS.md - Project docs for Codex CLI",
-    }),
-    meta: { type: "single-file", location: "AGENTS.md" },
-  },
-};

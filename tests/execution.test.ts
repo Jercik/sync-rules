@@ -10,7 +10,7 @@ describe("executeActions", () => {
 
       expect(result).toEqual({
         success: true,
-        changes: { written: [] },
+        written: [],
         errors: [],
       });
     });
@@ -57,7 +57,7 @@ describe("executeActions - algorithm tests", () => {
       const result = await executeActions(actions, { dryRun: true });
 
       expect(result.success).toBe(true);
-      expect(result.changes.written).toContain("/test/file.txt");
+      expect(result.written).toContain("/test/file.txt");
 
       // Verify no actual FS operations were called
       expect(fsExtra.outputFile).not.toHaveBeenCalled();
@@ -92,8 +92,6 @@ describe("executeActions - algorithm tests", () => {
         "utf8",
       );
     });
-
-    // Copy and mkdir actions are no longer supported
   });
 
   describe("error handling", () => {
@@ -140,10 +138,7 @@ describe("executeActions - algorithm tests", () => {
       const result = await executeActions(actions, { dryRun: false });
 
       expect(result.success).toBe(true);
-      expect(result.changes.written).toEqual([
-        "/test/file1.txt",
-        "/test/file2.txt",
-      ]);
+      expect(result.written).toEqual(["/test/file1.txt", "/test/file2.txt"]);
     });
   });
 
