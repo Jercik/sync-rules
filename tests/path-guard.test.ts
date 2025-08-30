@@ -1,50 +1,33 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { PathGuard, createDefaultPathGuard } from "../src/pathGuard.ts";
-import { homedir } from "os";
-import { resolve } from "path";
-import * as fs from "fs";
-
-// Mock fs module for symlink tests
-vi.mock("fs", async () => {
-  const actual = await vi.importActual<typeof fs>("fs");
-  return {
-    ...actual,
-    realpathSync: vi.fn((path: string) => {
-      // Simulate symlink resolution for specific test cases
-      if (path.includes("/symlink/")) {
-        throw new Error("ENOENT");
-      }
-      return path;
-    }),
-  };
-});
+import { describe, it, expect, beforeEach } from "vitest";
+import { createPathGuard, type PathGuard } from "../src/core/path-guard.ts";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 
 describe("PathGuard", () => {
   const home = homedir();
   const testRoot = "/test/root";
-  const anotherRoot = "/another/root";
 
-  describe("constructor", () => {
-    it("should create instance with valid allowed roots", () => {
-      const guard = new PathGuard([home, testRoot]);
-      expect(guard).toBeInstanceOf(PathGuard);
+  describe("createPathGuard", () => {
+    it("should create guard with valid allowed roots", () => {
+      const guard = createPathGuard([home, testRoot]);
+      expect(guard).toBeDefined();
       expect(guard.getAllowedRoots()).toHaveLength(2);
     });
 
     it("should throw error if no allowed roots provided", () => {
-      expect(() => new PathGuard([])).toThrow(
+      expect(() => createPathGuard([])).toThrow(
         "At least one allowed root directory must be provided",
       );
     });
 
     it("should throw error if allowed root is not absolute path", () => {
-      expect(() => new PathGuard(["./relative/path"])).toThrow(
+      expect(() => createPathGuard(["./relative/path"])).toThrow(
         "Allowed root must be an absolute path: ./relative/path",
       );
     });
 
     it("should normalize allowed roots", () => {
-      const guard = new PathGuard(["/test//root//", "/another///root"]);
+      const guard = createPathGuard(["/test//root//", "/another///root"]);
       const roots = guard.getAllowedRoots();
       expect(roots).toContain("/test/root");
       expect(roots).toContain("/another/root");
@@ -55,7 +38,7 @@ describe("PathGuard", () => {
     let guard: PathGuard;
 
     beforeEach(() => {
-      guard = new PathGuard([home, testRoot, process.cwd()]);
+      guard = createPathGuard([home, testRoot, process.cwd()]);
     });
 
     it("should validate paths within allowed roots", () => {
@@ -126,7 +109,7 @@ describe("PathGuard", () => {
     let guard: PathGuard;
 
     beforeEach(() => {
-      guard = new PathGuard([home, testRoot]);
+      guard = createPathGuard([home, testRoot]);
     });
 
     it("should return true for paths inside allowed roots", () => {
@@ -155,7 +138,7 @@ describe("PathGuard", () => {
 
   describe("getAllowedRoots", () => {
     it("should return a copy of allowed roots", () => {
-      const guard = new PathGuard([home, testRoot]);
+      const guard = createPathGuard([home, testRoot]);
       const roots = guard.getAllowedRoots();
 
       expect(roots).toHaveLength(2);
@@ -166,94 +149,25 @@ describe("PathGuard", () => {
       roots.push("/new/root");
       expect(guard.getAllowedRoots()).toHaveLength(2);
     });
-  });
 
-  describe("addAllowedRoot", () => {
-    let guard: PathGuard;
+    it("should maintain immutability of roots", () => {
+      const originalRoots = [home, testRoot];
+      const guard = createPathGuard(originalRoots);
 
-    beforeEach(() => {
-      guard = new PathGuard([home]);
-    });
-
-    it("should add new allowed root", () => {
-      guard.addAllowedRoot(testRoot);
-      expect(guard.getAllowedRoots()).toContain(testRoot);
+      // Modifying the original array should not affect the guard
+      originalRoots.push("/another/root");
       expect(guard.getAllowedRoots()).toHaveLength(2);
-    });
 
-    it("should not add duplicate roots", () => {
-      guard.addAllowedRoot(testRoot);
-      guard.addAllowedRoot(testRoot);
+      // Getting roots and modifying them should not affect the guard
+      const retrievedRoots = guard.getAllowedRoots();
+      retrievedRoots.push("/yet/another/root");
       expect(guard.getAllowedRoots()).toHaveLength(2);
-    });
-
-    it("should normalize new roots", () => {
-      guard.addAllowedRoot("/test//root//");
-      expect(guard.getAllowedRoots()).toContain("/test/root");
-    });
-
-    it("should throw error for relative paths", () => {
-      expect(() => guard.addAllowedRoot("./relative")).toThrow(
-        "Allowed root must be an absolute path: ./relative",
-      );
-    });
-  });
-
-  describe("removeAllowedRoot", () => {
-    let guard: PathGuard;
-
-    beforeEach(() => {
-      guard = new PathGuard([home, testRoot, anotherRoot]);
-    });
-
-    it("should remove existing root and return true", () => {
-      expect(guard.removeAllowedRoot(testRoot)).toBe(true);
-      expect(guard.getAllowedRoots()).not.toContain(testRoot);
-      expect(guard.getAllowedRoots()).toHaveLength(2);
-    });
-
-    it("should return false if root not found", () => {
-      expect(guard.removeAllowedRoot("/non/existent")).toBe(false);
-      expect(guard.getAllowedRoots()).toHaveLength(3);
-    });
-
-    it("should handle normalized paths", () => {
-      expect(guard.removeAllowedRoot("/test//root//")).toBe(true);
-      expect(guard.getAllowedRoots()).not.toContain(testRoot);
-    });
-
-    it("should allow removing all but one root", () => {
-      guard.removeAllowedRoot(testRoot);
-      guard.removeAllowedRoot(anotherRoot);
-      expect(guard.getAllowedRoots()).toHaveLength(1);
-      expect(guard.getAllowedRoots()).toContain(home);
-    });
-  });
-
-  describe("createDefaultPathGuard", () => {
-    it("should create guard with default roots", () => {
-      const guard = createDefaultPathGuard();
-      const roots = guard.getAllowedRoots();
-
-      expect(roots).toContain(homedir());
-      expect(roots).toContain(process.cwd());
-      expect(roots).toContain(resolve(homedir(), "Developer/agent-rules"));
-    });
-
-    it("should include additional roots if provided", () => {
-      const additionalRoots = ["/custom/root1", "/custom/root2"];
-      const guard = createDefaultPathGuard(additionalRoots);
-      const roots = guard.getAllowedRoots();
-
-      expect(roots).toContain("/custom/root1");
-      expect(roots).toContain("/custom/root2");
-      expect(roots.length).toBeGreaterThanOrEqual(5); // 3 defaults + 2 additional
     });
   });
 
   describe("integration scenarios", () => {
     it("should handle complex path traversal attempts", () => {
-      const guard = new PathGuard(["/safe/root"]);
+      const guard = createPathGuard(["/safe/root"]);
 
       // Various traversal attempts
       const attacks = [
@@ -270,30 +184,60 @@ describe("PathGuard", () => {
       }
     });
 
-    it("should validate paths after adding new roots", () => {
-      const guard = new PathGuard([home]);
+    it("should respect immutable roots", () => {
+      const guard = createPathGuard([home]);
 
-      // Initially reject path outside home
-      expect(() => guard.validatePath("/new/root/file.txt")).toThrow();
+      // Path outside home should be rejected
+      expect(() => guard.validatePath("/new/root/file.txt")).toThrow(
+        "Path is outside allowed directories",
+      );
 
-      // Add new root and verify path is now valid
-      guard.addAllowedRoot("/new/root");
-      expect(guard.validatePath("/new/root/file.txt")).toBe(
+      // Create a new guard with additional roots for different validation rules
+      const guardWithNewRoot = createPathGuard([home, "/new/root"]);
+      expect(guardWithNewRoot.validatePath("/new/root/file.txt")).toBe(
         "/new/root/file.txt",
       );
+
+      // Original guard should still reject the path (immutable)
+      expect(() => guard.validatePath("/new/root/file.txt")).toThrow(
+        "Path is outside allowed directories",
+      );
+    });
+  });
+
+  describe("simplified path validation", () => {
+    it("should allow legitimate non-existent files in allowed directories", () => {
+      const guard = createPathGuard(["/test/root"]);
+
+      // Creating new files under allowed root should be allowed
+      const result = guard.validatePath("/test/root/newdir/newfile.txt");
+      expect(result).toBe("/test/root/newdir/newfile.txt");
     });
 
-    it("should invalidate paths after removing roots", () => {
-      const guard = new PathGuard([home, "/removable/root"]);
+    it("should properly handle deeply nested non-existent paths", () => {
+      const guard = createPathGuard(["/test/root"]);
 
-      // Initially accept path
-      expect(guard.validatePath("/removable/root/file.txt")).toBe(
-        "/removable/root/file.txt",
+      // Multiple levels of non-existent directories
+      const deepPath = "/test/root/level1/level2/level3/file.txt";
+      const result = guard.validatePath(deepPath);
+      expect(result).toBe(deepPath);
+    });
+
+    it("should allow paths for completely non-existent allowed roots", () => {
+      const guard = createPathGuard(["/completely/nonexistent/path"]);
+
+      // This should succeed since path is logically within allowed roots
+      const result = guard.validatePath(
+        "/completely/nonexistent/path/file.txt",
       );
+      expect(result).toBe("/completely/nonexistent/path/file.txt");
+    });
 
-      // Remove root and verify path is now invalid
-      guard.removeAllowedRoot("/removable/root");
-      expect(() => guard.validatePath("/removable/root/file.txt")).toThrow(
+    it("should reject paths outside allowed roots using logical checking", () => {
+      const guard = createPathGuard(["/test/root"]);
+
+      // Paths outside allowed root should be rejected
+      expect(() => guard.validatePath("/safe/parent/newfile.txt")).toThrow(
         "Path is outside allowed directories",
       );
     });

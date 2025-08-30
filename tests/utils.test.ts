@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { normalizePath, isValidMdFile, logMessage } from "../src/utils.ts";
-import { MAX_MD_SIZE } from "../src/constants.ts";
-import { homedir } from "os";
-import { resolve } from "path";
+import { normalizePath, isValidMdFile } from "../src/utils/paths.ts";
+import { logMessage } from "../src/utils/logger.ts";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 
 describe("utils", () => {
   describe("normalizePath", () => {
     const home = homedir();
-    const centralRepo = resolve(home, "Developer/agent-rules");
 
     it("should resolve home directory (~) correctly", () => {
       expect(normalizePath("~/test")).toBe(resolve(home, "test"));
@@ -21,36 +20,7 @@ describe("utils", () => {
       expect(normalizePath(absolutePath)).toBe(absolutePath);
     });
 
-    it("should reject path traversal attempts that escape allowed directories", () => {
-      // These should throw because they resolve outside allowed directories
-      expect(() => normalizePath("/etc/passwd")).toThrow(
-        /outside allowed directories/i,
-      );
-      expect(() => normalizePath("/root/.ssh/id_rsa")).toThrow(
-        /outside allowed directories/i,
-      );
-    });
-
-    it("should allow safe paths with .. that stay within allowed directories", () => {
-      // This path is safe: ~/Projects/../Documents/project resolves to ~/Documents/project
-      const safePath = `${home}/Projects/../Documents/project`;
-      const result = normalizePath(safePath);
-      expect(result).toBe(resolve(home, "Documents/project"));
-    });
-
-    it("should allow paths within home directory", () => {
-      const validPath = resolve(home, "Documents/project");
-      expect(() => normalizePath(validPath)).not.toThrow();
-    });
-
-    it("should allow paths within central repository", () => {
-      const validPath = resolve(centralRepo, "rules/python.md");
-      expect(() => normalizePath(validPath)).not.toThrow();
-    });
-
-    it("should handle empty string", () => {
-      expect(() => normalizePath("")).toThrow(/invalid path/i);
-    });
+    // Heavy security and root checks are covered by PathGuard tests.
 
     it("should handle relative paths by resolving them", () => {
       // Relative paths should be resolved from current directory
@@ -64,63 +34,41 @@ describe("utils", () => {
       expect(normalizePath(input)).toBe(expected);
     });
 
-    it("should reject paths that look like they start with allowed root but escape it", () => {
-      // /home/user2 should not be allowed just because it starts with /home/user
-      const evilPath = `${home}2/evil`; // e.g., /home/user2/evil when home is /home/user
-      expect(() => normalizePath(evilPath)).toThrow(
-        /outside allowed directories/i,
-      );
-    });
-
-    it("should handle symlinks by resolving to real path", () => {
-      // Since we can't easily create symlinks in tests, we'll just ensure
-      // the function returns a valid path within allowed directories
-      const result = normalizePath(`${home}/Documents/project`);
-      expect(result).toMatch(
-        new RegExp(`^${home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
-      );
-    });
+    // The following cases are validated in path-guard.test.ts:
+    // - traversal escapes
+    // - safe .. that remain within roots
+    // - prefix-evading paths
+    // - symlink/realpath handling
   });
 
   describe("isValidMdFile", () => {
-    it("should accept valid markdown files under 1MB", () => {
-      expect(isValidMdFile("test.md", 100)).toBe(true);
-      expect(isValidMdFile("README.md", MAX_MD_SIZE - 1)).toBe(true);
-      expect(isValidMdFile("path/to/file.md", 0)).toBe(true);
-    });
-
-    it("should reject files exactly 1MB or larger", () => {
-      expect(isValidMdFile("large.md", MAX_MD_SIZE)).toBe(false);
-      expect(isValidMdFile("huge.md", MAX_MD_SIZE + 1)).toBe(false);
-      expect(isValidMdFile("massive.md", 10 * MAX_MD_SIZE)).toBe(false);
+    it("should accept valid markdown files", () => {
+      expect(isValidMdFile("test.md")).toBe(true);
+      expect(isValidMdFile("README.md")).toBe(true);
+      expect(isValidMdFile("path/to/file.md")).toBe(true);
     });
 
     it("should reject non-markdown files", () => {
-      expect(isValidMdFile("test.txt", 100)).toBe(false);
-      expect(isValidMdFile("script.js", 100)).toBe(false);
-      expect(isValidMdFile("README", 100)).toBe(false);
+      expect(isValidMdFile("test.txt")).toBe(false);
+      expect(isValidMdFile("script.js")).toBe(false);
+      expect(isValidMdFile("README")).toBe(false);
     });
 
     it("should accept valid markdown files regardless of case", () => {
-      expect(isValidMdFile("test.MD", 100)).toBe(true);
-      expect(isValidMdFile("TEST.MD", 100)).toBe(true);
-      expect(isValidMdFile("file.mD", 100)).toBe(true);
+      expect(isValidMdFile("test.MD")).toBe(true);
+      expect(isValidMdFile("TEST.MD")).toBe(true);
+      expect(isValidMdFile("file.mD")).toBe(true);
     });
 
     it("should handle edge cases", () => {
-      expect(isValidMdFile(".md", 100)).toBe(false); // File named just .md should be rejected
-      expect(isValidMdFile("test.md.txt", 100)).toBe(false);
-      expect(isValidMdFile("test.markdown", 100)).toBe(false);
-    });
-
-    it("should reject negative sizes", () => {
-      expect(isValidMdFile("test.md", -1)).toBe(false);
-      expect(isValidMdFile("test.md", -1000)).toBe(false);
+      expect(isValidMdFile(".md")).toBe(false); // File named just .md should be rejected
+      expect(isValidMdFile("test.md.txt")).toBe(false);
+      expect(isValidMdFile("test.markdown")).toBe(false);
     });
 
     it("should handle files with multiple dots", () => {
-      expect(isValidMdFile("test.config.md", 100)).toBe(true);
-      expect(isValidMdFile("test.md.backup.md", 100)).toBe(true);
+      expect(isValidMdFile("test.config.md")).toBe(true);
+      expect(isValidMdFile("test.md.backup.md")).toBe(true);
     });
   });
 

@@ -1,22 +1,22 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { makeTempDir, cleanupDir } from "./test-utils";
 import {
   globRulePaths,
   filterValidMdPaths,
   readRuleContents,
-} from "../src/filesystem.ts";
+} from "../src/core/filesystem.ts";
 
 describe("filesystem operations", () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    // Create temp directory within current working directory (allowed by path validation)
-    tempDir = await mkdtemp(join(process.cwd(), "temp-test-"));
+    tempDir = await makeTempDir();
   });
 
   afterEach(async () => {
-    await rm(tempDir, { recursive: true, force: true });
+    await cleanupDir(tempDir);
   });
 
   describe("globRulePaths", () => {
@@ -168,62 +168,51 @@ describe("filesystem operations", () => {
       await writeFile(join(tempDir, "subdir", "nested.md"), "# Nested valid");
 
       // Create invalid files
-      await writeFile(join(tempDir, "large.md"), "x".repeat(1024 * 1024 + 1)); // >1MB
       await writeFile(join(tempDir, "not-markdown.txt"), "Not markdown");
       await writeFile(join(tempDir, "no-extension"), "No extension");
       await writeFile(join(tempDir, "wrong.MD"), "Wrong case extension");
     });
 
-    it("should filter to only valid markdown files", async () => {
+    it("should filter to only valid markdown files", () => {
       const paths = [
         "valid.md",
         "subdir/nested.md",
-        "large.md",
         "not-markdown.txt",
         "no-extension",
         "wrong.MD",
       ];
-      const result = await filterValidMdPaths(tempDir, paths);
+      const result = filterValidMdPaths(paths);
 
       expect(result).toEqual(["valid.md", "subdir/nested.md", "wrong.MD"]);
     });
 
-    it("should handle empty paths array", async () => {
-      const result = await filterValidMdPaths(tempDir, []);
+    it("should handle empty paths array", () => {
+      const result = filterValidMdPaths([]);
 
       expect(result).toEqual([]);
     });
 
-    it("should skip non-existent files", async () => {
+    it("should include files regardless of existence", () => {
       const paths = ["valid.md", "does-not-exist.md", "subdir/nested.md"];
-      const result = await filterValidMdPaths(tempDir, paths);
+      const result = filterValidMdPaths(paths);
 
-      expect(result).toEqual(["valid.md", "subdir/nested.md"]);
+      expect(result).toEqual([
+        "valid.md",
+        "does-not-exist.md",
+        "subdir/nested.md",
+      ]);
     });
 
-    it("should handle paths with no valid files", async () => {
+    it("should handle paths with no valid files", () => {
       const paths = ["not-markdown.txt", "no-extension"];
-      const result = await filterValidMdPaths(tempDir, paths);
+      const result = filterValidMdPaths(paths);
 
       expect(result).toEqual([]);
     });
 
-    it("should handle files that are exactly 1MB", async () => {
-      // Create file exactly 1MB (should be invalid - MAX_MD_SIZE uses >=)
-      await writeFile(join(tempDir, "exactly-1mb.md"), "x".repeat(1024 * 1024));
-
-      const paths = ["exactly-1mb.md"];
-      const result = await filterValidMdPaths(tempDir, paths);
-
-      expect(result).toEqual([]); // File exactly 1MB is rejected
-    });
-
-    it("should handle mixed case extensions", async () => {
-      await writeFile(join(tempDir, "mixed.Md"), "Mixed case");
-      await writeFile(join(tempDir, "upper.MD"), "Upper case");
-
+    it("should handle mixed case extensions", () => {
       const paths = ["mixed.Md", "upper.MD"];
-      const result = await filterValidMdPaths(tempDir, paths);
+      const result = filterValidMdPaths(paths);
 
       expect(result).toEqual(["mixed.Md", "upper.MD"]);
     });
@@ -267,20 +256,21 @@ describe("filesystem operations", () => {
       ]);
 
       // Then filter for valid markdown files
-      const validResults = await filterValidMdPaths(rulesDir, globResults);
+      const validResults = filterValidMdPaths(globResults);
       expect(validResults).toEqual([
         "backend/node.md",
         "frontend/react.md",
+        "large.md",
         "python.md",
       ]);
     });
 
-    it("should handle complex patterns with size filtering", async () => {
+    it("should handle complex patterns with filtering", async () => {
       const rulesDir = join(tempDir, "rules");
       const patterns = ["frontend/**", "python.md", "!**/*.json"];
 
       const globResults = await globRulePaths(rulesDir, patterns);
-      const validResults = await filterValidMdPaths(rulesDir, globResults);
+      const validResults = filterValidMdPaths(globResults);
 
       expect(validResults).toEqual(["frontend/react.md", "python.md"]);
     });
@@ -344,34 +334,14 @@ describe("filesystem operations", () => {
       expect(results).toEqual([]);
     });
 
-    it("should skip non-existent files and log error", async () => {
+    it("should throw error when file cannot be read", async () => {
       const rulesDir = join(tempDir, "rules");
       const relPaths = ["rule1.md", "nonexistent.md", "rule2.md"];
 
-      // Mock console.error to check if it's called
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-
-      const results = await readRuleContents(rulesDir, relPaths);
-
-      expect(results).toHaveLength(2);
-      expect(results).toContainEqual({
-        path: "rule1.md",
-        content: "# Rule 1\nThis is rule 1 content.",
-      });
-      expect(results).toContainEqual({
-        path: "rule2.md",
-        content: "# Rule 2\nThis is rule 2 content.",
-      });
-
-      // Check that error was logged
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to read file"),
-        expect.any(Error),
+      // Expect the function to throw an error
+      await expect(readRuleContents(rulesDir, relPaths)).rejects.toThrow(
+        /Failed to read rule file.*nonexistent\.md/,
       );
-
-      consoleErrorSpy.mockRestore();
     });
 
     it("should handle UTF-8 content correctly", async () => {

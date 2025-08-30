@@ -16,6 +16,7 @@ export default defineConfig([
     files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
     languageOptions: { globals: globals.node },
   },
+  tseslint.configs.recommended,
   {
     files: ["tests/**"],
     plugins: {
@@ -23,8 +24,8 @@ export default defineConfig([
     },
     rules: {
       ...vitest.configs.recommended.rules, // you can also use vitest.configs.all.rules to enable all rules
+      "@typescript-eslint/no-explicit-any": "off", // Allow 'any' in tests for mocking
     },
   },
-  tseslint.configs.recommended,
   eslintConfigPrettier,
 ]);

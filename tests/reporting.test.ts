@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { printProjectReport } from "../src/reporting.ts";
-import type { ProjectReport } from "../src/reporting.ts";
+import { printProjectReport } from "../src/core/reporting.ts";
+import type { ProjectReport } from "../src/core/reporting.ts";
 
 describe("printProjectReport", () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
@@ -16,13 +16,11 @@ describe("printProjectReport", () => {
   it("should print basic success report", () => {
     const reports: ProjectReport[] = [
       {
-        project: "/tmp/project1",
+        projectPath: "/tmp/project1",
         report: {
           success: true,
           changes: {
             written: ["/tmp/project1/file.md"],
-            copied: [],
-            createdDirs: [],
           },
           errors: [],
         },
@@ -44,13 +42,11 @@ describe("printProjectReport", () => {
   it("should print failure report with errors", () => {
     const reports: ProjectReport[] = [
       {
-        project: "/tmp/project1",
+        projectPath: "/tmp/project1",
         report: {
           success: false,
           changes: {
             written: [],
-            copied: [],
-            createdDirs: [],
           },
           errors: [new Error("Test error"), new Error("Another error")],
         },
@@ -69,16 +65,14 @@ describe("printProjectReport", () => {
     expect(output).toContain("Another error");
   });
 
-  it("should show all change types", () => {
+  it("should show written change type only", () => {
     const reports: ProjectReport[] = [
       {
-        project: "/tmp/project1",
+        projectPath: "/tmp/project1",
         report: {
           success: true,
           changes: {
             written: ["/tmp/file1.md", "/tmp/file2.md"],
-            copied: ["/tmp/copied.md"],
-            createdDirs: ["/tmp/dir1", "/tmp/dir2", "/tmp/dir3"],
           },
           errors: [],
         },
@@ -91,20 +85,18 @@ describe("printProjectReport", () => {
 
     const output = consoleLogSpy.mock.calls[0][0];
     expect(output).toContain("📝 Written: 2 files");
-    expect(output).toContain("📋 Copied: 1 files");
-    expect(output).toContain("📁 Created: 3 directories");
+    expect(output).not.toContain("📋 Copied:");
+    expect(output).not.toContain("📁 Created:");
   });
 
   it("should show file paths in verbose mode", () => {
     const reports: ProjectReport[] = [
       {
-        project: "/tmp/project1",
+        projectPath: "/tmp/project1",
         report: {
           success: true,
           changes: {
             written: ["/tmp/file1.md", "/tmp/file2.md"],
-            copied: ["/tmp/copied.md"],
-            createdDirs: ["/tmp/dir1"],
           },
           errors: [],
         },
@@ -116,20 +108,18 @@ describe("printProjectReport", () => {
     const output = consoleLogSpy.mock.calls[0][0];
     expect(output).toContain("- /tmp/file1.md");
     expect(output).toContain("- /tmp/file2.md");
-    expect(output).toContain("- /tmp/copied.md");
-    expect(output).toContain("- /tmp/dir1");
+    expect(output).not.toContain("Copied:");
+    expect(output).not.toContain("Created:");
   });
 
   it("should show dry-run message when in dry-run mode", () => {
     const reports: ProjectReport[] = [
       {
-        project: "/tmp/project1",
+        projectPath: "/tmp/project1",
         report: {
           success: true,
           changes: {
             written: [],
-            copied: [],
-            createdDirs: [],
           },
           errors: [],
         },
@@ -145,25 +135,21 @@ describe("printProjectReport", () => {
   it("should handle multiple projects", () => {
     const reports: ProjectReport[] = [
       {
-        project: "/tmp/project1",
+        projectPath: "/tmp/project1",
         report: {
           success: true,
           changes: {
             written: ["/tmp/p1/file.md"],
-            copied: [],
-            createdDirs: [],
           },
           errors: [],
         },
       },
       {
-        project: "/tmp/project2",
+        projectPath: "/tmp/project2",
         report: {
           success: false,
           changes: {
             written: [],
-            copied: [],
-            createdDirs: [],
           },
           errors: [new Error("Failed")],
         },
@@ -184,13 +170,11 @@ describe("printProjectReport", () => {
   it("should handle reports with no changes", () => {
     const reports: ProjectReport[] = [
       {
-        project: "/tmp/project1",
+        projectPath: "/tmp/project1",
         report: {
           success: true,
           changes: {
             written: [],
-            copied: [],
-            createdDirs: [],
           },
           errors: [],
         },

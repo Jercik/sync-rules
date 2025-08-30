@@ -1,120 +1,95 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { safeMkdir, simpleWrite, safeCopy } from "../src/execution.ts";
+import { executeActions } from "../src/core/execution.ts";
+import type { WriteAction } from "../src/utils/content.ts";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
-import { randomBytes } from "node:crypto";
+import { makeTempDir, cleanupDir } from "./test-utils";
 
-describe("helper functions - integration tests", () => {
+describe("executeActions - integration tests", () => {
   let testDir: string;
 
   beforeEach(async () => {
-    // Create a unique temporary directory within the current working directory
-    const randomName = randomBytes(16).toString("hex");
-    testDir = join(process.cwd(), ".test-tmp", `sync-rules-test-${randomName}`);
-    await fs.mkdir(testDir, { recursive: true });
+    testDir = await makeTempDir("sync-rules-exec-");
   });
 
   afterEach(async () => {
     // Clean up test directory
-    await fs.rm(testDir, { recursive: true, force: true });
+    await cleanupDir(testDir);
   });
 
-  describe("safeMkdir", () => {
-    it("should create nested directories", async () => {
-      const nestedPath = join(testDir, "a", "b", "c", "d");
+  describe("fs-extra integration", () => {
+    it("should automatically create parent directories for write actions", async () => {
+      const nestedPath = join(testDir, "a", "b", "c", "file.txt");
+      const actions: WriteAction[] = [
+        { path: nestedPath, content: "Hello nested!" },
+      ];
 
-      await safeMkdir(nestedPath);
+      await executeActions(actions, { dryRun: false });
 
-      const stats = await fs.stat(nestedPath);
-      expect(stats.isDirectory()).toBe(true);
+      const content = await fs.readFile(nestedPath, "utf8");
+      expect(content).toBe("Hello nested!");
     });
 
-    it("should not throw when directory already exists", async () => {
-      const dirPath = join(testDir, "existing");
-      await fs.mkdir(dirPath);
+    it("should handle multiple writes in nested directories", async () => {
+      const file1 = join(testDir, "dir1", "subdir1", "file1.txt");
+      const file2 = join(testDir, "dir2", "subdir2", "file2.txt");
+      const actions: WriteAction[] = [
+        { path: file1, content: "Content 1" },
+        { path: file2, content: "Content 2" },
+      ];
 
-      await expect(safeMkdir(dirPath)).resolves.not.toThrow();
+      await executeActions(actions, { dryRun: false });
 
-      const stats = await fs.stat(dirPath);
-      expect(stats.isDirectory()).toBe(true);
+      const content1 = await fs.readFile(file1, "utf8");
+      const content2 = await fs.readFile(file2, "utf8");
+      expect(content1).toBe("Content 1");
+      expect(content2).toBe("Content 2");
     });
 
-    it("should create single directory when recursive is false", async () => {
-      const dirPath = join(testDir, "single");
+    // Copy actions removed; only write actions are supported
 
-      await safeMkdir(dirPath, false);
-
-      const stats = await fs.stat(dirPath);
-      expect(stats.isDirectory()).toBe(true);
-    });
-  });
-
-  describe("simpleWrite", () => {
-    it("should write content to file", async () => {
-      const filePath = join(testDir, "test.txt");
-      const content = "Hello, World!";
-
-      await simpleWrite(filePath, content);
-
-      const readContent = await fs.readFile(filePath, "utf8");
-      expect(readContent).toBe(content);
-    });
-
-    it("should overwrite existing file", async () => {
+    it("should overwrite existing files", async () => {
       const filePath = join(testDir, "overwrite.txt");
       await fs.writeFile(filePath, "Old content");
 
-      await simpleWrite(filePath, "New content");
+      const actions: WriteAction[] = [
+        { path: filePath, content: "New content" },
+      ];
 
-      const readContent = await fs.readFile(filePath, "utf8");
-      expect(readContent).toBe("New content");
-    });
-  });
+      await executeActions(actions, { dryRun: false });
 
-  describe("safeCopy", () => {
-    it("should copy single file", async () => {
-      const srcFile = join(testDir, "source.txt");
-      const destFile = join(testDir, "dest.txt");
-      await fs.writeFile(srcFile, "File content");
-
-      await safeCopy(srcFile, destFile);
-
-      const content = await fs.readFile(destFile, "utf8");
-      expect(content).toBe("File content");
+      const content = await fs.readFile(filePath, "utf8");
+      expect(content).toBe("New content");
     });
 
-    it("should copy directory recursively", async () => {
-      const srcDir = join(testDir, "src-dir");
-      const destDir = join(testDir, "dest-dir");
+    it("should handle multiple writes without explicit mkdir", async () => {
+      const actions: WriteAction[] = [
+        {
+          path: join(testDir, "new", "file.txt"),
+          content: "Written",
+        },
+        {
+          path: join(testDir, "other", "file2.txt"),
+          content: "Also written",
+        },
+      ];
 
-      // Create source directory structure
-      await fs.mkdir(join(srcDir, "sub"), { recursive: true });
-      await fs.writeFile(join(srcDir, "file1.txt"), "Content 1");
-      await fs.writeFile(join(srcDir, "sub", "file2.txt"), "Content 2");
+      const result = await executeActions(actions, { dryRun: false });
 
-      await safeCopy(srcDir, destDir);
+      expect(result.success).toBe(true);
+      expect(result.changes.written).toHaveLength(2);
 
-      // Verify copied structure
-      const file1 = await fs.readFile(join(destDir, "file1.txt"), "utf8");
-      const file2 = await fs.readFile(
-        join(destDir, "sub", "file2.txt"),
+      // Verify files exist
+      const writtenContent1 = await fs.readFile(
+        join(testDir, "new", "file.txt"),
         "utf8",
       );
-      expect(file1).toBe("Content 1");
-      expect(file2).toBe("Content 2");
-    });
-
-    it("should overwrite existing files with force option", async () => {
-      const srcFile = join(testDir, "source.txt");
-      const destFile = join(testDir, "dest.txt");
-
-      await fs.writeFile(srcFile, "New content");
-      await fs.writeFile(destFile, "Old content");
-
-      await safeCopy(srcFile, destFile);
-
-      const content = await fs.readFile(destFile, "utf8");
-      expect(content).toBe("New content");
+      const writtenContent2 = await fs.readFile(
+        join(testDir, "other", "file2.txt"),
+        "utf8",
+      );
+      expect(writtenContent1).toBe("Written");
+      expect(writtenContent2).toBe("Also written");
     });
   });
 });

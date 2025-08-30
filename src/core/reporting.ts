@@ -2,7 +2,7 @@ import type { ExecutionReport } from "./execution.ts";
 import chalk from "chalk";
 
 export interface ProjectReport {
-  project: string;
+  projectPath: string;
   report: ExecutionReport;
 }
 
@@ -27,8 +27,8 @@ export function printProjectReport(
   lines.push("===================\n");
 
   // Project reports
-  for (const { project, report } of projectReports) {
-    lines.push(chalk.bold(`Project: ${project}`));
+  for (const { projectPath, report } of projectReports) {
+    lines.push(chalk.bold(`Project: ${projectPath}`));
 
     if (report.success) {
       lines.push(`${chalk.green("✓")} Success`);
@@ -45,23 +45,7 @@ export function printProjectReport(
       }
     }
 
-    if (report.changes.copied.length > 0) {
-      lines.push(`  📋 Copied: ${report.changes.copied.length} files`);
-      if (options.verbose) {
-        report.changes.copied.forEach((file) => lines.push(`     - ${file}`));
-      }
-    }
-
-    if (report.changes.createdDirs.length > 0) {
-      lines.push(
-        `  📁 Created: ${report.changes.createdDirs.length} directories`,
-      );
-      if (options.verbose) {
-        report.changes.createdDirs.forEach((dir) =>
-          lines.push(`     - ${dir}`),
-        );
-      }
-    }
+    // Only 'write' changes are reported
 
     // Print errors
     if (report.errors && report.errors.length > 0) {

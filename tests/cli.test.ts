@@ -1,26 +1,36 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { main } from "../src/cli.ts";
-import { Config } from "../src/config.ts";
-import type { FSAction } from "../src/utils.ts";
+import { Config } from "../src/config/config.ts";
+import { ConfigParseError } from "../src/utils/errors.ts";
+import type { WriteAction } from "../src/utils/content.ts";
 
 // Mock the modules with vi.hoisted
 const {
   mockReadFile,
-  mockGetAdapter,
+  mockAdapters,
   mockGlobRulePaths,
   mockFilterValidMdPaths,
   mockReadRuleContents,
   mockExecuteActions,
   mockPrintProjectReport,
+  mockLoadConfig,
 } = vi.hoisted(() => {
+  const mockAdapterFunction = vi.fn();
   return {
     mockReadFile: vi.fn(),
-    mockGetAdapter: vi.fn(),
+    mockAdapters: {
+      claude: mockAdapterFunction,
+      gemini: mockAdapterFunction,
+      kilocode: mockAdapterFunction,
+      cline: mockAdapterFunction,
+      codex: mockAdapterFunction,
+    },
     mockGlobRulePaths: vi.fn(),
     mockFilterValidMdPaths: vi.fn(),
     mockReadRuleContents: vi.fn(),
     mockExecuteActions: vi.fn(),
     mockPrintProjectReport: vi.fn(),
+    mockLoadConfig: vi.fn(),
   };
 });
 
@@ -28,22 +38,41 @@ vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
 }));
 
-vi.mock("../src/adapters/index.ts", () => ({
-  getAdapter: mockGetAdapter,
+vi.mock("../src/adapters/adapters.ts", () => ({
+  adapters: mockAdapters,
 }));
 
-vi.mock("../src/filesystem.ts", () => ({
+vi.mock("../src/core/filesystem.ts", () => ({
   globRulePaths: mockGlobRulePaths,
   filterValidMdPaths: mockFilterValidMdPaths,
   readRuleContents: mockReadRuleContents,
 }));
 
-vi.mock("../src/execution.ts", () => ({
+vi.mock("../src/core/execution.ts", () => ({
   executeActions: mockExecuteActions,
 }));
 
-vi.mock("../src/reporting.ts", () => ({
+vi.mock("../src/core/reporting.ts", () => ({
   printProjectReport: mockPrintProjectReport,
+}));
+
+vi.mock("../src/config/config-loader.ts", () => ({
+  loadConfig: mockLoadConfig,
+}));
+
+vi.mock("../src/core/path-guard.ts", () => ({
+  createPathGuardFromConfig: vi.fn(() => ({
+    validatePath: vi.fn((path) => path),
+    getAllowedRoots: vi.fn(() => []),
+    isInsideAllowedRoot: vi.fn(() => true),
+  })),
+}));
+
+// Create a mock that can be controlled per test
+const mockSyncProject = vi.fn();
+
+vi.mock("../src/core/sync.ts", () => ({
+  syncProject: mockSyncProject,
 }));
 
 describe("CLI", () => {
@@ -56,16 +85,39 @@ describe("CLI", () => {
     });
 
     // Setup default mock implementations
-    mockGetAdapter.mockImplementation(() => {
-      return () => {
+    const defaultConfig = {
+      projects: [
+        {
+          path: "~/test-project",
+          rules: ["**/*.md"],
+          adapters: ["claude"],
+        },
+      ],
+    };
+    mockLoadConfig.mockResolvedValue(defaultConfig);
+
+    // Default syncProject mock
+    mockSyncProject.mockResolvedValue({
+      projectPath: "~/test-project",
+      report: {
+        success: true,
+        changes: {
+          written: ["~/test-project/file.md"],
+        },
+        errors: [],
+      },
+    });
+
+    // Mock all adapters to return the same function
+    Object.values(mockAdapters).forEach((mockAdapter) => {
+      mockAdapter.mockImplementation(() => {
         return [
           {
-            type: "write",
             path: "~/test-project/file.md",
             content: "test content",
           },
-        ] as FSAction[];
-      };
+        ] as WriteAction[];
+      });
     });
 
     mockGlobRulePaths.mockResolvedValue(["rule1.md", "rule2.md"]);
@@ -79,8 +131,6 @@ describe("CLI", () => {
       success: true,
       changes: {
         written: ["~/test-project/file.md"],
-        copied: [],
-        createdDirs: [],
       },
       errors: [],
     });
@@ -103,22 +153,19 @@ describe("CLI", () => {
         },
       ],
     };
+    mockLoadConfig.mockResolvedValue(mockConfig);
 
-    mockReadFile.mockResolvedValue(JSON.stringify(mockConfig));
-
-    await main(["node", "sync-rules", "-c", "~/test-config.json"]);
+    await main(["node", "sync-rules", "-c", "~/test-config.json", "sync"]);
 
     // Check that printProjectReport was called with correct data
     expect(mockPrintProjectReport).toHaveBeenCalledWith(
       [
         {
-          project: expect.stringContaining("test-project"),
+          projectPath: expect.stringContaining("test-project"),
           report: {
             success: true,
             changes: {
               written: ["~/test-project/file.md"],
-              copied: [],
-              createdDirs: [],
             },
             errors: [],
           },
@@ -139,9 +186,16 @@ describe("CLI", () => {
       ],
     };
 
-    mockReadFile.mockResolvedValue(JSON.stringify(mockConfig));
+    mockLoadConfig.mockResolvedValue(mockConfig);
 
-    await main(["node", "sync-rules", "-c", "~/test-config.json", "-d"]);
+    await main([
+      "node",
+      "sync-rules",
+      "-c",
+      "~/test-config.json",
+      "-d",
+      "sync",
+    ]);
 
     expect(mockPrintProjectReport).toHaveBeenCalledWith(expect.any(Array), {
       verbose: false,
@@ -160,24 +214,25 @@ describe("CLI", () => {
       ],
     };
 
-    mockReadFile.mockResolvedValue(JSON.stringify(mockConfig));
+    mockLoadConfig.mockResolvedValue(mockConfig);
 
-    // Mock executeActions to return an error
-    mockExecuteActions.mockResolvedValueOnce({
-      success: false,
-      changes: {
-        written: [],
-        copied: [],
-        createdDirs: [],
+    // Mock syncProject to return an error
+    mockSyncProject.mockResolvedValueOnce({
+      projectPath: "~/test-project",
+      report: {
+        success: false,
+        changes: {
+          written: [],
+        },
+        errors: [new Error("Test error")],
       },
-      errors: [new Error("Test error")],
     });
 
     // Mock printProjectReport to return false (indicating failure)
     mockPrintProjectReport.mockReturnValueOnce(false);
 
     await expect(
-      main(["node", "sync-rules", "-c", "~/test-config.json"]),
+      main(["node", "sync-rules", "-c", "~/test-config.json", "sync"]),
     ).rejects.toThrow("Process exited with code 1");
 
     expect(mockPrintProjectReport).toHaveBeenCalledWith(
@@ -204,9 +259,16 @@ describe("CLI", () => {
       ],
     };
 
-    mockReadFile.mockResolvedValue(JSON.stringify(mockConfig));
+    mockLoadConfig.mockResolvedValue(mockConfig);
 
-    await main(["node", "sync-rules", "-c", "~/test-config.json", "--verbose"]);
+    await main([
+      "node",
+      "sync-rules",
+      "-c",
+      "~/test-config.json",
+      "--verbose",
+      "sync",
+    ]);
 
     // Check that verbose option was passed to printProjectReport
     expect(mockPrintProjectReport).toHaveBeenCalledWith(expect.any(Array), {
@@ -216,13 +278,18 @@ describe("CLI", () => {
   });
 
   it("should handle invalid config file", async () => {
-    mockReadFile.mockResolvedValue("invalid json");
+    const parseError = new ConfigParseError(
+      "~/test-config.json",
+      new Error("Invalid JSON"),
+    );
+    mockLoadConfig.mockRejectedValue(parseError);
 
     await expect(
-      main(["node", "sync-rules", "-c", "~/test-config.json"]),
+      main(["node", "sync-rules", "-c", "~/test-config.json", "sync"]),
     ).rejects.toThrow("Process exited with code 1");
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to load config"),
       expect.stringContaining("Invalid JSON"),
     );
   });

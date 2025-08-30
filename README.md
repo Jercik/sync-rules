@@ -10,11 +10,11 @@
 
 ### How it Works
 
-The tool operates as a centralized propagator. You define rules in a central repository (`~/Developer/agent-rules/rules/`). A user-maintained configuration file (`~/.config/sync-rules-config.json`) specifies which projects receive which rules and how they are adapted for different AI tools (e.g., `CLAUDE.md`, `GEMINI.md`, or copied to `.kilocode/rules/`). The process is non-interactive, with the central repository always being the source of truth.
+The tool operates as a centralized propagator. You define rules in a central repository (`~/Developer/agent-rules/rules/`). A user-maintained configuration file (`~/.config/sync-rules-config.json`) specifies which projects receive which rules and how they are adapted for different AI tools (e.g., `CLAUDE.md`, `GEMINI.md`, or materialized into `.kilocode/rules/`). The process is non-interactive, with the central repository always being the source of truth.
 
 ### Configuration
 
-You run `sync-rules`, which reads a user-maintained configuration file at `~/.config/sync-rules-config.json`. This JSON file, validated via Zod, lists projects to sync, along with which rules to select (via glob patterns like `"python.md"` or `"frontend/**"`) and which adapters to apply (from a supported list: `claude`, `cline`, `gemini`, `kilocode`). If a project isn't listed in the config, it's ignored—users must manually add entries to start syncing a repository, making the process deliberate and human-editable.
+You run `sync-rules sync`, which reads a user-maintained configuration file at `~/.config/sync-rules-config.json`. This JSON file, validated via Zod, lists projects to sync, along with which rules to select (via glob patterns like `"python.md"` or `"frontend/**"`) and which adapters to apply (from a supported list: `claude`, `cline`, `gemini`, `kilocode`). If a project isn't listed in the config, it's ignored—users must manually add entries to start syncing a repository, making the process deliberate and human-editable.
 
 Here's an example config:
 
@@ -51,23 +51,121 @@ Here's an example config:
 - **Design Patterns**: Pure Functions, Facade, Registry.
 - **Data Flow**: Config -> Rules -> Adapters -> Filesystem actions.
 
+### Security and PathGuard
+
+- **Normalization only**: `normalizePath` expands `~` and resolves to an absolute path. It does not enforce directory boundaries or permissions.
+- **Validation at execution**: Path boundary and symlink checks are enforced by `PathGuard` inside the execution layer right before filesystem writes.
+- **Initialization timing**: The active `PathGuard` initializes after the configuration is loaded (in `cli` and `launch` flows).
+- **Allowed roots**: By default, `PathGuard` allows only the central rules repo (`~/Developer/agent-rules`) plus the explicit project paths from your config. The home directory and current working directory are not implicitly allowed.
+- **Customizing roots**: To grant write access to additional locations, add those paths as projects in your config.
+- **Rationale**: This design follows least privilege and avoids premature config rejection. You can define projects anywhere (e.g., other drives); enforcement happens only when performing filesystem operations.
+
 ### Usage
 
-Basic:
+## Commands
+
+### Sync Command
+
+Synchronize rules across all configured projects:
 
 ```bash
-sync-rules -c ~/.config/sync-rules-config.json
+# Sync rules
+sync-rules sync
+
+# With options
+sync-rules sync --dry-run
+sync-rules sync --verbose
+sync-rules sync -c /path/to/config.json
 ```
 
-Dry-run and verbose:
+The `sync` subcommand is required - running `sync-rules` without a subcommand will display help.
+
+### Launch Command
+
+The `launch` subcommand wraps AI coding tools to ensure rules are always up-to-date:
 
 ```bash
-sync-rules -c ~/.config/sync-rules-config.json -d --verbose
+# Basic usage - interactive mode
+sync-rules launch claude
+sync-rules launch gemini
+
+# Headless mode with prompts
+sync-rules launch claude -- -p "How does the auth system work?"
+sync-rules launch gemini -- -p "Generate unit tests for main.ts"
+
+# With specific models
+sync-rules launch gemini -- --model gemini-2.5-pro
+sync-rules launch claude -- -p "Fix the bug in parser.js" --output-format json
+
+# Skip sync check when you know rules are current
+sync-rules launch --no-sync claude -- -p "Review this PR"
+sync-rules launch --no-sync gemini -- --style dark
+
+# Force sync to ensure latest rules
+sync-rules launch --force claude
+sync-rules launch --force gemini -- -d  # with debug output
+
+# Piping input to AI tools
+cat error.log | sync-rules launch claude -- -p "What's causing this error?"
+git diff | sync-rules launch gemini -- -p "Review these changes"
 ```
 
-Show help:
+Features:
+
+- Automatically detects project from current directory
+- Verifies rules match expected state before launching
+- Prompts to sync if rules are out-of-date (unless `--no-sync`)
+- Force sync with `--force` flag
+- Offers to open config file if project not configured
+- Passes through all arguments to the wrapped tool
+
+### Shell Aliases
+
+Add these to your shell config (~/.bashrc, ~/.zshrc, etc.):
 
 ```bash
+# Basic aliases for interactive mode
+alias claude='sync-rules launch claude'
+alias gemini='sync-rules launch gemini'
+
+# Headless mode aliases for quick prompts
+alias claudep='sync-rules launch claude -- -p'
+alias geminip='sync-rules launch gemini -- -p'
+
+# With specific preferences
+alias claude-json='sync-rules launch claude -- --output-format json -p'
+alias gemini-pro='sync-rules launch gemini -- --model gemini-2.5-pro'
+
+# Skip sync for faster launches when iterating
+alias claude-fast='sync-rules launch --no-sync claude --'
+alias gemini-fast='sync-rules launch --no-sync gemini --'
+
+# Force sync for critical work
+alias claude-sync='sync-rules launch --force claude --'
+```
+
+Example usage with aliases:
+
+```bash
+claudep "What does this function do?"
+geminip "Add error handling to this code"
+git diff | claude-json "Review these changes"
+```
+
+Now your tools will always check rules before starting!
+
+### Legacy Usage
+
+Older examples (now require the `sync` subcommand):
+
+```bash
+# Basic
+sync-rules sync -c ~/.config/sync-rules-config.json
+
+# Dry-run and verbose
+sync-rules sync -c ~/.config/sync-rules-config.json -d --verbose
+
+# Show help
 sync-rules --help
 ```
 
@@ -88,6 +186,12 @@ Manually delete the outdated rule files from your project directories when rules
 
 - For single-file adapters: Remove the specific file (e.g., `CLAUDE.md`, `GEMINI.md`)
 - For multi-file adapters: Remove files from the rules directory (e.g., `.kilocode/rules/*.md`, `.clinerules/*.md`)
+
+### Filesystem Actions & Reports
+
+- **Actions**: Adapters generate a single action type: `write` with `path` and `content`. Parent directories are created automatically during execution.
+- **Execution**: The executor validates paths via `PathGuard` and writes files using `fs-extra.outputFile`.
+- **Report**: The execution report includes a `changes.written` array and any errors encountered. There are no copy or mkdir actions.
 
 ### Claude Memory Bank Alias (`claudemb`)
 
