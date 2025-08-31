@@ -1,5 +1,6 @@
 import { execa, type ExecaError } from "execa";
 import { SpawnError } from "../utils/errors.ts";
+import { logger } from "../utils/pino-logger.ts";
 
 /**
  * Spawns a child process using execa.
@@ -14,15 +15,30 @@ export async function spawnProcess(
   cmd: string,
   args: string[],
 ): Promise<number> {
+  logger.debug({ args }, `Attempting to spawn process: ${cmd}`);
+
   try {
     const result = await execa(cmd, args, {
       stdio: "inherit",
-      reject: true,
     });
-    return result.exitCode ?? 0;
+
+    const exitCode = result.exitCode ?? 0;
+    logger.debug(`Process ${cmd} completed with exit code ${exitCode}`);
+    return exitCode;
   } catch (error) {
-    // When reject: true, execa throws an ExecaError
+    // execa rejects on non-zero exit and throws an ExecaError
     const execaError = error as ExecaError;
+
+    logger.error(
+      {
+        code: execaError.code,
+        exitCode: execaError.exitCode,
+        message: execaError.message,
+        signal: execaError.signal,
+        signalDescription: execaError.signalDescription,
+      },
+      `Failed to spawn process: ${cmd}`,
+    );
 
     throw new SpawnError(
       cmd,

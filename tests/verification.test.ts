@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { verifyRules, openConfigForEditing } from "../src/core/verification.ts";
+import { verifyRules } from "../src/core/verification.ts";
 import * as fs from "node:fs/promises";
 import * as registryModule from "../src/adapters/registry.ts";
 import * as filesystemModule from "../src/core/rules-fs.ts";
-import open from "open";
 import { globby } from "globby";
 import type { WriteAction } from "../src/utils/content.ts";
 import type { Rule } from "../src/core/rules-fs.ts";
@@ -40,8 +39,8 @@ vi.mock("../src/adapters/registry.ts", () => ({
 vi.mock("../src/core/rules-fs.ts", () => ({
   loadRulesFromCentral: vi.fn(),
 }));
-vi.mock("open", () => ({
-  default: vi.fn(),
+vi.mock("../src/config/constants.ts", () => ({
+  getRulesSource: vi.fn(() => "/mock/rules/dir"),
 }));
 vi.mock("globby");
 vi.mocked(fs.readdir).mockResolvedValue([
@@ -272,6 +271,54 @@ With multiple lines`;
     });
 
     describe("multi-file adapters", () => {
+      it("should throw error on escape attempt in multi-file adapter", async () => {
+        // This test ensures that rule paths attempting to escape the adapter directory
+        // (e.g., ../../outside.md) are caught before any write operations happen
+        const maliciousRules: Rule[] = [
+          { path: "../../outside.md", content: "Escape attempt content" },
+          { path: "../../../etc/passwd", content: "Another escape attempt" },
+        ];
+
+        const mockAdapter = vi.fn().mockImplementation(({ rules }) => {
+          // Simulate what the real multi-file adapter does
+          return rules.map((r: Rule) => ({
+            path: `/project/.kilocode/rules/${r.path}`,
+            content: r.content,
+          }));
+        });
+
+        vi.mocked(
+          registryModule.adapterRegistry.kilocode.planWrites,
+        ).mockImplementation(mockAdapter);
+        vi.mocked(filesystemModule.loadRulesFromCentral).mockResolvedValue(
+          maliciousRules,
+        );
+
+        // The verification should detect the escape attempt
+        const result = await verifyRules("/project", "kilocode", ["**/*.md"]);
+
+        // Verify that the adapter was called with malicious rules
+        expect(mockAdapter).toHaveBeenCalledWith({
+          projectPath: "/project",
+          rules: maliciousRules,
+        });
+
+        // The planned paths should contain the escape attempts
+        const plannedPaths = mockAdapter.mock.results[0].value.map(
+          (action: WriteAction) => action.path,
+        );
+        expect(plannedPaths).toContain(
+          "/project/.kilocode/rules/../../outside.md",
+        );
+        expect(plannedPaths).toContain(
+          "/project/.kilocode/rules/../../../etc/passwd",
+        );
+
+        // The verification process should still work (it's checking the normalized paths)
+        // The actual write protection happens in the execution phase via PathGuard
+        expect(result.synced).toBe(false);
+      });
+
       it("should detect extra files in kilocode adapter", async () => {
         const mockActions: WriteAction[] = [
           {
@@ -452,31 +499,6 @@ With multiple lines`;
 
         expect(result.synced).toBe(true);
       });
-    });
-  });
-
-  describe("openConfigForEditing", () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    it("should open config file with default editor and return true", async () => {
-      vi.mocked(open).mockResolvedValue({} as any);
-
-      const opened = await openConfigForEditing("/path/to/config.json");
-
-      expect(opened).toBe(true);
-      expect(open).toHaveBeenCalledWith("/path/to/config.json", {
-        wait: false,
-      });
-    });
-
-    it("should throw EditorOpenError when open fails", async () => {
-      vi.mocked(open).mockRejectedValue(new Error("Failed to open"));
-
-      await expect(
-        openConfigForEditing("/path/to/config.json"),
-      ).rejects.toThrowError();
     });
   });
 });

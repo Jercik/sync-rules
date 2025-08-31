@@ -1,6 +1,6 @@
 import { normalize, isAbsolute } from "node:path";
 import isPathInside from "is-path-inside";
-import { CENTRAL_REPO_PATH } from "../config/constants.ts";
+import { getRulesSource } from "../config/constants.ts";
 import { normalizePath } from "../utils/paths.ts";
 import type { Config } from "../config/config.ts";
 
@@ -106,7 +106,8 @@ export function createPathGuard(allowedRoots: string[]): PathGuard {
  */
 export function createPathGuardFromConfig(config: Config): PathGuard {
   const projectRoots = config.projects.map((p) => p.path);
-  const defaultRoots = [CENTRAL_REPO_PATH, ...projectRoots];
+  const rulesSource = getRulesSource(config.rulesSource);
+  const defaultRoots = [rulesSource, ...projectRoots];
   return createPathGuard(defaultRoots);
 }
 

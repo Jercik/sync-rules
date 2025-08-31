@@ -1,15 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { adapterRegistry } from "../adapters/registry.ts";
-import open from "open";
 import { globby } from "globby";
 import { normalizePath } from "../utils/paths.ts";
 import { normalizeContent } from "../utils/content.ts";
 import type { WriteAction } from "../utils/content.ts";
 import { loadRulesFromCentral } from "./rules-fs.ts";
-import { CENTRAL_RULES_DIR } from "../config/constants.ts";
+import { getRulesSource } from "../config/constants.ts";
 import type { AdapterName } from "../config/config.ts";
-import { EditorOpenError, ensureError } from "../utils/errors.ts";
 
 export interface VerificationIssue {
   type: "missing" | "modified" | "extra";
@@ -34,19 +32,22 @@ export interface VerificationResult {
  * @param projectPath - Absolute path to the target project.
  * @param adapterName - The adapter to verify against (e.g., `claude`).
  * @param rulePatterns - Glob patterns selecting rules from the central repo.
+ * @param rulesSource - Optional rules source directory (defaults to configured value).
  * @returns A verification result with `synced` state and a list of issues.
  */
 export async function verifyRules(
   projectPath: string,
   adapterName: AdapterName,
   rulePatterns: string[],
+  rulesSource?: string,
 ): Promise<VerificationResult> {
   // Get adapter definition and generate expected actions
   const adapterDef = adapterRegistry[adapterName];
   if (!adapterDef) {
     throw new Error(`Unknown adapter: ${adapterName}`);
   }
-  const rules = await loadRulesFromCentral(CENTRAL_RULES_DIR, rulePatterns);
+  const rulesDir = getRulesSource(rulesSource);
+  const rules = await loadRulesFromCentral(rulesDir, rulePatterns);
   const expectedActions = adapterDef.planWrites({ projectPath, rules });
 
   const issues: VerificationIssue[] = [];
@@ -81,7 +82,12 @@ export async function verifyRules(
 
     let actualFiles: string[] = [];
     try {
-      const files = await globby("**/*", { cwd: rulesDir, absolute: true });
+      const files = await globby("**/*", {
+        cwd: rulesDir,
+        absolute: true,
+        // Be explicit to avoid directories if defaults change upstream
+        onlyFiles: true,
+      });
       actualFiles = files.map(normalizePath);
     } catch {
       // Directory doesn't exist - continue with empty array
@@ -97,22 +103,4 @@ export async function verifyRules(
   }
 
   return { synced: issues.length === 0, issues };
-}
-
-/**
- * Opens the given config file in the default editor.
- * Uses the 'open' library for cross-platform support.
- * Exits the process after launching.
- *
- * @param configPath - Path to the config file to open.
- */
-export async function openConfigForEditing(
-  configPath: string,
-): Promise<boolean> {
-  try {
-    await open(configPath, { wait: false });
-    return true;
-  } catch (error) {
-    throw new EditorOpenError(configPath, ensureError(error));
-  }
 }

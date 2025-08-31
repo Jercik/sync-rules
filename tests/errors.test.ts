@@ -4,7 +4,6 @@ import {
   ConfigNotFoundError,
   ConfigParseError,
   SpawnError,
-  EditorOpenError,
 } from "../src/utils/errors.ts";
 
 describe("SyncError class", () => {
@@ -118,24 +117,5 @@ describe("SpawnError", () => {
   it("should use default message when not ENOENT", () => {
     const error = new SpawnError("cmd", "ERROR", 1);
     expect(error.message).toBe('Failed to launch "cmd"');
-  });
-});
-
-describe("EditorOpenError", () => {
-  it("should create error for editor open failures", () => {
-    const error = new EditorOpenError("/path/to/file");
-    expect(error).toBeInstanceOf(Error);
-    expect(error.name).toBe("EditorOpenError");
-    expect(error.path).toBe("/path/to/file");
-    expect(error.message).toBe("Failed to open editor for /path/to/file");
-  });
-
-  it("should include original error message", () => {
-    const originalError = new Error("Permission denied");
-    const error = new EditorOpenError("/path/to/file", originalError);
-    expect(error.originalError).toBe(originalError);
-    expect(error.message).toBe(
-      "Failed to open editor for /path/to/file: Permission denied",
-    );
   });
 });

@@ -141,6 +141,7 @@ dist
 # AI coding assistants
 CLAUDE.md
 GEMINI.md
+AGENTS.md
 .kilocode
 .clinerules
 

@@ -4,6 +4,7 @@ import { logMessage } from "../utils/logger.ts";
 import type { PathGuard } from "./path-guard.ts";
 import type { WriteAction } from "../utils/content.ts";
 import { SyncError, ensureError } from "../utils/errors.ts";
+import { logger } from "../utils/pino-logger.ts";
 
 export interface ExecutionReport {
   success: boolean;
@@ -23,8 +24,11 @@ export async function executeActions(
   };
 
   if (actions.length === 0) {
+    logger.debug("No actions to execute");
     return report;
   }
+
+  logger.debug({ dryRun }, `Executing ${actions.length} actions`);
 
   // Normalize all paths upfront to ensure uniformity
   const normalizedActions = actions.map((action) => ({
@@ -43,10 +47,19 @@ export async function executeActions(
 
       if (!dryRun) {
         logMessage(`Writing to: ${action.path}`, verbose);
+        logger.debug(
+          {
+            contentLength: action.content.length,
+          },
+          `Writing file: ${action.path}`,
+        );
         await outputFile(action.path, action.content, "utf8");
+        logger.debug(`Successfully wrote file: ${action.path}`);
       }
       report.written.push(action.path);
     } catch (err) {
+      logger.error(err, `Failed to write file: ${action.path}`);
+
       // Wrap with err to provide context
       const error = new SyncError(
         `Failed to write ${action.path}`,

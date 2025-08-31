@@ -105,26 +105,6 @@ export class SpawnError extends Error {
 }
 
 /**
- * Error thrown when attempting to open a file in the user's editor fails.
- */
-export class EditorOpenError extends Error {
-  readonly path: string;
-  readonly originalError?: Error;
-
-  constructor(path: string, originalError?: Error) {
-    super(
-      originalError
-        ? `Failed to open editor for ${path}: ${originalError.message}`
-        : `Failed to open editor for ${path}`,
-      { cause: originalError },
-    );
-    this.name = this.constructor.name;
-    this.path = path;
-    this.originalError = originalError;
-  }
-}
-
-/**
  * Ensures that an unknown caught value is an Error object.
  * @param e - The unknown value to ensure is an Error
  * @returns An Error object

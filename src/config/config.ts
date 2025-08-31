@@ -1,5 +1,6 @@
 import { z } from "zod";
 import isPathInside from "is-path-inside";
+import stripJsonComments from "strip-json-comments";
 import { normalizePath } from "../utils/paths.ts";
 
 /**
@@ -43,6 +44,10 @@ export const Project = z
 export const Config = z
   .object({
     // $schema intentionally omitted to avoid dangling/placeholder schema URLs
+    rulesSource: z
+      .string()
+      .optional()
+      .describe("Path to the central rules directory"),
     projects: z
       .array(Project)
       .nonempty("At least one project must be specified"),
@@ -58,12 +63,14 @@ export type Config = z.infer<typeof Config>;
 
 /**
  * Parses and validates a JSON configuration string
- * @param jsonContent - The JSON string to parse
+ * @param jsonContent - The JSON string to parse (supports JSON with comments)
  * @returns The validated configuration object
  * @throws ZodError for validation issues
  */
 export function parseConfig(jsonContent: string): Config {
-  const data = JSON.parse(jsonContent);
+  // Strip comments before parsing to support JSONC format
+  const cleanJson = stripJsonComments(jsonContent);
+  const data = JSON.parse(cleanJson);
   const result = Config.safeParse(data);
   if (!result.success) throw result.error;
   return result.data;

@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { parseConfig } from "./config.ts";
 import { normalizePath } from "../utils/paths.ts";
 import { isNodeError } from "../utils/logger.ts";
@@ -9,6 +10,44 @@ import {
   ensureError,
 } from "../utils/errors.ts";
 import type { Config } from "./config.ts";
+
+/**
+ * Sample configuration template for new installations
+ */
+const SAMPLE_CONFIG = `{
+  // Optional: Specify a custom path for the central rules directory
+  // "rulesSource": "~/.sync-rules/rules",
+  "projects": [
+    {
+      "path": "/path/to/project",
+      "adapters": ["claude"],
+      "rules": ["**/*.md"]
+    }
+  ]
+}`;
+
+/**
+ * Creates a new configuration file with sample content
+ *
+ * @param configPath - Path where the config file should be created
+ * @throws {Error} If the file cannot be created
+ */
+export async function createSampleConfig(configPath: string): Promise<void> {
+  const normalizedPath = normalizePath(configPath);
+  const configDir = dirname(normalizedPath);
+
+  try {
+    // Ensure the directory exists
+    await mkdir(configDir, { recursive: true });
+
+    // Write the sample config (already formatted as JSON string with comments)
+    await writeFile(normalizedPath, SAMPLE_CONFIG, "utf8");
+  } catch (error) {
+    throw new Error(
+      `Failed to create config file at ${normalizedPath}: ${ensureError(error).message}`,
+    );
+  }
+}
 
 /**
  * Loads and parses a configuration file.
@@ -28,7 +67,7 @@ export async function loadConfig(configPath: string): Promise<Config> {
   } catch (error) {
     // Handle file not found
     if (isNodeError(error) && error.code === "ENOENT") {
-      const isDefault = normalizedPath === DEFAULT_CONFIG_PATH;
+      const isDefault = normalizedPath === normalizePath(DEFAULT_CONFIG_PATH);
       throw new ConfigNotFoundError(normalizedPath, isDefault);
     }
 

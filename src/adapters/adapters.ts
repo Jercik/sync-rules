@@ -1,4 +1,4 @@
-import { single, under } from "./paths.ts";
+import { join } from "node:path";
 import type { Rule } from "../core/rules-fs.ts";
 import type { WriteAction } from "../utils/content.ts";
 
@@ -6,8 +6,8 @@ import type { WriteAction } from "../utils/content.ts";
  * Input structure for adapter functions
  */
 export type AdapterInput = {
-  projectPath: string;
-  rules: Rule[];
+  readonly projectPath: string;
+  readonly rules: readonly Rule[];
 };
 
 /**
@@ -37,7 +37,7 @@ export function adapterFromMeta(
   meta: AdapterMetadata,
   opts?: {
     headerTitle?: string;
-    filter?: (rules: Rule[]) => Rule[];
+    filter?: (rules: readonly Rule[]) => Rule[];
   },
 ): AdapterFunction {
   return ({ projectPath, rules }) => {
@@ -50,12 +50,12 @@ export function adapterFromMeta(
           selected.map((r) => r.content.trim()).join("\n\n---\n\n") +
           "\n"
         : `# ${title}\n\nNo rules configured.\n`;
-      return [{ path: single(projectPath, meta.location), content }];
+      return [{ path: join(projectPath, meta.location), content }];
     }
 
     // multi-file
     return selected.map((r) => ({
-      path: under(projectPath, meta.directory, r.path),
+      path: join(projectPath, meta.directory, r.path),
       content: r.content,
     }));
   };

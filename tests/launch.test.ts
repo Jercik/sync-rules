@@ -5,11 +5,6 @@ vi.mock("execa", () => ({
   execa: vi.fn(),
 }));
 
-// Mock prompts module for tests requiring interactive prompts
-vi.mock("prompts", () => ({
-  default: vi.fn(),
-}));
-
 // Provide explicit mock for adapters module
 vi.mock("../src/adapters/adapters.ts", () => ({
   adapterFromMeta: vi.fn(),
@@ -32,11 +27,9 @@ import * as verificationModule from "../src/core/verification.ts";
 import type { Config, Project } from "../src/config/config.ts";
 import { SpawnError } from "../src/utils/errors.ts";
 import { execa } from "execa";
-import prompts from "prompts";
 
 // Get mocked functions
 const mockExeca = vi.mocked(execa);
-const mockPrompts = vi.mocked(prompts);
 
 describe("launch", () => {
   describe("spawnProcess", () => {
@@ -52,7 +45,6 @@ describe("launch", () => {
       expect(exitCode).toBe(0);
       expect(mockExeca).toHaveBeenCalledWith("echo", ["hello"], {
         stdio: "inherit",
-        reject: true,
       });
     });
 
@@ -123,9 +115,6 @@ describe("launch", () => {
 
       // Note: process.exit is no longer needed for the new API
 
-      // Reset prompts mock
-      mockPrompts.mockReset();
-
       // Mock execa to simulate successful execution
       mockExeca.mockResolvedValue({ exitCode: 0 });
 
@@ -157,7 +146,6 @@ describe("launch", () => {
         expect(configModule.findProjectForPath).toHaveBeenCalled();
         expect(mockExeca).toHaveBeenCalledWith("claude", ["--chat"], {
           stdio: "inherit",
-          reject: true,
         });
       });
 
@@ -171,7 +159,6 @@ describe("launch", () => {
         expect(configModule.findProjectForPath).not.toHaveBeenCalled();
         expect(mockExeca).toHaveBeenCalledWith("git", ["status"], {
           stdio: "inherit",
-          reject: true,
         });
       });
     });
@@ -192,7 +179,6 @@ describe("launch", () => {
 
         expect(mockExeca).toHaveBeenCalledWith("claude", args, {
           stdio: "inherit",
-          reject: true,
         });
       });
 
@@ -206,7 +192,6 @@ describe("launch", () => {
 
         expect(mockExeca).toHaveBeenCalledWith("some-tool", args, {
           stdio: "inherit",
-          reject: true,
         });
       });
     });
@@ -229,31 +214,6 @@ describe("launch", () => {
         );
       });
 
-      it("should prompt to edit config when project not found (TTY)", async () => {
-        process.stdin.isTTY = true;
-
-        // Use the globally mocked readline interface
-        mockPrompts.mockResolvedValue({ value: false });
-
-        // claude is in adapterNames
-        vi.mocked(configModule.findProjectForPath).mockReturnValue(undefined);
-
-        await launchTool("claude", [], {
-          configPath: "config.json",
-        });
-
-        expect(mockPrompts).toHaveBeenCalledWith({
-          type: "confirm",
-          name: "value",
-          message: "Would you like to open the config file to add it? [Y/n]",
-          initial: true,
-        });
-        expect(mockExeca).toHaveBeenCalledWith("claude", [], {
-          stdio: "inherit",
-          reject: true,
-        });
-      });
-
       it("should skip prompt when project not found (non-TTY)", async () => {
         process.stdin.isTTY = false;
 
@@ -267,46 +227,6 @@ describe("launch", () => {
         // Should not prompt, just launch
         expect(mockExeca).toHaveBeenCalledWith("claude", [], {
           stdio: "inherit",
-          reject: true,
-        });
-      });
-    });
-
-    describe("adapter configuration", () => {
-      it("should warn when adapter not configured for project", async () => {
-        process.stdin.isTTY = true;
-
-        // Use the globally mocked readline interface
-        mockPrompts.mockResolvedValue({ value: false });
-
-        const consoleSpy = vi.spyOn(console, "log");
-
-        const projectWithoutCline = {
-          ...mockProject,
-          adapters: ["claude", "gemini"] as ("claude" | "gemini")[],
-        };
-
-        // claude is in adapterNames
-        vi.mocked(configModule.findProjectForPath).mockReturnValue(
-          projectWithoutCline,
-        );
-        vi.mocked(verificationModule.verifyRules).mockResolvedValue({
-          synced: true,
-          issues: [],
-        });
-
-        await launchTool("cline", [], {
-          configPath: "config.json",
-        });
-
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("cline adapter not configured"),
-        );
-        expect(mockPrompts).toHaveBeenCalledWith({
-          type: "confirm",
-          name: "value",
-          message: 'Add "cline" to adapters in config? [Y/n]',
-          initial: true,
         });
       });
     });
@@ -427,20 +347,14 @@ describe("launch", () => {
         expect(mockExeca).toHaveBeenCalled();
       });
 
-      it("should verify and prompt for sync when rules out of sync (TTY)", async () => {
-        process.stdin.isTTY = true;
-
-        // Use the globally mocked readline interface
-        mockPrompts.mockResolvedValue({ value: true });
+      it("should auto-sync when rules out of sync (non-TTY)", async () => {
+        process.stdin.isTTY = false;
 
         // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(verificationModule.verifyRules).mockResolvedValue({
           synced: false,
-          issues: [
-            { type: "modified", path: "/project/CLAUDE.md" },
-            { type: "missing", path: "/project/GEMINI.md" },
-          ],
+          issues: [{ type: "modified", path: "/project/CLAUDE.md" }],
         });
         vi.mocked(syncModule.syncProject).mockResolvedValue({
           project: "/home/user/project",
@@ -460,35 +374,11 @@ describe("launch", () => {
           configPath: "config.json",
         });
 
-        expect(consoleSpy).toHaveBeenCalledWith("Rules out of sync (2 issues)");
-        expect(mockPrompts).toHaveBeenCalledWith({
-          type: "confirm",
-          name: "value",
-          message: "Sync now? [Y/n]",
-          initial: true,
-        });
+        expect(consoleSpy).toHaveBeenCalledWith(
+          "Rules out of sync (1 issue). Syncing...",
+        );
         expect(syncModule.syncProject).toHaveBeenCalled();
         expect(consoleSpy).toHaveBeenCalledWith("✓ Synced 2 files");
-      });
-
-      it("should skip sync prompt when rules out of sync (non-TTY)", async () => {
-        process.stdin.isTTY = false;
-
-        // claude is in adapterNames
-        vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
-        vi.mocked(verificationModule.verifyRules).mockResolvedValue({
-          synced: false,
-          issues: [{ type: "modified", path: "/project/CLAUDE.md" }],
-        });
-
-        const consoleSpy = vi.spyOn(console, "log");
-
-        await launchTool("claude", [], {
-          configPath: "config.json",
-        });
-
-        expect(consoleSpy).toHaveBeenCalledWith("Rules out of sync (1 issue)");
-        expect(syncModule.syncProject).not.toHaveBeenCalled();
         expect(mockExeca).toHaveBeenCalled();
       });
 

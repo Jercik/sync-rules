@@ -2,7 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG_PATH } from "../config/constants.ts";
-import { loadConfig } from "../config/loader.ts";
+import { loadConfig, createSampleConfig } from "../config/loader.ts";
 import { createPathGuardFromConfig } from "../core/path-guard.ts";
 import { printProjectReport } from "../core/reporting.ts";
 import type { ProjectReport } from "../core/reporting.ts";
@@ -13,7 +13,6 @@ import {
   ConfigNotFoundError,
   ConfigParseError,
   SpawnError,
-  EditorOpenError,
   ensureError,
 } from "../utils/errors.ts";
 
@@ -22,6 +21,19 @@ async function runSync(options: {
   dryRun?: boolean;
   verbose?: boolean;
 }) {
+  // Expose verbose mode to logger before dynamic imports
+  if (options.verbose) {
+    process.env.SYNC_RULES_VERBOSE = "1";
+  }
+
+  // Surface log file location in verbose mode when file logging is enabled
+  if (options.verbose) {
+    const logLevel = process.env.LOG_LEVEL || "silent";
+    const isLaunch = process.env.SYNC_RULES_LAUNCH === "1";
+    if (logLevel !== "silent" || isLaunch) {
+      console.log(chalk.gray("log file: ~/.sync-rules/debug.log"));
+    }
+  }
   // Load config and create path guard
   const config = await loadConfig(options.config);
   const pathGuard = createPathGuardFromConfig(config);
@@ -33,6 +45,7 @@ async function runSync(options: {
         dryRun: options.dryRun,
         verbose: options.verbose,
         pathGuard,
+        rulesSource: config.rulesSource,
       });
     }),
   );
@@ -132,10 +145,45 @@ export async function main(argv: string[]) {
     .option("--verbose", "Enable verbose output", false)
     .enablePositionalOptions(); // Required for passThroughOptions to work on subcommands
 
-  // Add explicit sync subcommand
+  // Add init command to create sample config
   program
-    .command("sync")
-    .description("Synchronize rules across all configured projects")
+    .command("init")
+    .description("Initialize a new configuration file")
+    .option("-f, --force", "Overwrite existing config file", false)
+    .action(async (options) => {
+      try {
+        const parentOpts = program.opts();
+        const configPath = parentOpts.config || DEFAULT_CONFIG_PATH;
+
+        // Check if config already exists
+        try {
+          await loadConfig(configPath);
+          if (!options.force) {
+            console.log(
+              chalk.yellow(`Config file already exists at: ${configPath}`),
+            );
+            console.log(chalk.yellow("Use --force to overwrite"));
+            process.exit(1);
+          }
+        } catch {
+          // Config doesn't exist, which is what we want
+        }
+
+        await createSampleConfig(configPath);
+        console.log(chalk.green(`✓ Created config file at: ${configPath}`));
+        console.log(chalk.gray("\nNext steps:"));
+        console.log(chalk.gray("1. Edit the config file to add your projects"));
+        console.log(chalk.gray("2. Run 'sync-rules' to synchronize rules"));
+      } catch (error) {
+        handleError(ensureError(error));
+        process.exit(1);
+      }
+    });
+
+  // Add explicit sync subcommand (default when no command is specified)
+  program
+    .command("sync", { isDefault: true })
+    .description("Synchronize rules across all configured projects (default)")
     .action(async () => {
       try {
         // Get options from parent command
@@ -160,10 +208,31 @@ export async function main(argv: string[]) {
     .passThroughOptions() // Everything after -- is passed through untouched
     .allowUnknownOption(); // Allow unknown options to be passed through
 
+  // Mark launch context for logger before the action runs
+  launchCommand.hook("preAction", () => {
+    process.env.SYNC_RULES_LAUNCH = "1";
+  });
+
   launchCommand.action(async (tool, toolArgs) => {
     try {
       const parentOpts = program.opts();
       const opts = launchCommand.opts();
+
+      // Indicate verbose context for downstream code if needed
+      if (parentOpts.verbose) {
+        process.env.SYNC_RULES_VERBOSE = "1";
+      }
+
+      // Surface log file location in verbose mode when file logging is enabled
+      if (parentOpts.verbose) {
+        const logLevel = process.env.LOG_LEVEL || "silent";
+        const isLaunch = process.env.SYNC_RULES_LAUNCH === "1";
+        if (logLevel !== "silent" || isLaunch) {
+          console.log(chalk.gray("log file: ~/.sync-rules/debug.log"));
+        }
+      }
+
+      // Logging removed - use LOG_LEVEL env var to enable debug logging
 
       const { launchTool } = await import("../launch/launch.ts");
       const exitCode = await launchTool(tool, toolArgs, {
@@ -175,6 +244,7 @@ export async function main(argv: string[]) {
       process.exit(exitCode);
     } catch (error) {
       const err = ensureError(error);
+      // Error already handled by handleError
       handleError(err);
       if (err instanceof SpawnError) {
         process.exit(err.exitCode ?? 1);
@@ -183,13 +253,12 @@ export async function main(argv: string[]) {
     }
   });
 
-  // No default action - running without a subcommand shows help
-  // Commander.js automatically shows help when no subcommand is provided
-
   try {
     await program.parseAsync(argv);
   } catch (error) {
-    handleError(ensureError(error));
+    const err = ensureError(error);
+    // Error already handled by handleError
+    handleError(err);
     process.exit(1);
   }
 }
@@ -204,14 +273,27 @@ function handleError(error: Error): void {
     // Add helpful guidance for default config case
     if (error.isDefault) {
       console.error(
-        "\nPlease create a config file at the default location or specify one with -c <path>",
+        `\n${chalk.yellow("Config file not found at:")} ${DEFAULT_CONFIG_PATH}`,
+      );
+      console.error("\nYou can:");
+      console.error(
+        `  1. Run ${chalk.cyan("sync-rules init")} to create a sample config`,
+      );
+      console.error(
+        `  2. Create a config file manually at ${chalk.gray(DEFAULT_CONFIG_PATH)}`,
+      );
+      console.error(
+        `  3. Specify a custom config path with ${chalk.gray("-c <path>")}`,
+      );
+      console.error(
+        `  4. Set ${chalk.gray("SYNC_RULES_CONFIG")} environment variable`,
       );
       console.error("\nExample config structure:");
       console.error(`{
   "projects": [
     {
       "path": "/path/to/project",
-      "adapters": ["claude", "kilocode"],
+      "adapters": ["claude"],
       "rules": ["**/*.md"]
     }
   ]
@@ -221,8 +303,6 @@ function handleError(error: Error): void {
     console.error(`${chalk.red("✗ Error:")} ${error.message}`);
   } else if (error instanceof SpawnError) {
     console.error(`${chalk.red("✗")} ${error.message}`);
-  } else if (error instanceof EditorOpenError) {
-    console.error(`${chalk.red("✗ Error:")} ${error.message}`);
   } else if (error instanceof Error) {
     console.error(`${chalk.red("✗ Error:")} ${error.message}`);
   } else {

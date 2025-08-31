@@ -1,7 +1,10 @@
 /**
  * Write action for file system operations
  */
-export type WriteAction = { path: string; content: string };
+export type WriteAction = {
+  readonly path: string;
+  readonly content: string;
+};
 
 /**
  * Normalizes text for comparison by handling line ending differences

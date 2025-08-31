@@ -4,7 +4,7 @@ import type { Rule } from "../core/rules-fs.ts";
 /**
  * Filters rules for the Claude adapter, excluding memory-bank and self-reflection rules.
  */
-export function claudeFilter(rules: Rule[]): Rule[] {
+export function claudeFilter(rules: readonly Rule[]): Rule[] {
   return [...rules].filter(
     (rule) =>
       ![
