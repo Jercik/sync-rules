@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { syncProject } from "../src/core/sync.ts";
-import * as registryModule from "../src/adapters/registry.ts";
-import * as filesystemModule from "../src/core/rules-fs.ts";
-import * as executionModule from "../src/core/execution.ts";
-import type { Project } from "../src/config/config.ts";
-import type { WriteAction } from "../src/utils/content.ts";
-import type { Rule } from "../src/core/rules-fs.ts";
-import { SyncError } from "../src/utils/errors.ts";
+import { syncProject } from "./sync.js";
+import * as registryModule from "../adapters/registry.js";
+import * as filesystemModule from "./rules-fs.js";
+import * as executionModule from "./execution.js";
+import type { Project } from "../config/config.js";
+import type { WriteAction } from "../utils/content.js";
+import type { Rule } from "./rules-fs.js";
+import { SyncError } from "../utils/errors.js";
 
-vi.mock("../src/adapters/adapters.ts", () => ({
+vi.mock("../adapters/adapters.ts", () => ({
   adapterFromMeta: vi.fn(),
 }));
 
-vi.mock("../src/adapters/registry.ts", () => ({
+vi.mock("../adapters/registry.ts", () => ({
   adapterRegistry: {
     claude: {
       planWrites: vi.fn(),
@@ -37,11 +37,11 @@ vi.mock("../src/adapters/registry.ts", () => ({
   },
 }));
 
-vi.mock("../src/core/rules-fs.ts", () => ({
+vi.mock("./rules-fs.ts", () => ({
   loadRulesFromCentral: vi.fn(),
 }));
 
-vi.mock("../src/core/execution.ts", () => ({
+vi.mock("./execution.ts", () => ({
   executeActions: vi.fn(),
 }));
 

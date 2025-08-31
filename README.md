@@ -71,13 +71,21 @@ Place your markdown rule files in this directory, organized however you prefer. 
 
 ### Installation
 
-`sync-rules` is a zero-build Node.js tool.
+#### Install from npm (recommended)
 
-1.  **Prerequisites**: Node.js >=23.6.0
+```bash
+npm install -g sync-rules
+sync-rules init
+```
+
+#### Install from source
+
+1.  **Prerequisites**: Node.js >=20.0.0
 2.  **Clone**: `git clone https://github.com/your-repo/sync-rules.git && cd sync-rules`
 3.  **Install**: `npm install`
-4.  **Link (optional)**: `npm link`
-5.  **Initialize config**: `sync-rules init`
+4.  **Build**: `npm run build`
+5.  **Link (optional)**: `npm link`
+6.  **Initialize config**: `sync-rules init`
 
 ### Architecture Overview
 

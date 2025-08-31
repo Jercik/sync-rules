@@ -1,14 +1,14 @@
-import { adapterRegistry } from "../adapters/registry.ts";
-import { getRulesSource } from "../config/constants.ts";
-import { executeActions } from "./execution.ts";
-import type { ExecutionReport } from "./execution.ts";
-import { loadRulesFromCentral } from "./rules-fs.ts";
-import type { Project } from "../config/config.ts";
-import type { WriteAction } from "../utils/content.ts";
-import { SyncError, ensureError } from "../utils/errors.ts";
-import type { PathGuard } from "./path-guard.ts";
-import { createPathGuardForPlannedWrites } from "./path-guard.ts";
-import { logger } from "../utils/pino-logger.ts";
+import { adapterRegistry } from "../adapters/registry.js";
+import { getRulesSource } from "../config/constants.js";
+import { executeActions } from "./execution.js";
+import type { ExecutionReport } from "./execution.js";
+import { loadRulesFromCentral } from "./rules-fs.js";
+import type { Project } from "../config/config.js";
+import type { WriteAction } from "../utils/content.js";
+import { SyncError, ensureError } from "../utils/errors.js";
+import type { PathGuard } from "./path-guard.js";
+import { createPathGuardForPlannedWrites } from "./path-guard.js";
+import { logger } from "../utils/pino-logger.js";
 
 export interface SyncOptions {
   dryRun?: boolean;

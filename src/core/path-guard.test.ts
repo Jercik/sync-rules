@@ -3,7 +3,7 @@ import {
   createPathGuard,
   createPathGuardForPlannedWrites,
   type PathGuard,
-} from "../src/core/path-guard.ts";
+} from "./path-guard.js";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 

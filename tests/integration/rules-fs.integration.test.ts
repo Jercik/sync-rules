@@ -1,12 +1,12 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { makeTempDir, cleanupDir } from "./test-utils";
+import { makeTempDir, cleanupDir } from "../_helpers/test-utils";
 import {
   globRulePaths,
   filterValidMdPaths,
   readRuleContents,
-} from "../src/core/rules-fs.ts";
+} from "../../src/core/rules-fs.js";
 
 describe("filesystem operations", () => {
   let tempDir: string;

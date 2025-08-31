@@ -4,7 +4,7 @@ import {
   ConfigNotFoundError,
   ConfigParseError,
   SpawnError,
-} from "../src/utils/errors.ts";
+} from "./errors.js";
 
 describe("SyncError class", () => {
   it("should create a SyncError with message", () => {

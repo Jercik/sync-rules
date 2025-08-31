@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
-import { parseConfig, findProjectForPath } from "../src/config/config.ts";
-import { loadConfig } from "../src/config/loader.ts";
-import { ConfigNotFoundError, ConfigParseError } from "../src/utils/errors.ts";
+import { parseConfig, findProjectForPath } from "./config.js";
+import { loadConfig } from "./loader.js";
+import { ConfigNotFoundError, ConfigParseError } from "../utils/errors.js";
 import * as fs from "node:fs/promises";
-import type { Config } from "../src/config/config.ts";
+import type { Config } from "./config.js";
 
 vi.mock("node:fs/promises");
 
 // Mock utils to bypass path validation during tests
-vi.mock("../src/utils/paths.ts", async () => {
+vi.mock("../utils/paths.ts", async () => {
   const actual = (await vi.importActual(
-    "../src/utils/paths.ts",
-  )) as typeof import("../src/utils/paths.ts");
+    "../utils/paths.ts",
+  )) as typeof import("../utils/paths.ts");
   return {
     ...actual,
     normalizePath: (path: string) => {
@@ -626,9 +626,7 @@ describe("config", () => {
       error.code = "ENOENT";
       vi.mocked(fs.readFile).mockRejectedValue(error);
 
-      const { DEFAULT_CONFIG_PATH } = await import(
-        "../src/config/constants.ts"
-      );
+      const { DEFAULT_CONFIG_PATH } = await import("./constants.ts");
 
       await expect(loadConfig(DEFAULT_CONFIG_PATH)).rejects.toThrow(
         ConfigNotFoundError,

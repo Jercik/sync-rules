@@ -18,7 +18,7 @@ export default defineConfig([
   },
   tseslint.configs.recommended,
   {
-    files: ["tests/**"],
+    files: ["tests/**", "**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}"],
     plugins: {
       vitest,
     },

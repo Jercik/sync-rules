@@ -1,13 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { adapterRegistry } from "../adapters/registry.ts";
+import { adapterRegistry } from "../adapters/registry.js";
 import { globby } from "globby";
-import { normalizePath } from "../utils/paths.ts";
-import { normalizeContent } from "../utils/content.ts";
-import type { WriteAction } from "../utils/content.ts";
-import { loadRulesFromCentral } from "./rules-fs.ts";
-import { getRulesSource } from "../config/constants.ts";
-import type { AdapterName } from "../config/config.ts";
+import { normalizePath } from "../utils/paths.js";
+import { normalizeContent } from "../utils/content.js";
+import type { WriteAction } from "../utils/content.js";
+import { loadRulesFromCentral } from "./rules-fs.js";
+import { getRulesSource } from "../config/constants.js";
+import type { AdapterName } from "../config/config.js";
 
 export interface VerificationIssue {
   type: "missing" | "modified" | "extra";

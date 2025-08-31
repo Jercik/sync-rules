@@ -1,5 +1,5 @@
 import { matchesGlob } from "node:path";
-import type { Rule } from "../core/rules-fs.ts";
+import type { Rule } from "../core/rules-fs.js";
 
 /**
  * Filters rules for the Claude adapter, excluding memory-bank and self-reflection rules.

@@ -1,6 +1,6 @@
 import { execa, type ExecaError } from "execa";
-import { SpawnError } from "../utils/errors.ts";
-import { logger } from "../utils/pino-logger.ts";
+import { SpawnError } from "../utils/errors.js";
+import { logger } from "../utils/pino-logger.js";
 
 /**
  * Spawns a child process using execa.

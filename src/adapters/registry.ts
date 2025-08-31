@@ -1,7 +1,7 @@
-import { adapterFromMeta } from "./adapters.ts";
-import { claudeFilter } from "./filters.ts";
-import type { AdapterName } from "../config/config.ts";
-import type { AdapterDefinition } from "./adapters.ts";
+import { adapterFromMeta } from "./adapters.js";
+import { claudeFilter } from "./filters.js";
+import type { AdapterName } from "../config/config.js";
+import type { AdapterDefinition } from "./adapters.js";
 
 /**
  * Registry of available adapters with metadata

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { executeActions } from "../src/core/execution.ts";
-import type { WriteAction } from "../src/utils/content.ts";
+import { executeActions } from "./execution.js";
+import type { WriteAction } from "../utils/content.js";
 import * as fsExtra from "fs-extra";
 
 describe("executeActions", () => {
@@ -23,20 +23,22 @@ vi.mock("fs-extra", () => ({
 }));
 
 // Mock utils
-vi.mock("../src/utils/paths.ts", async () => {
-  const actual = await vi.importActual<typeof import("../src/utils/paths.ts")>(
-    "../src/utils/paths.ts",
-  );
+vi.mock("../utils/paths.ts", async () => {
+  const actual =
+    await vi.importActual<typeof import("../utils/paths.ts")>(
+      "../utils/paths.ts",
+    );
   return {
     ...actual,
     normalizePath: vi.fn((path: string) => path),
   };
 });
 
-vi.mock("../src/utils/logger.ts", async () => {
-  const actual = await vi.importActual<typeof import("../src/utils/logger.ts")>(
-    "../src/utils/logger.ts",
-  );
+vi.mock("../utils/logger.ts", async () => {
+  const actual =
+    await vi.importActual<typeof import("../utils/logger.ts")>(
+      "../utils/logger.ts",
+    );
   return {
     ...actual,
     logMessage: vi.fn(),
@@ -64,7 +66,7 @@ describe("executeActions - algorithm tests", () => {
     });
 
     it("should log previews in verbose dry-run mode", async () => {
-      const { logMessage } = await import("../src/utils/logger.ts");
+      const { logMessage } = await import("../utils/logger.ts");
       const actions: WriteAction[] = [
         { path: "/test/file.txt", content: "Hello" },
       ];
@@ -144,7 +146,7 @@ describe("executeActions - algorithm tests", () => {
 
   describe("verbose logging", () => {
     it("should log operations when verbose is true", async () => {
-      const { logMessage } = await import("../src/utils/logger.ts");
+      const { logMessage } = await import("../utils/logger.ts");
       const actions: WriteAction[] = [
         { path: "/test/file.txt", content: "Hello" },
       ];
@@ -160,7 +162,7 @@ describe("executeActions - algorithm tests", () => {
 
   describe("path normalization", () => {
     it("should normalize all paths upfront", async () => {
-      const { normalizePath } = await import("../src/utils/paths.ts");
+      const { normalizePath } = await import("../utils/paths.ts");
       const actions: WriteAction[] = [
         { path: "/test/../file.txt", content: "Hello" },
       ];

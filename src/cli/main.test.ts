@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { main } from "../src/cli/main.ts";
-import { Config } from "../src/config/config.ts";
-import { ConfigParseError } from "../src/utils/errors.ts";
+import { main } from "./main.js";
+import { Config } from "../config/config.js";
+import { ConfigParseError } from "../utils/errors.js";
 
 // Mock the modules with vi.hoisted
 const { mockReadFile, mockPrintProjectReport, mockLoadConfig } = vi.hoisted(
@@ -18,15 +18,15 @@ vi.mock("node:fs/promises", () => ({
   readFile: mockReadFile,
 }));
 
-vi.mock("../src/core/reporting.ts", () => ({
+vi.mock("../core/reporting.ts", () => ({
   printProjectReport: mockPrintProjectReport,
 }));
 
-vi.mock("../src/config/loader.ts", () => ({
+vi.mock("../config/loader.ts", () => ({
   loadConfig: mockLoadConfig,
 }));
 
-vi.mock("../src/core/path-guard.ts", () => ({
+vi.mock("../core/path-guard.ts", () => ({
   createPathGuardFromConfig: vi.fn(() => ({
     validatePath: vi.fn((path) => path),
     getAllowedRoots: vi.fn(() => []),
@@ -37,7 +37,7 @@ vi.mock("../src/core/path-guard.ts", () => ({
 // Create a mock that can be controlled per test
 const mockSyncProject = vi.fn();
 
-vi.mock("../src/core/sync.ts", () => ({
+vi.mock("../core/sync.ts", () => ({
   syncProject: mockSyncProject,
 }));
 

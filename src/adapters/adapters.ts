@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import type { Rule } from "../core/rules-fs.ts";
-import type { WriteAction } from "../utils/content.ts";
+import type { Rule } from "../core/rules-fs.js";
+import type { WriteAction } from "../utils/content.js";
 
 /**
  * Input structure for adapter functions

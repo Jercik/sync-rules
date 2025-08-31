@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { homedir, platform } from "node:os";
-import { normalizePath } from "../utils/paths.ts";
+import { normalizePath } from "../utils/paths.js";
 
 /**
  * Get the default configuration directory based on platform and XDG spec

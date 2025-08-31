@@ -1,10 +1,10 @@
 import { outputFile } from "fs-extra";
-import { normalizePath } from "../utils/paths.ts";
-import { logMessage } from "../utils/logger.ts";
-import type { PathGuard } from "./path-guard.ts";
-import type { WriteAction } from "../utils/content.ts";
-import { SyncError, ensureError } from "../utils/errors.ts";
-import { logger } from "../utils/pino-logger.ts";
+import { normalizePath } from "../utils/paths.js";
+import { logMessage } from "../utils/logger.js";
+import type { PathGuard } from "./path-guard.js";
+import type { WriteAction } from "../utils/content.js";
+import { SyncError, ensureError } from "../utils/errors.js";
+import { logger } from "../utils/pino-logger.js";
 
 export interface ExecutionReport {
   success: boolean;

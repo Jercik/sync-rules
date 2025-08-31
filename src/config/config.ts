@@ -1,7 +1,7 @@
 import { z } from "zod";
 import isPathInside from "is-path-inside";
 import stripJsonComments from "strip-json-comments";
-import { normalizePath } from "../utils/paths.ts";
+import { normalizePath } from "../utils/paths.js";
 
 /**
  * AdapterName enum - supported AI coding assistant tools

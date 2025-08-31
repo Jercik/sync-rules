@@ -1,8 +1,8 @@
 import { normalize, isAbsolute } from "node:path";
 import isPathInside from "is-path-inside";
-import { getRulesSource } from "../config/constants.ts";
-import { normalizePath } from "../utils/paths.ts";
-import type { Config } from "../config/config.ts";
+import { getRulesSource } from "../config/constants.js";
+import { normalizePath } from "../utils/paths.js";
+import type { Config } from "../config/config.js";
 
 /**
  * Normalizes a root path - removes trailing slashes and normalizes

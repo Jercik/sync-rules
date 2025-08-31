@@ -1,15 +1,15 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import { parseConfig } from "./config.ts";
-import { normalizePath } from "../utils/paths.ts";
-import { isNodeError } from "../utils/logger.ts";
-import { DEFAULT_CONFIG_PATH } from "./constants.ts";
+import { parseConfig } from "./config.js";
+import { normalizePath } from "../utils/paths.js";
+import { isNodeError } from "../utils/logger.js";
+import { DEFAULT_CONFIG_PATH } from "./constants.js";
 import {
   ConfigNotFoundError,
   ConfigParseError,
   ensureError,
-} from "../utils/errors.ts";
-import type { Config } from "./config.ts";
+} from "../utils/errors.js";
+import type { Config } from "./config.js";
 
 /**
  * Sample configuration template for new installations

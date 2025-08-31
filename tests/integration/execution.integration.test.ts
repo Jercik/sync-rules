@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { executeActions } from "../src/core/execution.ts";
-import type { WriteAction } from "../src/utils/content.ts";
+import { executeActions } from "../../src/core/execution.js";
+import type { WriteAction } from "../../src/utils/content.js";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
-import { makeTempDir, cleanupDir } from "./test-utils";
+import { makeTempDir, cleanupDir } from "../_helpers/test-utils";
 
 describe("executeActions - integration tests", () => {
   let testDir: string;

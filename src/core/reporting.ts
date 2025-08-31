@@ -1,4 +1,4 @@
-import type { ExecutionReport } from "./execution.ts";
+import type { ExecutionReport } from "./execution.js";
 import chalk from "chalk";
 
 export interface ProjectReport {

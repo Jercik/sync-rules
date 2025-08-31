@@ -1,12 +1,12 @@
-import { adapterNames } from "../adapters/registry.ts";
-import { verifyRules } from "../core/verification.ts";
-import { loadConfig } from "../config/loader.ts";
-import { createPathGuardFromConfig } from "../core/path-guard.ts";
-import { findProjectForPath } from "../config/config.ts";
-import { syncProject } from "../core/sync.ts";
-import { spawnProcess } from "./spawn.ts";
-import type { AdapterName } from "../config/config.ts";
-import { logger } from "../utils/pino-logger.ts";
+import { adapterNames } from "../adapters/registry.js";
+import { verifyRules } from "../core/verification.js";
+import { loadConfig } from "../config/loader.js";
+import { createPathGuardFromConfig } from "../core/path-guard.js";
+import { findProjectForPath } from "../config/config.js";
+import { syncProject } from "../core/sync.js";
+import { spawnProcess } from "./spawn.js";
+import type { AdapterName } from "../config/config.js";
+import { logger } from "../utils/pino-logger.js";
 import { basename } from "node:path";
 
 const isSupportedAdapter = (name: string): name is AdapterName =>

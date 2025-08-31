@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { adapterRegistry } from "../src/adapters/registry.ts";
-import type { AdapterInput } from "../src/adapters/adapters.ts";
+import { adapterRegistry } from "./registry.js";
+import type { AdapterInput } from "./adapters.js";
 import { join } from "node:path";
 import { homedir } from "node:os";
 

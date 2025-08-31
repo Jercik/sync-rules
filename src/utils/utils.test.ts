@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { normalizePath, isValidMdFile } from "../src/utils/paths.ts";
-import { logMessage } from "../src/utils/logger.ts";
+import { normalizePath, isValidMdFile } from "./paths.js";
+import { logMessage } from "./logger.js";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 

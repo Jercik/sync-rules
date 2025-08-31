@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { printProjectReport } from "../src/core/reporting.ts";
-import type { ProjectReport } from "../src/core/reporting.ts";
+import { printProjectReport } from "./reporting.js";
+import type { ProjectReport } from "./reporting.js";
 
 describe("printProjectReport", () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;

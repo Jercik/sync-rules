@@ -1,18 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { verifyRules } from "../src/core/verification.ts";
+import { verifyRules } from "./verification.js";
 import * as fs from "node:fs/promises";
-import * as registryModule from "../src/adapters/registry.ts";
-import * as filesystemModule from "../src/core/rules-fs.ts";
+import * as registryModule from "../adapters/registry.js";
+import * as filesystemModule from "./rules-fs.js";
 import { globby } from "globby";
-import type { WriteAction } from "../src/utils/content.ts";
-import type { Rule } from "../src/core/rules-fs.ts";
+import type { WriteAction } from "../utils/content.js";
+import type { Rule } from "./rules-fs.js";
+import type { Dirent } from "node:fs";
 
 vi.mock("node:fs/promises");
-vi.mock("../src/adapters/adapters.ts", () => ({
+vi.mock("../adapters/adapters.ts", () => ({
   adapterFromMeta: vi.fn(),
 }));
 
-vi.mock("../src/adapters/registry.ts", () => ({
+vi.mock("../adapters/registry.ts", () => ({
   adapterRegistry: {
     claude: {
       planWrites: vi.fn(),
@@ -36,22 +37,22 @@ vi.mock("../src/adapters/registry.ts", () => ({
     },
   },
 }));
-vi.mock("../src/core/rules-fs.ts", () => ({
+vi.mock("./rules-fs.ts", () => ({
   loadRulesFromCentral: vi.fn(),
 }));
-vi.mock("../src/config/constants.ts", () => ({
+vi.mock("../config/constants.ts", () => ({
   getRulesSource: vi.fn(() => "/mock/rules/dir"),
 }));
 vi.mock("globby");
 vi.mocked(fs.readdir).mockResolvedValue([
-  { name: "claude.md", isDirectory: () => false } as any,
+  { name: "claude.md", isDirectory: () => false } as unknown as Dirent,
 ]);
 
 // Mock utils to bypass path validation during tests
-vi.mock("../src/utils/paths.ts", async () => {
+vi.mock("../utils/paths.ts", async () => {
   const actual = (await vi.importActual(
-    "../src/utils/paths.ts",
-  )) as typeof import("../src/utils/paths.ts");
+    "../utils/paths.ts",
+  )) as typeof import("../utils/paths.ts");
   return {
     ...actual,
     normalizePath: (path: string) => {
@@ -228,7 +229,7 @@ With multiple lines`;
         );
         vi.mocked(fs.readFile).mockResolvedValue("test");
         vi.mocked(fs.readdir).mockResolvedValue([
-          { name: "file.md", isDirectory: () => false } as any,
+          { name: "file.md", isDirectory: () => false } as unknown as Dirent,
         ]);
 
         const result = await verifyRules("/project/", "claude", ["**/*.md"]);
@@ -257,7 +258,7 @@ With multiple lines`;
         );
         vi.mocked(fs.readFile).mockRejectedValue(new Error("ENOENT"));
         vi.mocked(fs.readdir).mockResolvedValue([
-          { name: "claude.md", isDirectory: () => false } as any,
+          { name: "claude.md", isDirectory: () => false } as unknown as Dirent,
         ]);
 
         // On Linux, CLAUDE.md and claude.md are different files

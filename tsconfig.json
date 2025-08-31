@@ -16,12 +16,17 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     /* Node Stuff */
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
     "module": "NodeNext",
-    "noEmit": true,
+    "moduleResolution": "NodeNext",
+    /* Output */
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
     /* If your code doesn't run in the DOM: */
     "lib": ["esnext"]
   },
-  "include": ["src/**/*.ts", "bin/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }

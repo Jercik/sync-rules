@@ -6,26 +6,26 @@ vi.mock("execa", () => ({
 }));
 
 // Provide explicit mock for adapters module
-vi.mock("../src/adapters/adapters.ts", () => ({
+vi.mock("../adapters/adapters.ts", () => ({
   adapterFromMeta: vi.fn(),
 }));
 
-vi.mock("../src/adapters/registry.ts", () => ({
+vi.mock("../adapters/registry.ts", () => ({
   adapterNames: ["claude", "gemini", "kilocode", "cline", "codex"],
 }));
-vi.mock("../src/config/config.ts");
-vi.mock("../src/config/loader.ts");
-vi.mock("../src/core/sync.ts");
-vi.mock("../src/core/verification.ts");
+vi.mock("../config/config.ts");
+vi.mock("../config/loader.ts");
+vi.mock("../core/sync.ts");
+vi.mock("../core/verification.ts");
 
-import { launchTool } from "../src/launch/launch.ts";
-import { spawnProcess } from "../src/launch/spawn.ts";
-import * as configModule from "../src/config/config.ts";
-import * as configLoaderModule from "../src/config/loader.ts";
-import * as syncModule from "../src/core/sync.ts";
-import * as verificationModule from "../src/core/verification.ts";
-import type { Config, Project } from "../src/config/config.ts";
-import { SpawnError } from "../src/utils/errors.ts";
+import { launchTool } from "./launch.js";
+import { spawnProcess } from "./spawn.js";
+import * as configModule from "../config/config.js";
+import * as configLoaderModule from "../config/loader.js";
+import * as syncModule from "../core/sync.js";
+import * as verificationModule from "../core/verification.js";
+import type { Config, Project } from "../config/config.js";
+import { SpawnError } from "../utils/errors.js";
 import { execa } from "execa";
 
 // Get mocked functions

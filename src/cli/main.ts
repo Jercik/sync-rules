@@ -1,20 +1,20 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import packageJson from "../../package.json" with { type: "json" };
-import { DEFAULT_CONFIG_PATH } from "../config/constants.ts";
-import { loadConfig, createSampleConfig } from "../config/loader.ts";
-import { createPathGuardFromConfig } from "../core/path-guard.ts";
-import { printProjectReport } from "../core/reporting.ts";
-import type { ProjectReport } from "../core/reporting.ts";
-import type { Project } from "../config/config.ts";
-import type { SyncResult } from "../core/sync.ts";
+import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
+import { loadConfig, createSampleConfig } from "../config/loader.js";
+import { createPathGuardFromConfig } from "../core/path-guard.js";
+import { printProjectReport } from "../core/reporting.js";
+import type { ProjectReport } from "../core/reporting.js";
+import type { Project } from "../config/config.js";
+import type { SyncResult } from "../core/sync.js";
 import {
   SyncError,
   ConfigNotFoundError,
   ConfigParseError,
   SpawnError,
   ensureError,
-} from "../utils/errors.ts";
+} from "../utils/errors.js";
 
 async function runSync(options: {
   config: string;
@@ -40,7 +40,7 @@ async function runSync(options: {
 
   const results = await Promise.allSettled(
     config.projects.map(async (project: Project) => {
-      const { syncProject } = await import("../core/sync.ts");
+      const { syncProject } = await import("../core/sync.js");
       return await syncProject(project, {
         dryRun: options.dryRun,
         verbose: options.verbose,
@@ -234,7 +234,7 @@ export async function main(argv: string[]) {
 
       // Logging removed - use LOG_LEVEL env var to enable debug logging
 
-      const { launchTool } = await import("../launch/launch.ts");
+      const { launchTool } = await import("../launch/launch.js");
       const exitCode = await launchTool(tool, toolArgs, {
         configPath: parentOpts.config || DEFAULT_CONFIG_PATH,
         noSync: opts.noSync,
