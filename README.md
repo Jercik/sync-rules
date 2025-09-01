@@ -148,8 +148,7 @@ sync-rules sync
 
 # With options
 sync-rules sync --dry-run
-sync-rules sync -v
-sync-rules sync --verbose
+sync-rules sync --log-level debug
 sync-rules sync -c /path/to/config.json
 
 # Check version
@@ -231,11 +230,10 @@ Now your tools will always check rules before starting!
 
 ### Logging
 
-- Default level: `warn`.
-- Verbose: `-v` sets level to `debug` and prints the log file path.
-- CLI override: `--log-level <silent|error|warn|info|debug|trace>`.
+- Default level: `info`.
+- CLI override: `--log-level <silent|fatal|error|warn|info|debug|trace>`.
 - Env override: set `LOG_LEVEL=<level>`.
-- Optional file logging: set `LOG_TO_FILE=1` (path is shown when running with `-v`).
+- Optional file logging: set `LOG_TO_FILE=1` (path is shown when level is `debug` or `trace`).
 
 ## Known Issues
 

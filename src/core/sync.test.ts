@@ -8,11 +8,11 @@ import type { WriteAction } from "./execution.js";
 import type { Rule } from "./rules-fs.js";
 import { SyncError } from "../utils/errors.js";
 
-vi.mock("../adapters/adapters.ts", () => ({
+vi.mock("../adapters/adapters.js", () => ({
   createAdapter: vi.fn(),
 }));
 
-vi.mock("../adapters/registry.ts", () => ({
+vi.mock("../adapters/registry.js", () => ({
   adapterRegistry: {
     claude: {
       planWrites: vi.fn(),
@@ -37,11 +37,11 @@ vi.mock("../adapters/registry.ts", () => ({
   },
 }));
 
-vi.mock("./rules-fs.ts", () => ({
+vi.mock("./rules-fs.js", () => ({
   loadRules: vi.fn(),
 }));
 
-vi.mock("./execution.ts", () => ({
+vi.mock("./execution.js", () => ({
   executeActions: vi.fn(),
 }));
 
@@ -189,7 +189,7 @@ describe("sync", () => {
       );
     });
 
-    it("should respect verbose mode", async () => {
+    it("should execute with debug logs available when level is debug", async () => {
       const singleAdapterProject: Project = {
         ...mockProject,
         adapters: ["claude"],

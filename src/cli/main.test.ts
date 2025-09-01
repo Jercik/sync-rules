@@ -57,18 +57,18 @@ vi.mock("node:fs/promises", () => ({
   },
 }));
 
-vi.mock("../core/reporting.ts", () => ({
+vi.mock("../core/reporting.js", () => ({
   printProjectReport: mockPrintProjectReport,
 }));
 
-vi.mock("../config/loader.ts", () => ({
+vi.mock("../config/loader.js", () => ({
   loadConfig: mockLoadConfig,
   createSampleConfig: mockCreateSampleConfig,
 }));
 
 const mockSyncProject = vi.fn();
 
-vi.mock("../core/sync.ts", () => ({
+vi.mock("../core/sync.js", () => ({
   syncProject: mockSyncProject,
 }));
 
@@ -197,7 +197,7 @@ describe("CLI", () => {
     );
   });
 
-  it("should handle verbose mode", async () => {
+  it("should log file path when log level is debug", async () => {
     const mockConfig: Config = {
       rulesSource: "/path/to/rules",
       projects: [
@@ -216,13 +216,17 @@ describe("CLI", () => {
       "sync-rules",
       "-c",
       "~/test-config.json",
-      "--verbose",
+      "--log-level",
+      "debug",
       "sync",
     ]);
 
-    expect(mockPrintProjectReport).toHaveBeenCalledWith(expect.any(Array), {
-      dryRun: false,
-    });
+    // Ensure it announced the log file path at debug level
+    const { getLogger } = await import("../utils/log.js");
+    const cliLogger = getLogger("cli");
+    expect(cliLogger.info).toHaveBeenCalledWith(
+      expect.stringContaining("log file: /tmp/debug.log"),
+    );
   });
 
   it("should handle invalid config file", async () => {

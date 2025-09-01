@@ -1,5 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+// Mock env-paths to avoid external dependency issues in test environment
+vi.mock("env-paths", () => ({
+  default: () => ({
+    config: "/tmp",
+    data: "/tmp",
+    cache: "/tmp",
+    log: "/tmp",
+    temp: "/tmp",
+  }),
+}));
+
 const originalEnv = process.env;
 
 describe("constants", () => {

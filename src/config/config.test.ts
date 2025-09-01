@@ -9,10 +9,10 @@ import type { Config } from "./config.js";
 vi.mock("node:fs/promises");
 
 // Mock utils to bypass path validation during tests
-vi.mock("../utils/paths.ts", async () => {
+vi.mock("../utils/paths.js", async () => {
   const actual = (await vi.importActual(
-    "../utils/paths.ts",
-  )) as typeof import("../utils/paths.ts");
+    "../utils/paths.js",
+  )) as typeof import("../utils/paths.js");
   return {
     ...actual,
     normalizePath: (path: string) => {
@@ -649,7 +649,7 @@ describe("config", () => {
       const error = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       vi.mocked(fs.readFile).mockRejectedValue(error);
 
-      const { DEFAULT_CONFIG_PATH } = await import("./constants.ts");
+      const { DEFAULT_CONFIG_PATH } = await import("./constants.js");
 
       await expect(loadConfig(DEFAULT_CONFIG_PATH)).rejects.toThrow(
         ConfigNotFoundError,

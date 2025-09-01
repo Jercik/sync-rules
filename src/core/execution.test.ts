@@ -20,10 +20,10 @@ vi.mock("node:fs/promises", () => ({
   writeFile: vi.fn(),
 }));
 
-vi.mock("../utils/paths.ts", async () => {
+vi.mock("../utils/paths.js", async () => {
   const actual =
-    await vi.importActual<typeof import("../utils/paths.ts")>(
-      "../utils/paths.ts",
+    await vi.importActual<typeof import("../utils/paths.js")>(
+      "../utils/paths.js",
     );
   return {
     ...actual,
@@ -31,9 +31,9 @@ vi.mock("../utils/paths.ts", async () => {
   };
 });
 
-vi.mock("../utils/log.ts", async () => {
+vi.mock("../utils/log.js", async () => {
   const actual =
-    await vi.importActual<typeof import("../utils/log.ts")>("../utils/log.ts");
+    await vi.importActual<typeof import("../utils/log.js")>("../utils/log.js");
   const child = {
     debug: vi.fn(),
     info: vi.fn(),
@@ -70,7 +70,7 @@ describe("executeActions - algorithm tests", () => {
     });
 
     it("should log previews in dry-run mode", async () => {
-      const { rootLogger: logger } = await import("../utils/log.ts");
+      const { rootLogger: logger } = await import("../utils/log.js");
       const actions: WriteAction[] = [
         { path: "/test/file.txt", content: "Hello" },
       ];
@@ -155,7 +155,7 @@ describe("executeActions - algorithm tests", () => {
 
   describe("debug logging", () => {
     it("should log operations in debug mode", async () => {
-      const { rootLogger: logger } = await import("../utils/log.ts");
+      const { rootLogger: logger } = await import("../utils/log.js");
       const actions: WriteAction[] = [
         { path: "/test/file.txt", content: "Hello" },
       ];
@@ -172,7 +172,7 @@ describe("executeActions - algorithm tests", () => {
 
   describe("path normalization", () => {
     it("should normalize all paths upfront", async () => {
-      const { normalizePath } = await import("../utils/paths.ts");
+      const { normalizePath } = await import("../utils/paths.js");
       const actions: WriteAction[] = [
         { path: "/test/../file.txt", content: "Hello" },
       ];

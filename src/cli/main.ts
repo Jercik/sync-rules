@@ -1,9 +1,10 @@
-import { Command, CommanderError } from "commander";
+import { Command, CommanderError, Option } from "commander";
 import { access, constants as FS } from "node:fs/promises";
 import packageJson from "../../package.json" with { type: "json" };
+import type { LevelWithSilent } from "pino";
 import { getLogger, getLogFilePath, rootLogger } from "../utils/log.js";
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
-import { validateLogLevel } from "../utils/type-guards.js";
+import { LogLevel } from "../config/config.js";
 import { loadConfig, createSampleConfig } from "../config/loader.js";
 import { printProjectReport } from "../core/reporting.js";
 import type { ProjectReport } from "../core/reporting.js";
@@ -32,31 +33,21 @@ async function configExists(path: string): Promise<boolean> {
   }
 }
 
-function applyCliLogging({
-  logLevel,
-  verbose,
-}: {
-  logLevel?: string;
-  verbose?: boolean;
-}) {
-  const validLevel = logLevel ? validateLogLevel(logLevel) : undefined;
-  if (validLevel) {
-    rootLogger.level = validLevel;
-  } else if (verbose) {
-    rootLogger.level = "debug";
+function applyCliLogging(logLevel?: string) {
+  if (logLevel && LogLevel.safeParse(logLevel).success) {
+    rootLogger.level = logLevel as LevelWithSilent;
   }
 }
 
 async function runSync(options: {
   config: string;
   dryRun?: boolean;
-  verbose?: boolean;
   logLevel?: string;
 }): Promise<{ ok: boolean; reports: ProjectReport[] }> {
   // Configure logger level from CLI options
-  applyCliLogging({ logLevel: options.logLevel, verbose: options.verbose });
+  applyCliLogging(options.logLevel);
 
-  if (options.verbose) {
+  if (options.logLevel === "debug" || options.logLevel === "trace") {
     logger.info(`log file: ${getLogFilePath()}`);
   }
 
@@ -110,16 +101,11 @@ export async function main(argv: string[]): Promise<number> {
       DEFAULT_CONFIG_PATH,
     )
     .option("-d, --dry-run", "Preview changes without applying them", false)
-    .option("-v, --verbose", "Enable verbose output", false)
-    .option("--log-level <level>", "Set log level", (value) => {
-      const validLevels = ["silent", "error", "warn", "info", "debug", "trace"];
-      if (!validLevels.includes(value)) {
-        program.error(
-          `Invalid log level '${value}'. Must be one of: ${validLevels.join(", ")}`,
-        );
-      }
-      return value;
-    })
+    .addOption(
+      new Option("--log-level <level>", "Set log level")
+        .choices(LogLevel.options as unknown as string[])
+        .default("info"),
+    )
     .showHelpAfterError("(add --help for additional information)")
     .showSuggestionAfterError()
     .exitOverride()
@@ -171,7 +157,6 @@ export async function main(argv: string[]): Promise<number> {
       const { ok } = await runSync({
         config: options.config || DEFAULT_CONFIG_PATH,
         dryRun: options.dryRun,
-        verbose: options.verbose,
         logLevel: options.logLevel,
       });
       if (!ok) {
@@ -195,12 +180,9 @@ export async function main(argv: string[]): Promise<number> {
     const opts = launchCommand.opts();
 
     // Configure logger level for launch subcommand as well
-    applyCliLogging({
-      logLevel: parentOpts.logLevel,
-      verbose: parentOpts.verbose,
-    });
+    applyCliLogging(parentOpts.logLevel);
 
-    if (parentOpts.verbose) {
+    if (parentOpts.logLevel === "debug" || parentOpts.logLevel === "trace") {
       logger.info(`log file: ${getLogFilePath()}`);
     }
 

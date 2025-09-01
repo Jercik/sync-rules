@@ -20,16 +20,31 @@ vi.mock("execa", () => {
 });
 
 // Provide explicit mock for adapters module
-vi.mock("../adapters/adapters.ts", () => ({
+vi.mock("../adapters/adapters.js", () => ({
   createAdapter: vi.fn(),
 }));
 
-vi.mock("../adapters/registry.ts", () => ({
+vi.mock("../adapters/registry.js", () => ({
   adapterNames: ["claude", "gemini", "kilocode", "cline", "codex"],
 }));
-vi.mock("../config/config.ts");
-vi.mock("../config/loader.ts");
-vi.mock("../core/sync.ts");
+vi.mock("../config/config.js", () => ({
+  findProjectForPath: vi.fn(),
+  LogLevel: {
+    // Ensure logger creation doesn't crash when reading env level
+    safeParse: () => ({ success: false }),
+    options: [
+      "silent",
+      "fatal",
+      "error",
+      "warn",
+      "info",
+      "debug",
+      "trace",
+    ],
+  },
+}));
+vi.mock("../config/loader.js");
+vi.mock("../core/sync.js");
 
 import { launchTool } from "./launch.js";
 import { spawnProcess } from "./spawn.js";
@@ -466,7 +481,7 @@ describe("launch", () => {
         expect(mockExeca).toHaveBeenCalled();
       });
 
-      it("should show verbose output when verbose flag is set and no files need syncing", async () => {
+      it("should run normally when no files need syncing (debug logs may show file path)", async () => {
         // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(syncModule.syncProject).mockResolvedValue({
@@ -490,7 +505,7 @@ describe("launch", () => {
         expect(mockExeca).toHaveBeenCalled();
       });
 
-      it("should not log when no files need syncing and not verbose", async () => {
+      it("should not print 'Rules up to date' when none written", async () => {
         // claude is in adapterNames
         vi.mocked(configModule.findProjectForPath).mockReturnValue(mockProject);
         vi.mocked(syncModule.syncProject).mockResolvedValue({

@@ -2,7 +2,7 @@
 import pino, { type Logger } from "pino";
 import envPaths from "env-paths";
 import { join } from "node:path";
-import { validateLogLevel } from "./type-guards.js";
+import { LogLevel } from "../config/config.js";
 
 export interface LogConfig {
   level?: pino.LevelWithSilent;
@@ -10,7 +10,8 @@ export interface LogConfig {
 }
 
 function destinations(toFile: boolean, logFile: string) {
-  const targets: Array<{ target: string; options?: Record<string, unknown> }> = [];
+  const targets: Array<{ target: string; options?: Record<string, unknown> }> =
+    [];
 
   // Console: pretty if TTY, plain JSON otherwise
   if (process.stdout.isTTY) {
@@ -31,9 +32,10 @@ function destinations(toFile: boolean, logFile: string) {
 }
 
 export function createLogger(cfg: LogConfig = {}): Logger {
-  const envLevel = validateLogLevel(process.env.LOG_LEVEL);
-  const level = cfg.level ?? envLevel ?? "warn";
-  if (level === "silent") return pino({ level: "silent" });
+  const envLevel = LogLevel.safeParse(process.env.LOG_LEVEL).success
+    ? (process.env.LOG_LEVEL as pino.LevelWithSilent)
+    : undefined;
+  const level = (cfg.level ?? envLevel ?? "info") as pino.LevelWithSilent;
 
   const logFile = join(envPaths("sync-rules").log, "debug.log");
   const toFile = cfg.toFile ?? process.env.LOG_TO_FILE === "1";

@@ -23,7 +23,7 @@ export interface SyncResult {
  * 3) Executing those actions (optionally as a dry run).
  *
  * @param project - The project configuration to sync.
- * @param options - Execution options such as `dryRun` and `verbose`.
+ * @param options - Execution options such as `dryRun`.
  * @returns A summary of the execution results for the project.
  */
 export async function syncProject(

@@ -4,6 +4,19 @@ import { normalizePath } from "../utils/paths.js";
 import { DEFAULT_RULES_SOURCE } from "./constants.js";
 
 /**
+ * LogLevel enum - supported log levels
+ */
+export const LogLevel = z.enum([
+  "silent",
+  "fatal",
+  "error",
+  "warn",
+  "info",
+  "debug",
+  "trace",
+]);
+
+/**
  * AdapterName enum - supported AI coding assistant tools
  */
 export const AdapterName = z.enum([
@@ -55,7 +68,10 @@ export const Config = z
         try {
           return normalizePath(v ?? DEFAULT_RULES_SOURCE);
         } catch {
-          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid rulesSource path" });
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Invalid rulesSource path",
+          });
           return z.NEVER;
         }
       })
