@@ -1,19 +1,13 @@
 import { adapterRegistry } from "../adapters/registry.js";
-import { getRulesSource } from "../config/constants.js";
+import { DEFAULT_RULES_SOURCE } from "../config/constants.js";
 import { executeActions } from "./execution.js";
-import type { ExecutionReport } from "./execution.js";
-import { loadRulesFromCentral } from "./rules-fs.js";
+import type { ExecutionReport, WriteAction, RunFlags } from "./execution.js";
+import { loadRules } from "./rules-fs.js";
 import type { Project } from "../config/config.js";
-import type { WriteAction } from "../utils/content.js";
 import { SyncError, ensureError } from "../utils/errors.js";
-import type { PathGuard } from "./path-guard.js";
-import { createPathGuardForPlannedWrites } from "./path-guard.js";
-import { logger } from "../utils/pino-logger.js";
+import { getLogger } from "../utils/log.js";
 
 export interface SyncOptions {
-  dryRun?: boolean;
-  verbose?: boolean;
-  pathGuard?: PathGuard;
   rulesSource?: string;
 }
 
@@ -22,9 +16,6 @@ export interface SyncResult {
   report: ExecutionReport;
 }
 
-/**
- * Synchronizes rules for a single project
- */
 /**
  * Synchronize rules for a single project by:
  * 1) Loading rule files from the central repository once,
@@ -37,61 +28,64 @@ export interface SyncResult {
  */
 export async function syncProject(
   project: Project,
+  flags: RunFlags = { dryRun: false },
   options: SyncOptions = {},
 ): Promise<SyncResult> {
-  const { dryRun = false, verbose = false, pathGuard, rulesSource } = options;
+  const logger = getLogger("core:sync");
+  const { dryRun } = flags;
+  const { rulesSource } = options;
   const allActions: WriteAction[] = [];
 
-  // Determine the rules source directory
-  const rulesDir = getRulesSource(rulesSource);
-
+  const rulesDir = rulesSource ?? DEFAULT_RULES_SOURCE;
   logger.debug(
     {
+      evt: "sync.start",
       projectPath: project.path,
       adapters: project.adapters,
       ruleCount: project.rules.length,
       rulesDir,
       dryRun,
-      verbose,
     },
-    "Starting project sync",
+    "Start",
   );
 
-  // Avoid touching the filesystem here; directory creation is handled
-  // automatically by fs-extra during write execution.
-
   // Load rules once for all adapters - avoids redundant I/O
-  const rules = await loadRulesFromCentral(rulesDir, project.rules);
-  logger.debug(`Loaded ${rules.length} rules from central repository`);
 
-  // Process rules for all adapters
+  const rules = await loadRules(rulesDir, project.rules);
+  logger.debug(
+    { evt: "sync.rules.loaded", rulesCount: rules.length, rulesDir },
+    "Rules loaded",
+  );
+
   for (const adapterName of project.adapters) {
     try {
-      logger.debug(`Processing adapter: ${adapterName}`);
-
-      // Get the adapter definition from the registry
-      const adapterDef = adapterRegistry[adapterName];
-      if (!adapterDef) {
-        logger.error(`Unknown adapter: ${adapterName}`);
-        throw new Error(`Unknown adapter: ${adapterName}`);
-      }
+      logger.debug(
+        { evt: "sync.adapter.start", adapter: adapterName },
+        "Adapter start",
+      );
 
       // Generate actions for this adapter using pre-loaded rules
-      const actions = adapterDef.planWrites({
+      const actions = adapterRegistry[adapterName].planWrites({
         projectPath: project.path,
         rules,
       });
 
       logger.debug(
         {
+          evt: "sync.adapter.plan",
+          adapter: adapterName,
           actions: actions.map((a) => ({ path: a.path, type: "write" })),
+          actionCount: actions.length,
         },
-        `Adapter ${adapterName} generated ${actions.length} actions`,
+        `Adapter ${adapterName} planned actions`,
       );
 
       allActions.push(...actions);
     } catch (err) {
-      logger.error(err, `Failed to process adapter ${adapterName}`);
+      logger.error(
+        { err, evt: "sync.adapter.error", adapter: adapterName },
+        `Failed to process adapter ${adapterName}`,
+      );
       // Wrap the error with context and re-throw
       // The CLI will handle logging with proper formatting
       throw new SyncError(
@@ -105,28 +99,20 @@ export async function syncProject(
     }
   }
 
-  // Execute only the planned writes (defense-in-depth)
-  // If no pathGuard is provided, create one from the planned actions
-  // This ensures we only write to explicitly planned paths
-  const plannedGuard =
-    pathGuard ?? createPathGuardForPlannedWrites(allActions.map((a) => a.path));
+  logger.debug(
+    { evt: "sync.execute.start", actionCount: allActions.length },
+    "Execute actions",
+  );
 
-  logger.debug(`Executing ${allActions.length} total actions`);
-
-  const report = await executeActions(allActions, {
-    dryRun,
-    verbose,
-    pathGuard: plannedGuard,
-  });
+  const report = await executeActions(allActions, flags);
 
   logger.info(
     {
+      evt: "sync.done",
       projectPath: project.path,
       filesWritten: report.written.length,
-      errors: report.errors.length,
-      success: report.success,
     },
-    "Sync completed",
+    "Done",
   );
 
   return { projectPath: project.path, report };

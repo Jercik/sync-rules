@@ -97,58 +97,6 @@ describe("Claude Adapter", () => {
     expect(actions).toHaveLength(1);
     expect(actions[0].content).toContain("No rules configured.");
   });
-
-  it("should filter out files containing memory-bank in path", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "docs/memory-bank.md", content: "# Memory Bank\nContent" },
-        { path: "other.md", content: "# Other\nContent" },
-      ],
-    };
-
-    const actions = adapter(input);
-    const content = actions[0].content;
-
-    // Memory bank files should be filtered out
-    expect(content).not.toContain("# Memory Bank");
-    expect(content).toContain("# Other\nContent");
-  });
-
-  it("should filter out files containing self-reflection in path", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        {
-          path: "ai-coding-workflow/self-reflection.md",
-          content: "# Self Reflection\nContent",
-        },
-        { path: "other.md", content: "# Other\nContent" },
-      ],
-    };
-
-    const actions = adapter(input);
-    const content = actions[0].content;
-
-    // Self-reflection files should be filtered out
-    expect(content).not.toContain("# Self Reflection");
-    expect(content).toContain("# Other\nContent");
-  });
-
-  it("should show 'No rules configured' when all rules are filtered out", () => {
-    const input: AdapterInput = {
-      projectPath,
-      rules: [
-        { path: "memory-bank.md", content: "# Memory Bank" },
-        { path: "self-reflection.md", content: "# Self Reflection" },
-      ],
-    };
-
-    const actions = adapter(input);
-    const content = actions[0].content;
-
-    expect(content).toContain("No rules configured.");
-  });
 });
 
 describe("Gemini Adapter", () => {
@@ -263,7 +211,6 @@ describe("Cline Adapter", () => {
 
     expect(actions).toHaveLength(3);
 
-    // Check write actions
     expect(actions[0]).toEqual({
       path: join(rulesDir, "dir1/rule1.md"),
       content: "Content 1",
@@ -315,5 +262,69 @@ describe("Kilocode Adapter", () => {
     const actions = adapter(input);
 
     expect(actions).toHaveLength(0); // No actions needed for empty rules
+  });
+});
+
+describe("Path Traversal Prevention", () => {
+  const projectPath = join(homedir(), "test-project");
+
+  it("should reject path traversal attempts in cline adapter", () => {
+    const adapter = adapterRegistry.cline.planWrites;
+    const input: AdapterInput = {
+      projectPath,
+      rules: [{ path: "../../../etc/passwd", content: "malicious content" }],
+    };
+
+    expect(() => adapter(input)).toThrow(/Refusing to write outside/);
+  });
+
+  it("should reject path traversal attempts in kilocode adapter", () => {
+    const adapter = adapterRegistry.kilocode.planWrites;
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        { path: "../../sensitive/file.txt", content: "malicious content" },
+      ],
+    };
+
+    expect(() => adapter(input)).toThrow(/Refusing to write outside/);
+  });
+
+  it("should allow valid relative paths within directory", () => {
+    const adapter = adapterRegistry.cline.planWrites;
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        { path: "subdir/rule.md", content: "valid content" },
+        { path: "./another/rule.md", content: "also valid" },
+      ],
+    };
+
+    const actions = adapter(input);
+    expect(actions).toHaveLength(2);
+    expect(actions[0].path).toContain(".clinerules");
+    expect(actions[0].path).toContain("subdir");
+  });
+
+  it("should reject absolute paths", () => {
+    const adapter = adapterRegistry.kilocode.planWrites;
+    const input: AdapterInput = {
+      projectPath,
+      rules: [{ path: "/etc/passwd", content: "malicious content" }],
+    };
+
+    expect(() => adapter(input)).toThrow(/Refusing to write outside/);
+  });
+
+  it("should reject paths with .. in the middle", () => {
+    const adapter = adapterRegistry.cline.planWrites;
+    const input: AdapterInput = {
+      projectPath,
+      rules: [
+        { path: "valid/../../../etc/passwd", content: "malicious content" },
+      ],
+    };
+
+    expect(() => adapter(input)).toThrow(/Refusing to write outside/);
   });
 });

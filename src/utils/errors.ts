@@ -19,22 +19,6 @@ export class SyncError extends Error {
     this.name = this.constructor.name;
     this.details = details;
   }
-
-  /**
-   * Returns a formatted string representation of the error including context details.
-   * Example:
-   *   ✗ Project: /path | Adapter: claude | Action: write | Path: rules.md
-   *     └─ Failed to write file
-   */
-  toFormattedString(): string {
-    let message = "✗";
-    if (this.details.project) message += ` Project: ${this.details.project}`;
-    if (this.details.adapter) message += ` | Adapter: ${this.details.adapter}`;
-    if (this.details.action) message += ` | Action: ${this.details.action}`;
-    if (this.details.path) message += ` | Path: ${this.details.path}`;
-    message += `\n  └─ ${this.message}`;
-    return message;
-  }
 }
 
 /**
@@ -93,7 +77,7 @@ export class SpawnError extends Error {
   ) {
     const baseMessage =
       code === "ENOENT"
-        ? `"${command}" not found on PATH. Install it or adjust your alias.`
+        ? `"${command}" not found on PATH or cwd invalid. Install it or verify working directory.`
         : message || `Failed to launch "${command}"`;
 
     super(baseMessage, { cause });
@@ -111,4 +95,49 @@ export class SpawnError extends Error {
  */
 export function ensureError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
+}
+
+/**
+ * Type guard to safely check if an error is a Node.js ErrnoException
+ * @param e - The error to check
+ * @returns true if the error is a NodeJS.ErrnoException
+ */
+export function isNodeError(e: unknown): e is NodeJS.ErrnoException {
+  return (
+    !!e &&
+    typeof e === "object" &&
+    "code" in e &&
+    (typeof (e as { code: unknown }).code === "string" ||
+      typeof (e as { code: unknown }).code === "number")
+  );
+}
+
+/**
+ * Error thrown when the current working directory does not match any
+ * configured project in the provided config file.
+ */
+export class ProjectNotFoundError extends Error {
+  constructor(
+    readonly cwd: string,
+    readonly configPath: string,
+  ) {
+    super(`Project at ${cwd} not found in config at ${configPath}`);
+    this.name = this.constructor.name;
+  }
+}
+
+/**
+ * Error thrown when a managed adapter is not configured for the detected project.
+ */
+export class AdapterNotConfiguredError extends Error {
+  constructor(
+    readonly adapter: string,
+    readonly projectPath: string,
+    readonly configPath: string,
+  ) {
+    super(
+      `${adapter} adapter not configured for project at ${projectPath} (config: ${configPath})`,
+    );
+    this.name = this.constructor.name;
+  }
 }

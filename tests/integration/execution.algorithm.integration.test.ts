@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { executeActions } from "../../src/core/execution.js";
-import type { WriteAction } from "../../src/utils/content.js";
+import type { WriteAction } from "../../src/core/execution.js";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import { makeTempDir, cleanupDir } from "../_helpers/test-utils";
@@ -21,7 +21,6 @@ describe("executeActions - integration tests", () => {
     it("should handle 100+ writes across multiple directories", async () => {
       const actions: WriteAction[] = [];
 
-      // Create a complex directory structure
       for (let i = 0; i < 10; i++) {
         const dirPath = join(testDir, `dir${i}`);
         for (let j = 0; j < 3; j++) {
@@ -35,9 +34,8 @@ describe("executeActions - integration tests", () => {
         }
       }
 
-      const result = await executeActions(actions, { verbose: false });
+      const result = await executeActions(actions, { dryRun: false });
 
-      expect(result.success).toBe(true);
       expect(result.written).toHaveLength(90); // 10 * 3 * 3 files
 
       // Verify a sample of files exist
@@ -47,7 +45,6 @@ describe("executeActions - integration tests", () => {
     });
 
     it("should handle deep directory structures", async () => {
-      // Create a very deep directory structure via write
       let currentPath = testDir;
       const actions: WriteAction[] = [];
 
@@ -63,7 +60,6 @@ describe("executeActions - integration tests", () => {
 
       const result = await executeActions(actions, {});
 
-      expect(result.success).toBe(true);
       expect(result.written).toHaveLength(1);
 
       // Verify the deep file exists
@@ -86,7 +82,6 @@ describe("executeActions - integration tests", () => {
 
       const result = await executeActions(actions, { dryRun: true });
 
-      expect(result.success).toBe(true);
       expect(result.written).toHaveLength(1);
 
       // Verify nothing was actually created

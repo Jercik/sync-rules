@@ -1,7 +1,7 @@
 import { z } from "zod";
-import isPathInside from "is-path-inside";
-import stripJsonComments from "strip-json-comments";
+import { relative } from "node:path";
 import { normalizePath } from "../utils/paths.js";
+import { DEFAULT_RULES_SOURCE } from "./constants.js";
 
 /**
  * AdapterName enum - supported AI coding assistant tools
@@ -33,7 +33,12 @@ export const Project = z
           return z.NEVER;
         }
       }),
-    rules: z.array(z.string()).nonempty("At least one rule must be specified"),
+    rules: z
+      .array(z.string())
+      .nonempty("At least one rule must be specified")
+      .describe(
+        "POSIX-style glob patterns for selecting rule files. Use forward slashes even on Windows.",
+      ),
     adapters: z.array(AdapterName).nonempty(),
   })
   .strict(); // Reject unknown properties
@@ -43,16 +48,25 @@ export const Project = z
  */
 export const Config = z
   .object({
-    // $schema intentionally omitted to avoid dangling/placeholder schema URLs
     rulesSource: z
       .string()
       .optional()
-      .describe("Path to the central rules directory"),
+      .transform((v, ctx) => {
+        try {
+          return normalizePath(v ?? DEFAULT_RULES_SOURCE);
+        } catch {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid rulesSource path" });
+          return z.NEVER;
+        }
+      })
+      .describe(
+        "Path to the central rules directory. If not specified, defaults to system app data folder.",
+      ),
     projects: z
       .array(Project)
       .nonempty("At least one project must be specified"),
   })
-  .strict(); // Add strict to reject unknown root properties
+  .strict(); // Reject unknown properties
 
 /**
  * Inferred types from Zod schemas
@@ -63,14 +77,12 @@ export type Config = z.infer<typeof Config>;
 
 /**
  * Parses and validates a JSON configuration string
- * @param jsonContent - The JSON string to parse (supports JSON with comments)
+ * @param jsonContent - The JSON string to parse
  * @returns The validated configuration object
  * @throws ZodError for validation issues
  */
 export function parseConfig(jsonContent: string): Config {
-  // Strip comments before parsing to support JSONC format
-  const cleanJson = stripJsonComments(jsonContent);
-  const data = JSON.parse(cleanJson);
+  const data = JSON.parse(jsonContent);
   const result = Config.safeParse(data);
   if (!result.success) throw result.error;
   return result.data;
@@ -90,14 +102,10 @@ export function findProjectForPath(
   // Find all matching projects with proper boundary checking
   const matches = config.projects.filter((project) => {
     // project.path is already normalized by Zod schema
-    // Exact match
-    if (normalizedTarget === project.path) {
-      return true;
-    }
-
-    // Check if target is inside project using is-path-inside
-    // This correctly handles path boundaries and avoids /app matching /app-data
-    return isPathInside(normalizedTarget, project.path);
+    // Check if target is inside project (or is the project root itself)
+    const rel = relative(project.path, normalizedTarget);
+    // Empty string means same path, otherwise check that it doesn't escape
+    return rel === "" || (!rel.startsWith("..") && !rel.startsWith("/"));
   });
 
   if (matches.length === 0) {

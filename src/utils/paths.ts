@@ -1,17 +1,13 @@
 import { homedir } from "node:os";
-import { resolve, basename } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 
 /**
  * Normalize a path by expanding `~` and resolving to an absolute path.
  * No boundary or permission checks are performed here.
- * Use PathGuard at execution time to enforce allowed roots.
  * @param input - The path to normalize (supports ~ for home directory)
  * @returns The normalized absolute path
  */
 export function normalizePath(input: string): string {
-  if (!input || input.trim() === "") {
-    return resolve(input || ".");
-  }
   const expanded = input.startsWith("~")
     ? input.replace(/^~/, homedir())
     : input;
@@ -19,13 +15,15 @@ export function normalizePath(input: string): string {
 }
 
 /**
- * Checks if a file is a valid markdown file
- * @param path - The file path to check
- * @returns true if valid markdown file, false otherwise
+ * Resolve a relative path inside a base directory, rejecting escapes.
+ * - Rejects absolute input paths explicitly (e.g. "/etc/passwd").
+ * - Uses path.resolve + path.relative to ensure the final path stays within baseDir.
  */
-export function isValidMdFile(path: string): boolean {
-  // Use basename to handle edge cases like /directory/.md correctly
-  const filename = basename(path).toLowerCase();
-  // Check markdown extension and ensure it has a filename before .md
-  return filename.endsWith(".md") && filename !== ".md";
+export function resolveInside(baseDir: string, relPath: string): string {
+  const full = resolve(baseDir, relPath);
+  const rel = relative(baseDir, full);
+  if (rel.startsWith("..") || isAbsolute(relPath)) {
+    throw new Error(`Refusing to write outside ${baseDir}: ${relPath}`);
+  }
+  return full;
 }

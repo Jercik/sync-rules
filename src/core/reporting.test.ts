@@ -1,12 +1,39 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { printProjectReport } from "./reporting.js";
 import type { ProjectReport } from "./reporting.js";
+import { rootLogger as logger } from "../utils/log.js";
+
+vi.mock("../utils/log.js", () => {
+  const child = {
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    level: "info",
+    isLevelEnabled: (lvl: string) => {
+      const order: Record<string, number> = {
+        trace: 10,
+        debug: 20,
+        info: 30,
+        warn: 40,
+        error: 50,
+        fatal: 60,
+        silent: Infinity,
+      };
+      const current = order[(child as any).level] ?? 30;
+      const target = order[lvl] ?? 30;
+      return current <= target;
+    },
+  };
+  return {
+    getLogger: vi.fn(() => child),
+    rootLogger: child,
+  };
+});
 
 describe("printProjectReport", () => {
-  let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
-    consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -18,9 +45,7 @@ describe("printProjectReport", () => {
       {
         projectPath: "/tmp/project1",
         report: {
-          success: true,
           written: ["/tmp/project1/file.md"],
-          errors: [],
         },
       },
     ];
@@ -28,9 +53,9 @@ describe("printProjectReport", () => {
     const result = printProjectReport(reports);
 
     expect(result).toBe(true);
-    expect(consoleLogSpy).toHaveBeenCalledOnce();
+    expect(logger.info).toHaveBeenCalled();
 
-    const output = consoleLogSpy.mock.calls[0][0];
+    const output = (logger.info as any).mock.calls[0][0];
     expect(output).toContain("📋 Sync Rules Report");
     expect(output).toContain("Project: /tmp/project1");
     expect(output).toContain("✓ Success");
@@ -42,23 +67,22 @@ describe("printProjectReport", () => {
       {
         projectPath: "/tmp/project1",
         report: {
-          success: false,
           written: [],
-          errors: [new Error("Test error"), new Error("Another error")],
         },
+        failed: true,
+        error: new Error("Test error"),
       },
     ];
 
     const result = printProjectReport(reports);
 
     expect(result).toBe(false);
-    expect(consoleLogSpy).toHaveBeenCalledOnce();
+    expect(logger.info).toHaveBeenCalled();
 
-    const output = consoleLogSpy.mock.calls[0][0];
+    const output = (logger.info as any).mock.calls[0][0];
     expect(output).toContain("✗ Failed");
-    expect(output).toContain("⚠️  Errors:");
+    expect(output).toContain("⚠️  Error:");
     expect(output).toContain("Test error");
-    expect(output).toContain("Another error");
   });
 
   it("should show written change type only", () => {
@@ -66,9 +90,7 @@ describe("printProjectReport", () => {
       {
         projectPath: "/tmp/project1",
         report: {
-          success: true,
           written: ["/tmp/file1.md", "/tmp/file2.md"],
-          errors: [],
         },
       },
     ];
@@ -77,31 +99,29 @@ describe("printProjectReport", () => {
 
     expect(result).toBe(true);
 
-    const output = consoleLogSpy.mock.calls[0][0];
+    const output = (logger.info as any).mock.calls[0][0];
     expect(output).toContain("📝 Written: 2 files");
-    expect(output).not.toContain("📋 Copied:");
-    expect(output).not.toContain("📁 Created:");
   });
 
-  it("should show file paths in verbose mode", () => {
+  it("should show file paths in debug mode", () => {
     const reports: ProjectReport[] = [
       {
         projectPath: "/tmp/project1",
         report: {
-          success: true,
           written: ["/tmp/file1.md", "/tmp/file2.md"],
-          errors: [],
         },
       },
     ];
 
-    printProjectReport(reports, { verbose: true });
+    // Set debug log level on the mocked logger
+    (logger as any).level = "debug";
+    printProjectReport(reports);
 
-    const output = consoleLogSpy.mock.calls[0][0];
+    const output = (logger.info as any).mock.calls[0][0];
     expect(output).toContain("- /tmp/file1.md");
+    // Clean up
+    (logger as any).level = "info";
     expect(output).toContain("- /tmp/file2.md");
-    expect(output).not.toContain("Copied:");
-    expect(output).not.toContain("Created:");
   });
 
   it("should show dry-run message when in dry-run mode", () => {
@@ -109,16 +129,14 @@ describe("printProjectReport", () => {
       {
         projectPath: "/tmp/project1",
         report: {
-          success: true,
           written: [],
-          errors: [],
         },
       },
     ];
 
     printProjectReport(reports, { dryRun: true });
 
-    const output = consoleLogSpy.mock.calls[0][0];
+    const output = (logger.info as any).mock.calls[0][0];
     expect(output).toContain("🔍 Dry-run mode: No changes were applied");
   });
 
@@ -127,18 +145,16 @@ describe("printProjectReport", () => {
       {
         projectPath: "/tmp/project1",
         report: {
-          success: true,
           written: ["/tmp/p1/file.md"],
-          errors: [],
         },
       },
       {
         projectPath: "/tmp/project2",
         report: {
-          success: false,
           written: [],
-          errors: [new Error("Failed")],
         },
+        failed: true,
+        error: new Error("Failed"),
       },
     ];
 
@@ -146,7 +162,7 @@ describe("printProjectReport", () => {
 
     expect(result).toBe(false); // One project failed
 
-    const output = consoleLogSpy.mock.calls[0][0];
+    const output = (logger.info as any).mock.calls[0][0];
     expect(output).toContain("Project: /tmp/project1");
     expect(output).toContain("✓ Success");
     expect(output).toContain("Project: /tmp/project2");
@@ -158,20 +174,16 @@ describe("printProjectReport", () => {
       {
         projectPath: "/tmp/project1",
         report: {
-          success: true,
           written: [],
-          errors: [],
         },
       },
     ];
 
     printProjectReport(reports);
 
-    const output = consoleLogSpy.mock.calls[0][0];
+    const output = (logger.info as any).mock.calls[0][0];
     expect(output).toContain("✓ Success");
-    // Should not contain any of the change indicators
+    // Should not contain change indicator when no files written
     expect(output).not.toContain("📝 Written:");
-    expect(output).not.toContain("📋 Copied:");
-    expect(output).not.toContain("📁 Created:");
   });
 });

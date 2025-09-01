@@ -6,7 +6,7 @@ import eslintConfigPrettier from "eslint-config-prettier/flat";
 import vitest from "@vitest/eslint-plugin";
 
 export default defineConfig([
-  globalIgnores(["coverage/*"]),
+  globalIgnores(["coverage/*", "dist/*"]),
   {
     files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
     plugins: { js },

@@ -16,12 +16,11 @@ vi.mock("../utils/paths.ts", async () => {
   return {
     ...actual,
     normalizePath: (path: string) => {
-      // Simple normalization for tests without PathGuard validation
+      // Simple normalization for tests
       let normalized = path;
       if (path.startsWith("~")) {
         normalized = path.replace("~", "/home/user");
       }
-      // Remove trailing slash if not root
       if (normalized.endsWith("/") && normalized.length > 1) {
         normalized = normalized.slice(0, -1);
       }
@@ -35,6 +34,7 @@ describe("config", () => {
     describe("valid configurations", () => {
       it("should parse a basic valid config with single project", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: [
             {
               path: "~/Developer/project",
@@ -54,6 +54,7 @@ describe("config", () => {
 
       it("should parse config with multiple projects and adapters", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: [
             {
               path: "./backend",
@@ -74,24 +75,9 @@ describe("config", () => {
         expect(config.projects[1].rules).toEqual(["frontend/**/*.md"]);
       });
 
-      // $schema support removed intentionally; configs with $schema should be rejected
-      it("should reject config containing $schema property", () => {
-        const json = JSON.stringify({
-          $schema: "https://placeholder/schema.json",
-          projects: [
-            {
-              path: "~/Developer/my-project",
-              rules: ["*.md"],
-              adapters: ["claude"],
-            },
-          ],
-        });
-
-        expect(() => parseConfig(json)).toThrow(z.ZodError);
-      });
-
       it("should handle all adapter types", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: [
             {
               path: "./project",
@@ -113,6 +99,7 @@ describe("config", () => {
 
       it("should handle glob patterns in rules", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: [
             {
               path: "./project",
@@ -128,6 +115,26 @@ describe("config", () => {
           "frontend/**",
           "!test/**",
         ]);
+      });
+
+      it("should parse config without rulesSource (using default)", () => {
+        const json = JSON.stringify({
+          projects: [
+            {
+              path: "~/Developer/project",
+              rules: ["test.md"],
+              adapters: ["claude"],
+            },
+          ],
+        });
+        const config = parseConfig(json);
+        // Should default to a normalized absolute path in app data
+        expect(typeof config.rulesSource).toBe("string");
+        expect(config.rulesSource).toMatch(/sync-rules(-nodejs)?[/\\]rules$/);
+        expect(config.projects).toHaveLength(1);
+        expect(config.projects[0].path).toMatch(/\//);
+        expect(config.projects[0].rules).toEqual(["test.md"]);
+        expect(config.projects[0].adapters).toEqual(["claude"]);
       });
     });
 
@@ -146,14 +153,15 @@ describe("config", () => {
           parseConfig(json);
         } catch (error) {
           const zodError = error as z.ZodError;
-          expect(zodError.issues).toHaveLength(1);
-          expect(zodError.issues[0].path).toEqual(["projects"]);
-          expect(zodError.issues[0].code).toBe("invalid_type");
+          expect(zodError.issues).toHaveLength(1); // Only projects is missing
+          const paths = zodError.issues.map((issue) => issue.path[0]);
+          expect(paths).toContain("projects");
         }
       });
 
       it("should throw on non-array projects", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: "not an array",
         });
         expect(() => parseConfig(json)).toThrow(z.ZodError);
@@ -161,6 +169,7 @@ describe("config", () => {
 
       it("should throw on empty projects array", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: [],
         });
 
@@ -183,6 +192,7 @@ describe("config", () => {
         expect(() =>
           parseConfig(
             JSON.stringify({
+              rulesSource: "/path/to/rules",
               projects: [{ rules: ["test.md"], adapters: ["claude"] }],
             }),
           ),
@@ -192,6 +202,7 @@ describe("config", () => {
         expect(() =>
           parseConfig(
             JSON.stringify({
+              rulesSource: "/path/to/rules",
               projects: [{ path: "./test", adapters: ["claude"] }],
             }),
           ),
@@ -201,6 +212,7 @@ describe("config", () => {
         expect(() =>
           parseConfig(
             JSON.stringify({
+              rulesSource: "/path/to/rules",
               projects: [{ path: "./test", rules: ["test.md"] }],
             }),
           ),
@@ -212,6 +224,7 @@ describe("config", () => {
         expect(() =>
           parseConfig(
             JSON.stringify({
+              rulesSource: "/path/to/rules",
               projects: [
                 { path: "", rules: ["test.md"], adapters: ["claude"] },
               ],
@@ -288,6 +301,7 @@ describe("config", () => {
 
       it("should throw on extra unknown properties", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: [
             {
               path: "./test",
@@ -330,6 +344,7 @@ describe("config", () => {
 
       it("should provide helpful error messages for nested errors", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: [
             {
               path: "./valid",
@@ -349,6 +364,7 @@ describe("config", () => {
 
       it("should handle multiple validation errors in a single project", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: [
             {
               path: "",
@@ -371,6 +387,7 @@ describe("config", () => {
 
       it("should handle multiple validation errors across different projects", () => {
         const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
           projects: [
             {
               path: "./valid1",
@@ -438,7 +455,10 @@ describe("config", () => {
           adapters: ["claude"],
         }));
 
-        const json = JSON.stringify({ projects });
+        const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
+          projects,
+        });
         const config = parseConfig(json);
         expect(config.projects).toHaveLength(100);
       });
@@ -447,6 +467,7 @@ describe("config", () => {
 
   describe("findProjectForPath", () => {
     const mockConfig: Config = {
+      rulesSource: "/path/to/rules",
       projects: [
         {
           path: "/home/user/projects/web-app",
@@ -544,6 +565,7 @@ describe("config", () => {
       // This would be normalized by normalizePath before being passed to findProjectForPath
       const normalizedPath = "/home/user/projects/my-app";
       const normalizedConfig: Config = {
+        rulesSource: "/path/to/rules",
         projects: [
           {
             path: normalizedPath,
@@ -563,6 +585,7 @@ describe("config", () => {
 
     it("should handle multiple matches and return most specific", () => {
       const complexConfig: Config = {
+        rulesSource: "/path/to/rules",
         projects: [
           {
             path: "/app",
@@ -603,6 +626,7 @@ describe("config", () => {
 
     it("should load and parse valid config successfully", async () => {
       const configContent = JSON.stringify({
+        rulesSource: "/path/to/rules",
         projects: [
           {
             path: "/home/user/project",
@@ -622,8 +646,7 @@ describe("config", () => {
     });
 
     it("should throw ConfigNotFoundError for missing default config", async () => {
-      const error = new Error("ENOENT") as NodeJS.ErrnoException;
-      error.code = "ENOENT";
+      const error = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       vi.mocked(fs.readFile).mockRejectedValue(error);
 
       const { DEFAULT_CONFIG_PATH } = await import("./constants.ts");
@@ -639,8 +662,7 @@ describe("config", () => {
     });
 
     it("should throw ConfigNotFoundError for missing non-default config", async () => {
-      const error = new Error("ENOENT") as NodeJS.ErrnoException;
-      error.code = "ENOENT";
+      const error = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
       vi.mocked(fs.readFile).mockRejectedValue(error);
 
       await expect(loadConfig("/custom/config.json")).rejects.toThrow(
@@ -666,8 +688,7 @@ describe("config", () => {
     });
 
     it("should throw ConfigParseError for permission errors", async () => {
-      const error = new Error("EACCES") as NodeJS.ErrnoException;
-      error.code = "EACCES";
+      const error = Object.assign(new Error("EACCES"), { code: "EACCES" });
       vi.mocked(fs.readFile).mockRejectedValue(error);
 
       await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
@@ -681,6 +702,7 @@ describe("config", () => {
 
     it("should throw ConfigParseError for Zod validation errors", async () => {
       const invalidConfig = JSON.stringify({
+        rulesSource: "/path/to/rules",
         projects: [], // Empty projects array
       });
 
@@ -693,6 +715,7 @@ describe("config", () => {
 
     it("should normalize config paths", async () => {
       const configContent = JSON.stringify({
+        rulesSource: "/path/to/rules",
         projects: [
           {
             path: "~/project",

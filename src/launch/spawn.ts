@@ -1,6 +1,6 @@
-import { execa, type ExecaError } from "execa";
+import { execa, ExecaError } from "execa";
 import { SpawnError } from "../utils/errors.js";
-import { logger } from "../utils/pino-logger.js";
+import { getLogger } from "../utils/log.js";
 
 /**
  * Spawns a child process using execa.
@@ -15,37 +15,37 @@ export async function spawnProcess(
   cmd: string,
   args: string[],
 ): Promise<number> {
-  logger.debug({ args }, `Attempting to spawn process: ${cmd}`);
+  const logger = getLogger("launch:spawn");
+  logger.debug(
+    { evt: "spawn.start", args, cmd },
+    `Attempting to spawn process: ${cmd}`,
+  );
 
   try {
-    const result = await execa(cmd, args, {
-      stdio: "inherit",
-    });
-
-    const exitCode = result.exitCode ?? 0;
-    logger.debug(`Process ${cmd} completed with exit code ${exitCode}`);
-    return exitCode;
+    const { exitCode } = await execa(cmd, args, { stdio: "inherit" });
+    const code = exitCode ?? 0;
+    logger.debug({ evt: "spawn.done", cmd, exitCode: code }, `Process ${cmd} completed`);
+    return code;
   } catch (error) {
-    // execa rejects on non-zero exit and throws an ExecaError
-    const execaError = error as ExecaError;
-
+    if (error instanceof ExecaError) {
+      logger.error(
+        {
+          evt: "spawn.error",
+          cmd,
+          code: error.code,
+          exitCode: error.exitCode,
+          message: error.message,
+          stderr: error.stderr,
+        },
+        `Failed to spawn process: ${cmd}`,
+      );
+      throw new SpawnError(cmd, error.code, error.exitCode, error.message, error);
+    }
+    const unknown = error instanceof Error ? error : new Error(String(error));
     logger.error(
-      {
-        code: execaError.code,
-        exitCode: execaError.exitCode,
-        message: execaError.message,
-        signal: execaError.signal,
-        signalDescription: execaError.signalDescription,
-      },
+      { evt: "spawn.error", cmd, message: unknown.message },
       `Failed to spawn process: ${cmd}`,
     );
-
-    throw new SpawnError(
-      cmd,
-      execaError.code,
-      execaError.exitCode,
-      execaError.message,
-      execaError,
-    );
+    throw new SpawnError(cmd, undefined, undefined, unknown.message, unknown);
   }
 }

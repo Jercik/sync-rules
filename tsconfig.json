@@ -9,8 +9,6 @@
     "moduleDetection": "force",
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    /* Erasable syntax only */
-    "erasableSyntaxOnly": true,
     /* Strictness */
     "strict": true,
     "noUncheckedIndexedAccess": true,

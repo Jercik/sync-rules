@@ -1,14 +1,53 @@
+import type { RunFlags } from "./execution.js";
+import { getLogger } from "../utils/log.js";
 import type { ExecutionReport } from "./execution.js";
-import chalk from "chalk";
+
+export type ReportOptions = Partial<RunFlags>;
 
 export interface ProjectReport {
   projectPath: string;
   report: ExecutionReport;
+  failed?: boolean;
+  error?: Error;
 }
 
-export interface ReportOptions {
-  verbose?: boolean;
-  dryRun?: boolean;
+/**
+ * Formats a single project report
+ */
+function formatProjectReport(
+  project: ProjectReport,
+  _options: ReportOptions,
+  showFilePaths: boolean,
+): string[] {
+  const out: string[] = [];
+  const { projectPath, report, failed, error } = project;
+
+  out.push(`Project: ${projectPath}`);
+
+  if (failed) {
+    out.push(`✗ Failed`);
+  } else {
+    out.push(`✓ Success`);
+  }
+
+  if (report.written.length > 0) {
+    const fileCount = report.written.length;
+    out.push(
+      `  📝 Written: ${fileCount} ${fileCount === 1 ? "file" : "files"}`,
+    );
+    // Show file paths when debug-level logging is enabled
+    if (showFilePaths) {
+      report.written.forEach((file) => out.push(`     - ${file}`));
+    }
+  }
+
+  if (error) {
+    out.push(`  ⚠️  Error:`);
+    out.push(`     - ${error.message}`);
+  }
+
+  out.push(""); // Empty line between projects
+  return out;
 }
 
 /**
@@ -19,53 +58,24 @@ export function printProjectReport(
   projectReports: ProjectReport[],
   options: ReportOptions = {},
 ): boolean {
+  const logger = getLogger("core:reporting");
+  const showFilePaths = logger.isLevelEnabled("debug");
   let hasErrors = false;
-  const lines: string[] = [];
+  const buf: string[] = [];
 
-  // Header
-  lines.push("\n📋 Sync Rules Report");
-  lines.push("===================\n");
+  buf.push("\n📋 Sync Rules Report");
+  buf.push("===================\n");
 
-  // Project reports
-  for (const { projectPath, report } of projectReports) {
-    lines.push(chalk.bold(`Project: ${projectPath}`));
-
-    if (report.success) {
-      lines.push(`${chalk.green("✓")} Success`);
-    } else {
-      lines.push(`${chalk.red("✗")} Failed`);
-      hasErrors = true;
-    }
-
-    // Print changes
-    if (report.written.length > 0) {
-      const fileCount = report.written.length;
-      lines.push(
-        `  📝 Written: ${fileCount} ${fileCount === 1 ? "file" : "files"}`,
-      );
-      if (options.verbose) {
-        report.written.forEach((file) => lines.push(`     - ${file}`));
-      }
-    }
-
-    // Only 'write' changes are reported
-
-    // Print errors
-    if (report.errors && report.errors.length > 0) {
-      lines.push(`  ${chalk.red("⚠️  Errors:")}`);
-      report.errors.forEach((error) => lines.push(`     - ${error.message}`));
-    }
-
-    lines.push(""); // Empty line between projects
+  for (const project of projectReports) {
+    if (project.failed) hasErrors = true;
+    buf.push(...formatProjectReport(project, options, showFilePaths));
   }
 
-  // Summary
   if (options.dryRun) {
-    lines.push(chalk.yellow("🔍 Dry-run mode: No changes were applied"));
+    buf.push("🔍 Dry-run mode: No changes were applied");
   }
 
-  // Print all lines at once
-  console.log(lines.join("\n").trimEnd());
+  logger.info(buf.join("\n").trimEnd());
 
   return !hasErrors;
 }

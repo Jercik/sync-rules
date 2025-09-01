@@ -7,7 +7,6 @@ export function testTmpRoot(): string {
   return process.env.TEST_TMPDIR || tmpdir();
 }
 
-// Create a unique temp directory with a clear prefix under the test tmp root
 export async function makeTempDir(
   prefix = "sync-rules-test-",
 ): Promise<string> {

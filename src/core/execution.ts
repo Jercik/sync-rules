@@ -1,80 +1,65 @@
-import { outputFile } from "fs-extra";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { normalizePath } from "../utils/paths.js";
-import { logMessage } from "../utils/logger.js";
-import type { PathGuard } from "./path-guard.js";
-import type { WriteAction } from "../utils/content.js";
 import { SyncError, ensureError } from "../utils/errors.js";
-import { logger } from "../utils/pino-logger.js";
+import { getLogger } from "../utils/log.js";
+export type RunFlags = {
+  dryRun: boolean;
+};
+export type WriteAction = {
+  readonly path: string;
+  readonly content: string;
+};
 
 export interface ExecutionReport {
-  success: boolean;
   written: string[];
-  errors: Error[];
 }
 
 export async function executeActions(
   actions: WriteAction[],
-  opts: { dryRun?: boolean; verbose?: boolean; pathGuard?: PathGuard } = {},
+  flags: RunFlags = { dryRun: false },
 ): Promise<ExecutionReport> {
-  const { dryRun = false, verbose = false, pathGuard } = opts;
+  const logger = getLogger("core:execution");
+  const { dryRun } = flags;
   const report: ExecutionReport = {
-    success: true,
     written: [],
-    errors: [],
   };
 
   if (actions.length === 0) {
-    logger.debug("No actions to execute");
+    logger.debug({ evt: "exec.noop" }, "No actions to execute");
     return report;
   }
 
-  logger.debug({ dryRun }, `Executing ${actions.length} actions`);
+  logger.debug(
+    { evt: "exec.start", dryRun, actionCount: actions.length },
+    "Start execution",
+  );
 
-  // Normalize all paths upfront to ensure uniformity
-  const normalizedActions = actions.map((action) => ({
-    ...action,
-    path: pathGuard
-      ? pathGuard.validatePath(action.path)
-      : normalizePath(action.path),
+  const normalized = actions.map((a) => ({
+    ...a,
+    path: normalizePath(a.path),
+    len: a.content.length,
   }));
 
-  // Execute actions directly - fs-extra handles directory creation automatically
-  for (const action of normalizedActions) {
+  for (const { path, len, content } of normalized) {
+    if (dryRun) {
+      logger.debug({ evt: "write.preview", path, len });
+      report.written.push(path);
+      continue;
+    }
     try {
-      if (dryRun) {
-        logMessage(`[Dry-run] [Write] ${action.path}`, verbose);
-      }
-
-      if (!dryRun) {
-        logMessage(`Writing to: ${action.path}`, verbose);
-        logger.debug(
-          {
-            contentLength: action.content.length,
-          },
-          `Writing file: ${action.path}`,
-        );
-        await outputFile(action.path, action.content, "utf8");
-        logger.debug(`Successfully wrote file: ${action.path}`);
-      }
-      report.written.push(action.path);
+      logger.debug({ evt: "write.start", path, len });
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, content, "utf8");
+      logger.debug({ evt: "write.ok", path });
+      report.written.push(path);
     } catch (err) {
-      logger.error(err, `Failed to write file: ${action.path}`);
-
-      // Wrap with err to provide context
-      const error = new SyncError(
-        `Failed to write ${action.path}`,
-        {
-          action: "write",
-          path: action.path,
-        },
+      logger.error({ err, path }, "write.fail");
+      throw new SyncError(
+        `Failed to write ${path}`,
+        { action: "write", path },
         ensureError(err),
       );
-
-      if (!dryRun) throw error; // fail fast
-
-      // Only reachable in dry-run mode
-      report.errors.push(error);
-      report.success = false;
     }
   }
 

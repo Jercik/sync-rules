@@ -1,30 +1,28 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { Rule } from "../core/rules-fs.js";
-import type { WriteAction } from "../utils/content.js";
+import type { WriteAction } from "../core/execution.js";
+import { resolveInside } from "../utils/paths.js";
 
-/**
- * Input structure for adapter functions
- */
 export type AdapterInput = {
   readonly projectPath: string;
   readonly rules: readonly Rule[];
 };
 
-/**
- * Function signature for adapters
- */
 export type AdapterFunction = (input: AdapterInput) => WriteAction[];
 
 /**
  * Metadata describing adapter output characteristics
  */
+export type SingleFileMeta = {
+  type: "single-file";
+  location: string;
+  title?: string;
+};
+
 export type AdapterMetadata =
-  | { type: "single-file"; location: string }
+  | SingleFileMeta
   | { type: "multi-file"; directory: string };
 
-/**
- * Complete adapter definition including function and metadata
- */
 export type AdapterDefinition = {
   planWrites: AdapterFunction;
   meta: AdapterMetadata;
@@ -33,30 +31,23 @@ export type AdapterDefinition = {
 /**
  * Creates an adapter function from metadata and optional configuration
  */
-export function adapterFromMeta(
-  meta: AdapterMetadata,
-  opts?: {
-    headerTitle?: string;
-    filter?: (rules: readonly Rule[]) => Rule[];
-  },
-): AdapterFunction {
-  return ({ projectPath, rules }) => {
-    const selected = opts?.filter ? opts.filter(rules) : [...rules];
-
-    if (meta.type === "single-file") {
-      const title = opts?.headerTitle ?? meta.location;
-      const content = selected.length
-        ? `# ${title}\n\nTo modify rules, edit the source ".md" files and run "sync-rules" to regenerate.\n\n` +
-          selected.map((r) => r.content.trim()).join("\n\n---\n\n") +
-          "\n"
-        : `# ${title}\n\nNo rules configured.\n`;
-      return [{ path: join(projectPath, meta.location), content }];
-    }
-
-    // multi-file
-    return selected.map((r) => ({
-      path: join(projectPath, meta.directory, r.path),
-      content: r.content,
-    }));
-  };
+export function createAdapter(meta: AdapterMetadata): AdapterFunction {
+  return ({ projectPath, rules }) =>
+    meta.type === "single-file"
+      ? [
+          {
+            path: join(projectPath, meta.location),
+            content:
+              `# ${meta.title ?? meta.location}\n\n` +
+              (rules.length
+                ? 'To modify rules, edit the source ".md" files and run "sync-rules".\n\n' +
+                  rules.map((r) => r.content.trim()).join("\n\n---\n\n") +
+                  "\n"
+                : "No rules configured.\n"),
+          },
+        ]
+      : rules.map((r) => ({
+          path: resolveInside(resolve(projectPath, meta.directory), r.path),
+          content: r.content,
+        }));
 }

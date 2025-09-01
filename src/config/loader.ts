@@ -2,12 +2,12 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { parseConfig } from "./config.js";
 import { normalizePath } from "../utils/paths.js";
-import { isNodeError } from "../utils/logger.js";
 import { DEFAULT_CONFIG_PATH } from "./constants.js";
 import {
   ConfigNotFoundError,
   ConfigParseError,
   ensureError,
+  isNodeError,
 } from "../utils/errors.js";
 import type { Config } from "./config.js";
 
@@ -15,8 +15,6 @@ import type { Config } from "./config.js";
  * Sample configuration template for new installations
  */
 const SAMPLE_CONFIG = `{
-  // Optional: Specify a custom path for the central rules directory
-  // "rulesSource": "~/.sync-rules/rules",
   "projects": [
     {
       "path": "/path/to/project",
@@ -37,10 +35,8 @@ export async function createSampleConfig(configPath: string): Promise<void> {
   const configDir = dirname(normalizedPath);
 
   try {
-    // Ensure the directory exists
     await mkdir(configDir, { recursive: true });
 
-    // Write the sample config (already formatted as JSON string with comments)
     await writeFile(normalizedPath, SAMPLE_CONFIG, "utf8");
   } catch (error) {
     throw new Error(
@@ -65,7 +61,6 @@ export async function loadConfig(configPath: string): Promise<Config> {
     const configContent = await readFile(normalizedPath, "utf8");
     return parseConfig(configContent);
   } catch (error) {
-    // Handle file not found
     if (isNodeError(error) && error.code === "ENOENT") {
       const isDefault = normalizedPath === normalizePath(DEFAULT_CONFIG_PATH);
       throw new ConfigNotFoundError(normalizedPath, isDefault);

@@ -1,28 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { executeActions } from "./execution.js";
-import type { WriteAction } from "../utils/content.js";
-import * as fsExtra from "fs-extra";
+import type { WriteAction } from "./execution.js";
+import * as fsPromises from "node:fs/promises";
 
 describe("executeActions", () => {
   describe("basic functionality", () => {
-    it("should return success: true for empty actions array", async () => {
-      const result = await executeActions([], {});
+    it("should return empty written array for empty actions array", async () => {
+      const result = await executeActions([]);
 
       expect(result).toEqual({
-        success: true,
         written: [],
-        errors: [],
       });
     });
   });
 });
 
-// Mock fs-extra
-vi.mock("fs-extra", () => ({
-  outputFile: vi.fn(),
+vi.mock("node:fs/promises", () => ({
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
 }));
 
-// Mock utils
 vi.mock("../utils/paths.ts", async () => {
   const actual =
     await vi.importActual<typeof import("../utils/paths.ts")>(
@@ -34,14 +31,19 @@ vi.mock("../utils/paths.ts", async () => {
   };
 });
 
-vi.mock("../utils/logger.ts", async () => {
+vi.mock("../utils/log.ts", async () => {
   const actual =
-    await vi.importActual<typeof import("../utils/logger.ts")>(
-      "../utils/logger.ts",
-    );
+    await vi.importActual<typeof import("../utils/log.ts")>("../utils/log.ts");
+  const child = {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
   return {
     ...actual,
-    logMessage: vi.fn(),
+    getLogger: vi.fn(() => child),
+    rootLogger: child,
   };
 });
 
@@ -56,39 +58,45 @@ describe("executeActions - algorithm tests", () => {
         { path: "/test/file.txt", content: "Hello" },
       ];
 
-      const result = await executeActions(actions, { dryRun: true });
+      const result = await executeActions(actions, {
+        dryRun: true,
+      });
 
-      expect(result.success).toBe(true);
       expect(result.written).toContain("/test/file.txt");
 
       // Verify no actual FS operations were called
-      expect(fsExtra.outputFile).not.toHaveBeenCalled();
+      expect(fsPromises.mkdir).not.toHaveBeenCalled();
+      expect(fsPromises.writeFile).not.toHaveBeenCalled();
     });
 
-    it("should log previews in verbose dry-run mode", async () => {
-      const { logMessage } = await import("../utils/logger.ts");
+    it("should log previews in dry-run mode", async () => {
+      const { rootLogger: logger } = await import("../utils/log.ts");
       const actions: WriteAction[] = [
         { path: "/test/file.txt", content: "Hello" },
       ];
 
-      await executeActions(actions, { dryRun: true, verbose: true });
+      await executeActions(actions, { dryRun: true });
 
-      expect(logMessage).toHaveBeenCalledWith(
-        "[Dry-run] [Write] /test/file.txt",
-        true,
-      );
+      expect(logger.debug).toHaveBeenCalledWith({
+        evt: "write.preview",
+        path: "/test/file.txt",
+        len: 5,
+      });
     });
   });
 
   describe("action execution", () => {
-    it("should execute write actions using fs-extra", async () => {
+    it("should execute write actions using fs/promises", async () => {
       const actions: WriteAction[] = [
         { path: "/test/file.txt", content: "Hello" },
       ];
 
       await executeActions(actions, { dryRun: false });
 
-      expect(fsExtra.outputFile).toHaveBeenCalledWith(
+      expect(fsPromises.mkdir).toHaveBeenCalledWith("/test", {
+        recursive: true,
+      });
+      expect(fsPromises.writeFile).toHaveBeenCalledWith(
         "/test/file.txt",
         "Hello",
         "utf8",
@@ -98,7 +106,7 @@ describe("executeActions - algorithm tests", () => {
 
   describe("error handling", () => {
     it("should fail fast on error", async () => {
-      vi.mocked(fsExtra.outputFile).mockRejectedValueOnce(
+      vi.mocked(fsPromises.writeFile).mockRejectedValueOnce(
         new Error("Write failed"),
       );
 
@@ -112,7 +120,7 @@ describe("executeActions - algorithm tests", () => {
     });
 
     it("should fail on first error in any group", async () => {
-      vi.mocked(fsExtra.outputFile).mockRejectedValueOnce(
+      vi.mocked(fsPromises.writeFile).mockRejectedValueOnce(
         new Error("Write failed"),
       );
 
@@ -126,7 +134,7 @@ describe("executeActions - algorithm tests", () => {
       );
 
       // Second write should not be attempted
-      expect(fsExtra.outputFile).toHaveBeenCalledTimes(1);
+      expect(fsPromises.writeFile).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -137,26 +145,28 @@ describe("executeActions - algorithm tests", () => {
         { path: "/test/file2.txt", content: "World" },
       ];
 
-      const result = await executeActions(actions, { dryRun: false });
+      const result = await executeActions(actions, {
+        dryRun: false,
+      });
 
-      expect(result.success).toBe(true);
       expect(result.written).toEqual(["/test/file1.txt", "/test/file2.txt"]);
     });
   });
 
-  describe("verbose logging", () => {
-    it("should log operations when verbose is true", async () => {
-      const { logMessage } = await import("../utils/logger.ts");
+  describe("debug logging", () => {
+    it("should log operations in debug mode", async () => {
+      const { rootLogger: logger } = await import("../utils/log.ts");
       const actions: WriteAction[] = [
         { path: "/test/file.txt", content: "Hello" },
       ];
 
-      await executeActions(actions, { dryRun: false, verbose: true });
+      await executeActions(actions, { dryRun: false });
 
-      expect(logMessage).toHaveBeenCalledWith(
-        "Writing to: /test/file.txt",
-        true,
-      );
+      expect(logger.debug).toHaveBeenCalledWith({
+        evt: "write.start",
+        path: "/test/file.txt",
+        len: 5,
+      });
     });
   });
 

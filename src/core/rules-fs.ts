@@ -1,12 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { globby } from "globby";
-import { normalizePath, isValidMdFile } from "../utils/paths.js";
+import { normalizePath } from "../utils/paths.js";
 import { ensureError } from "../utils/errors.js";
 
 /**
  * Finds all paths in the rules directory that match the given glob patterns.
  * Uses globby for efficient pattern matching with support for negation patterns.
+ *
+ * @returns A sorted array of matching file paths
+ * Note: Glob patterns must use POSIX-style slashes (/).
  */
 export async function globRulePaths(
   rulesDir: string,
@@ -17,33 +20,14 @@ export async function globRulePaths(
   // Filter out empty patterns to prevent glob errors
   const validPatterns = patterns.filter((p) => p && p.trim() !== "");
 
-  // Determine if there is at least one positive (non-negated) pattern
-  const hasPositive = validPatterns.some((p) => !p.trim().startsWith("!"));
-
-  // Default to all markdown files if no patterns provided
-  // If only negative patterns are provided, start from all markdown and apply exclusions
-  const patternsToUse =
-    validPatterns.length === 0
-      ? ["**/*.md"]
-      : hasPositive
-        ? validPatterns
-        : ["**/*.md", ...validPatterns];
-
-  const paths = await globby(patternsToUse, {
+  // globby naturally returns empty array for no matches or only negative patterns
+  const paths = await globby(validPatterns, {
     cwd: normalizedDir,
     unique: true,
     onlyFiles: true,
   });
 
   return paths.sort();
-}
-
-/**
- * Filters an array of relative paths to only include valid Markdown files.
- * Checks extension using isValidMdFile from utils.
- */
-export function filterValidMdPaths(paths: string[]): string[] {
-  return paths.filter((relPath) => isValidMdFile(relPath));
 }
 
 /**
@@ -60,6 +44,7 @@ export async function readRuleContents(
 
   const results = await Promise.all(
     relPaths.map(async (relPath) => {
+      // Use regular join for file system operations (not glob patterns)
       const fullPath = join(normalizedDir, relPath);
       try {
         const content = await readFile(fullPath, "utf8");
@@ -78,13 +63,12 @@ export async function readRuleContents(
 
 /**
  * Convenience function to load rules from the central repository
- * Combines globRulePaths, filterValidMdPaths, and readRuleContents
+ * Combines globRulePaths and readRuleContents
  */
-export async function loadRulesFromCentral(
+export async function loadRules(
   rulesDir: string,
   patterns: string[],
 ): Promise<Rule[]> {
   const rulePaths = await globRulePaths(rulesDir, patterns);
-  const validPaths = filterValidMdPaths(rulePaths);
-  return readRuleContents(rulesDir, validPaths);
+  return readRuleContents(rulesDir, rulePaths);
 }

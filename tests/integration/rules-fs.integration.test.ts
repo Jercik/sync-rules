@@ -2,11 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { makeTempDir, cleanupDir } from "../_helpers/test-utils";
-import {
-  globRulePaths,
-  filterValidMdPaths,
-  readRuleContents,
-} from "../../src/core/rules-fs.js";
+import { globRulePaths, readRuleContents } from "../../src/core/rules-fs.js";
 
 describe("filesystem operations", () => {
   let tempDir: string;
@@ -21,13 +17,11 @@ describe("filesystem operations", () => {
 
   describe("globRulePaths", () => {
     beforeEach(async () => {
-      // Create test file structure
       await mkdir(join(tempDir, "frontend"), { recursive: true });
       await mkdir(join(tempDir, "backend"), { recursive: true });
       await mkdir(join(tempDir, "test"), { recursive: true });
       await mkdir(join(tempDir, "deep", "nested"), { recursive: true });
 
-      // Create test files
       await writeFile(join(tempDir, "python.md"), "# Python rules");
       await writeFile(join(tempDir, "javascript.md"), "# JS rules");
       await writeFile(join(tempDir, "frontend", "react.md"), "# React rules");
@@ -99,33 +93,20 @@ describe("filesystem operations", () => {
       ]);
     });
 
-    it("should default to all markdown files when only negative patterns", async () => {
+    it("should return empty array when only negative patterns", async () => {
       const patterns = ["!test/**"];
       const result = await globRulePaths(tempDir, patterns);
 
-      expect(result).toEqual([
-        "backend/node.md",
-        "deep/nested/deep.md",
-        "frontend/react.md",
-        "frontend/vue.md",
-        "javascript.md",
-        "python.md",
-      ]);
+      // Users must be explicit: to exclude test files, use ["**/*.md", "!test/**"]
+      expect(result).toEqual([]);
     });
 
-    it("should handle empty patterns", async () => {
+    it("should return empty array when no patterns provided", async () => {
       const patterns: string[] = [];
       const result = await globRulePaths(tempDir, patterns);
 
-      expect(result).toEqual([
-        "backend/node.md",
-        "deep/nested/deep.md",
-        "frontend/react.md",
-        "frontend/vue.md",
-        "javascript.md",
-        "python.md",
-        "test/test-rule.md",
-      ]);
+      // No patterns means no files selected
+      expect(result).toEqual([]);
     });
 
     it("should handle non-existent directory gracefully", async () => {
@@ -159,68 +140,8 @@ describe("filesystem operations", () => {
     });
   });
 
-  describe("filterValidMdPaths", () => {
-    beforeEach(async () => {
-      await mkdir(join(tempDir, "subdir"), { recursive: true });
-
-      // Create valid markdown files
-      await writeFile(join(tempDir, "valid.md"), "# Valid markdown");
-      await writeFile(join(tempDir, "subdir", "nested.md"), "# Nested valid");
-
-      // Create invalid files
-      await writeFile(join(tempDir, "not-markdown.txt"), "Not markdown");
-      await writeFile(join(tempDir, "no-extension"), "No extension");
-      await writeFile(join(tempDir, "wrong.MD"), "Wrong case extension");
-    });
-
-    it("should filter to only valid markdown files", () => {
-      const paths = [
-        "valid.md",
-        "subdir/nested.md",
-        "not-markdown.txt",
-        "no-extension",
-        "wrong.MD",
-      ];
-      const result = filterValidMdPaths(paths);
-
-      expect(result).toEqual(["valid.md", "subdir/nested.md", "wrong.MD"]);
-    });
-
-    it("should handle empty paths array", () => {
-      const result = filterValidMdPaths([]);
-
-      expect(result).toEqual([]);
-    });
-
-    it("should include files regardless of existence", () => {
-      const paths = ["valid.md", "does-not-exist.md", "subdir/nested.md"];
-      const result = filterValidMdPaths(paths);
-
-      expect(result).toEqual([
-        "valid.md",
-        "does-not-exist.md",
-        "subdir/nested.md",
-      ]);
-    });
-
-    it("should handle paths with no valid files", () => {
-      const paths = ["not-markdown.txt", "no-extension"];
-      const result = filterValidMdPaths(paths);
-
-      expect(result).toEqual([]);
-    });
-
-    it("should handle mixed case extensions", () => {
-      const paths = ["mixed.Md", "upper.MD"];
-      const result = filterValidMdPaths(paths);
-
-      expect(result).toEqual(["mixed.Md", "upper.MD"]);
-    });
-  });
-
   describe("integration tests", () => {
     beforeEach(async () => {
-      // Create comprehensive test structure
       await mkdir(join(tempDir, "rules", "frontend"), { recursive: true });
       await mkdir(join(tempDir, "rules", "backend"), { recursive: true });
       await mkdir(join(tempDir, "rules", "test"), { recursive: true });
@@ -242,11 +163,11 @@ describe("filesystem operations", () => {
       await writeFile(join(tempDir, "rules", "config.json"), "{}");
     });
 
-    it("should combine globbing and filtering correctly", async () => {
+    it("should glob paths correctly with case-sensitive matching", async () => {
       const rulesDir = join(tempDir, "rules");
       const patterns = ["**/*.md", "!test/**"];
 
-      // First glob for matching paths
+      // Glob patterns are case-sensitive (e.g., *.md won't match .MD files)
       const globResults = await globRulePaths(rulesDir, patterns);
       expect(globResults).toEqual([
         "backend/node.md",
@@ -254,31 +175,20 @@ describe("filesystem operations", () => {
         "large.md",
         "python.md",
       ]);
-
-      // Then filter for valid markdown files
-      const validResults = filterValidMdPaths(globResults);
-      expect(validResults).toEqual([
-        "backend/node.md",
-        "frontend/react.md",
-        "large.md",
-        "python.md",
-      ]);
     });
 
-    it("should handle complex patterns with filtering", async () => {
+    it("should handle complex patterns correctly", async () => {
       const rulesDir = join(tempDir, "rules");
       const patterns = ["frontend/**", "python.md", "!**/*.json"];
 
       const globResults = await globRulePaths(rulesDir, patterns);
-      const validResults = filterValidMdPaths(globResults);
 
-      expect(validResults).toEqual(["frontend/react.md", "python.md"]);
+      expect(globResults).toEqual(["frontend/react.md", "python.md"]);
     });
   });
 
   describe("readRuleContents", () => {
     beforeEach(async () => {
-      // Create test files with content
       await mkdir(join(tempDir, "rules"), { recursive: true });
       await writeFile(
         join(tempDir, "rules", "rule1.md"),

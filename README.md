@@ -2,7 +2,7 @@
 
 ## Centralized AI Coding Rule Propagation
 
-`sync-rules` is a command-line interface (CLI) tool designed to keep AI coding assistant rule files consistent across multiple development projects. It automates the one-way distribution of tailored guidelines (for tools like Claude Code, Gemini CLI, or Kilocode) from a single, centralized source of truth (default: `~/.sync-rules/rules`). This eliminates manual copying and ensures your project rules stay aligned with minimal effort, prioritizing safety and user control.
+`sync-rules` is a command-line interface (CLI) tool designed to keep AI coding assistant rule files consistent across multiple development projects. It automates the one-way distribution of tailored guidelines (for tools like Claude Code, Gemini CLI, or Kilocode) from a single, centralized source of truth. This eliminates manual copying and ensures your project rules stay aligned with minimal effort, prioritizing safety and user control.
 
 ### Purpose
 
@@ -10,7 +10,7 @@
 
 ### How it Works
 
-The tool operates as a centralized propagator. You define rules in a central repository (default: `~/.sync-rules/rules/`). A user-maintained configuration file (default: `~/.sync-rules/config.json`) specifies which projects receive which rules and how they are adapted for different AI tools (e.g., `CLAUDE.md`, `GEMINI.md`, or materialized into `.kilocode/rules/`). The process is fully automated and non-interactive - when launching AI tools, rules are automatically synced if needed for configured projects, with the central repository always being the source of truth.
+The tool operates as a centralized propagator. You define rules in a central repository. A user-maintained configuration file specifies which projects receive which rules and how they are adapted for different AI tools (e.g., `CLAUDE.md`, `GEMINI.md`, or materialized into `.kilocode/rules/`). The process is fully automated and non-interactive - when launching AI tools, rules are automatically synced if needed for configured projects, with the central repository always being the source of truth.
 
 ### Configuration
 
@@ -20,9 +20,7 @@ The configuration file location can be customized in multiple ways (in order of 
 
 1. **Command-line flag**: `-c /path/to/config.json`
 2. **Environment variable**: `SYNC_RULES_CONFIG=/path/to/config.json`
-3. **Config directory override**: `SYNC_RULES_CONFIG_DIR=/custom/dir` (config.json will be expected in this directory)
-4. **XDG Base Directory** (Linux only): If `XDG_CONFIG_HOME` is set, uses `$XDG_CONFIG_HOME/sync-rules/config.json`
-5. **Default location**: `~/.sync-rules/config.json`
+3. **Default location**: Platform-specific config directory (e.g., `~/.config/sync-rules/config.json` on Linux, `~/Library/Application Support/sync-rules/config.json` on macOS)
 
 #### Getting Started
 
@@ -42,8 +40,6 @@ Here's an example config:
 
 ```json
 {
-  // Optional: Specify a custom path for the central rules directory
-  // "rulesSource": "/custom/path/to/rules",
   "projects": [
     {
       "path": "/home/alice/Work/awesome-service",
@@ -61,13 +57,33 @@ Here's an example config:
 
 #### Rules Source Location
 
-The central rules directory location can be customized in multiple ways (in order of precedence):
+The central rules directory defaults to a platform-specific data directory (via [env-paths](https://npmjs.com/package/env-paths)). You can optionally override this location by adding a `"rulesSource"` field to your configuration:
 
-1. **Configuration file**: `"rulesSource"` field in your config.json
-2. **Environment variable**: `SYNC_RULES_CENTRAL_REPO=/path/to/rules`
-3. **Default location**: `~/.sync-rules/rules`
+```json
+{
+  "rulesSource": "/custom/path/to/rules",
+  "projects": [...]
+}
+```
+
+**Default locations by platform:**
+
+- **Linux**: `~/.local/share/sync-rules/rules`
+- **macOS**: `~/Library/Application Support/sync-rules/rules`
+- **Windows**: `%APPDATA%/sync-rules/rules`
 
 Place your markdown rule files in this directory, organized however you prefer. The tool will select files based on the glob patterns specified in each project's `rules` array.
+
+**Glob patterns use POSIX-style paths** (forward slashes) even on Windows:
+
+```json
+"rules": [
+  "frontend/**/*.md",     // All .md files under frontend/
+  "backend/api.md",       // Specific file
+  "shared/**",            // Everything under shared/
+  "!**/test/**"           // Exclude test directories
+]
+```
 
 ### Installation
 
@@ -94,14 +110,23 @@ sync-rules init
 - **Design Patterns**: Pure Functions, Facade, Registry.
 - **Data Flow**: Config -> Rules -> Adapters -> Filesystem actions.
 
-### Security and PathGuard
+#### Glob Logic
 
-- **Normalization only**: `normalizePath` expands `~` and resolves to an absolute path. It does not enforce directory boundaries or permissions.
-- **Validation at execution**: Path boundary checks are enforced by `PathGuard` inside the execution layer right before filesystem writes.
-- **Initialization timing**: The active `PathGuard` initializes after the configuration is loaded (in `cli` and `launch` flows).
-- **Allowed roots**: By default, `PathGuard` allows only the central rules repo (default: `~/.sync-rules/rules`) plus the explicit project paths from your config. The home directory and current working directory are not implicitly allowed.
-- **Customizing roots**: To grant write access to additional locations, add those paths as projects in your config.
-- **Rationale**: This design follows least privilege and avoids premature config rejection. You can define projects anywhere (e.g., other drives); enforcement happens only when performing filesystem operations.
+Rule selection uses glob patterns powered by the globby library with case-sensitive matching. Patterns must match file extensions exactly (e.g., `**/*.md` will not match `.MD` files).
+
+**Important Notes:**
+
+- Empty `rules` array or only negative patterns (e.g., `["!test/**"]`) will select no files
+- To exclude certain files while selecting others, be explicit: `["**/*.md", "!test/**"]`
+- At least one positive pattern is required to select any files
+
+### Security
+
+- **Path validation**: Path boundary checks are enforced directly in the adapter planning phase using Node.js's [`path.resolve`](https://nodejs.org/api/path.html#pathresolvepaths) and [`path.relative`](https://nodejs.org/api/path.html#pathrelativefrom-to) to prevent any path traversal attempts before execution.
+- **Adapter-level enforcement**: Each adapter validates that generated file paths stay within their designated directories (e.g., multi-file adapters ensure rules remain within `.kilocode/rules/` or `.clinerules/`).
+- **No global policy**: Security is enforced at the source where paths are generated, not through a global validation layer.
+- **Safe by construction**: Adapters use `path.resolve` and `path.relative` to detect and reject any paths that would escape their intended directories.
+- **Rationale**: This design ensures safety at the earliest point (during planning) rather than at execution time, making path traversal attacks impossible by construction.
 
 ### Usage
 
@@ -123,8 +148,12 @@ sync-rules sync
 
 # With options
 sync-rules sync --dry-run
+sync-rules sync -v
 sync-rules sync --verbose
 sync-rules sync -c /path/to/config.json
+
+# Check version
+sync-rules -V
 
 # Using environment variable
 SYNC_RULES_CONFIG=/path/to/config.json sync-rules sync
@@ -153,9 +182,6 @@ sync-rules launch claude -- -p "Fix the bug in parser.js" --output-format json
 sync-rules launch --no-sync claude -- -p "Review this PR"
 sync-rules launch --no-sync gemini -- --style dark
 
-# Force sync to ensure latest rules
-sync-rules launch --force claude
-sync-rules launch --force gemini -- -d  # with debug output
 
 # Piping input to AI tools
 cat error.log | sync-rules launch claude -- -p "What's causing this error?"
@@ -167,7 +193,6 @@ Features:
 - Automatically detects project from current directory
 - Verifies rules match expected state before launching
 - Automatically syncs if rules are out-of-date (unless `--no-sync`)
-- Force sync with `--force` flag
 - Exits with error if adapter not configured for project
 - Passes through all arguments to the wrapped tool
 
@@ -192,8 +217,6 @@ alias gemini-pro='sync-rules launch gemini -- --model gemini-2.5-pro'
 alias claude-fast='sync-rules launch --no-sync claude --'
 alias gemini-fast='sync-rules launch --no-sync gemini --'
 
-# Force sync for critical work
-alias claude-sync='sync-rules launch --force claude --'
 ```
 
 Example usage with aliases:
@@ -206,31 +229,19 @@ git diff | claude-json "Review these changes"
 
 Now your tools will always check rules before starting!
 
-### Legacy Usage
+### Logging
 
-Older examples that explicitly specify the `sync` subcommand still work (note: `sync` is the default):
-
-```bash
-# Basic (uses default config at ~/.sync-rules/config.json)
-sync-rules
-## or
-sync-rules sync
-
-# With specific config
-sync-rules sync -c /path/to/config.json
-
-# Dry-run and verbose
-sync-rules sync -d --verbose
-
-# Show help
-sync-rules --help
-```
+- Default level: `warn`.
+- Verbose: `-v` sets level to `debug` and prints the log file path.
+- CLI override: `--log-level <silent|error|warn|info|debug|trace>`.
+- Env override: set `LOG_LEVEL=<level>`.
+- Optional file logging: set `LOG_TO_FILE=1` (path is shown when running with `-v`).
 
 ## Known Issues
 
 ### Deleted Rules Not Removed from Projects
 
-When a rule file is deleted from the central repository (`~/.sync-rules/rules/`), the corresponding file in project directories is **not** automatically removed during sync. This is a known limitation of the current implementation.
+When a rule file is deleted from the central repository, the corresponding file in project directories is **not** automatically removed during sync. This is a known limitation of the current implementation.
 
 **Impact:**
 
@@ -248,5 +259,5 @@ Manually delete the outdated rule files from your project directories when rules
 ### Filesystem Actions & Reports
 
 - **Actions**: Adapters generate a single action type: `write` with `path` and `content`. Parent directories are created automatically during execution.
-- **Execution**: The executor validates paths via `PathGuard` and writes files using `fs-extra.outputFile`.
+- **Execution**: The executor creates parent directories as needed and writes files using Node's built-in [`fs/promises.writeFile`](https://nodejs.org/api/fs.html#fspromiseswritefilefile-data-options) from the [`fs/promises`](https://nodejs.org/api/fs.html#promises-api) module.
 - **Report**: The execution report includes a `written` array and any errors encountered. There are no copy or mkdir actions.

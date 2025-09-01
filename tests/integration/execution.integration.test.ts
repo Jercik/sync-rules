@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { executeActions } from "../../src/core/execution.js";
-import type { WriteAction } from "../../src/utils/content.js";
+import type { WriteAction } from "../../src/core/execution.js";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
 import { makeTempDir, cleanupDir } from "../_helpers/test-utils";
@@ -17,7 +17,7 @@ describe("executeActions - integration tests", () => {
     await cleanupDir(testDir);
   });
 
-  describe("fs-extra integration", () => {
+  describe("native fs integration", () => {
     it("should automatically create parent directories for write actions", async () => {
       const nestedPath = join(testDir, "a", "b", "c", "file.txt");
       const actions: WriteAction[] = [
@@ -74,7 +74,6 @@ describe("executeActions - integration tests", () => {
 
       const result = await executeActions(actions, { dryRun: false });
 
-      expect(result.success).toBe(true);
       expect(result.written).toHaveLength(2);
 
       // Verify files exist

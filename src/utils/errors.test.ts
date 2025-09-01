@@ -105,7 +105,7 @@ describe("SpawnError", () => {
     expect(error.code).toBe("ENOENT");
     expect(error.exitCode).toBe(1);
     expect(error.message).toBe(
-      '"nonexistent" not found on PATH. Install it or adjust your alias.',
+      '"nonexistent" not found on PATH or cwd invalid. Install it or verify working directory.',
     );
   });
 
