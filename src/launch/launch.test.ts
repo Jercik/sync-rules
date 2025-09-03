@@ -5,7 +5,10 @@ vi.mock("execa", () => {
     code?: string;
     exitCode?: number | null;
     stderr?: string;
-    constructor(message: string, opts: { code?: string; exitCode?: number | null; stderr?: string } = {}) {
+    constructor(
+      message: string,
+      opts: { code?: string; exitCode?: number | null; stderr?: string } = {},
+    ) {
       super(message);
       this.name = "ExecaError";
       this.code = opts.code;
@@ -32,15 +35,7 @@ vi.mock("../config/config.js", () => ({
   LogLevel: {
     // Ensure logger creation doesn't crash when reading env level
     safeParse: () => ({ success: false }),
-    options: [
-      "silent",
-      "fatal",
-      "error",
-      "warn",
-      "info",
-      "debug",
-      "trace",
-    ],
+    options: ["silent", "fatal", "error", "warn", "info", "debug", "trace"],
   },
 }));
 vi.mock("../config/loader.js");

@@ -24,7 +24,10 @@ export async function spawnProcess(
   try {
     const { exitCode } = await execa(cmd, args, { stdio: "inherit" });
     const code = exitCode ?? 0;
-    logger.debug({ evt: "spawn.done", cmd, exitCode: code }, `Process ${cmd} completed`);
+    logger.debug(
+      { evt: "spawn.done", cmd, exitCode: code },
+      `Process ${cmd} completed`,
+    );
     return code;
   } catch (error) {
     if (error instanceof ExecaError) {
@@ -39,7 +42,13 @@ export async function spawnProcess(
         },
         `Failed to spawn process: ${cmd}`,
       );
-      throw new SpawnError(cmd, error.code, error.exitCode, error.message, error);
+      throw new SpawnError(
+        cmd,
+        error.code,
+        error.exitCode,
+        error.message,
+        error,
+      );
     }
     const unknown = error instanceof Error ? error : new Error(String(error));
     logger.error(

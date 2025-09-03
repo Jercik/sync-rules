@@ -50,5 +50,6 @@ export const adapterRegistry: Record<AdapterName, AdapterDefinition> = (() => {
   return reg;
 })();
 
-export const adapterNames: readonly AdapterName[] =
-  Object.keys(ADAPTER_DEFS) as AdapterName[];
+export const adapterNames: readonly AdapterName[] = Object.keys(
+  ADAPTER_DEFS,
+) as AdapterName[];
