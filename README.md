@@ -20,7 +20,7 @@ The configuration file location can be customized in multiple ways (in order of 
 
 1. **Command-line flag**: `-c /path/to/config.json`
 2. **Environment variable**: `SYNC_RULES_CONFIG=/path/to/config.json`
-3. **Default location**: Platform-specific config directory (e.g., `~/.config/sync-rules/config.json` on Linux, `~/Library/Application Support/sync-rules/config.json` on macOS)
+3. **Default location**: Platform-specific config directory (e.g., `~/.config/sync-rules-nodejs/config.json` on Linux, `~/Library/Preferences/sync-rules-nodejs/config.json` on macOS)
 
 #### Getting Started
 
@@ -68,9 +68,9 @@ The central rules directory defaults to a platform-specific data directory (via 
 
 **Default locations by platform:**
 
-- **Linux**: `~/.local/share/sync-rules/rules`
-- **macOS**: `~/Library/Application Support/sync-rules/rules`
-- **Windows**: `%APPDATA%/sync-rules/rules`
+- **Linux**: `~/.local/share/sync-rules-nodejs/rules`
+- **macOS**: `~/Library/Application Support/sync-rules-nodejs/rules`
+- **Windows**: `%APPDATA%/sync-rules-nodejs/rules`
 
 Place your markdown rule files in this directory, organized however you prefer. The tool will select files based on the glob patterns specified in each project's `rules` array.
 
@@ -147,8 +147,6 @@ sync-rules
 sync-rules sync
 
 # With options
-sync-rules sync --dry-run
-sync-rules sync --log-level debug
 sync-rules sync -c /path/to/config.json
 
 # Check version
@@ -177,10 +175,6 @@ sync-rules launch gemini -p "Generate unit tests for main.ts"
 sync-rules launch gemini --model gemini-2.5-pro
 sync-rules launch claude -p "Fix the bug in parser.js" --output-format json
 
-# Skip sync check when you know rules are current (via env var)
-SYNC_RULES_NO_SYNC=1 sync-rules launch claude -p "Review this PR"
-SYNC_RULES_NO_SYNC=1 sync-rules launch gemini --style dark
-
 
 # Piping input to AI tools
 cat error.log | sync-rules launch claude -p "What's causing this error?"
@@ -191,7 +185,7 @@ Features:
 
 - Automatically detects project from current directory
 - Verifies rules match expected state before launching
-- Automatically syncs if rules are out-of-date (unless `SYNC_RULES_NO_SYNC=1`)
+- Automatically syncs if rules are out-of-date
 - Exits with error if adapter not configured for project
 - **Passes through all arguments after `<tool>` to the wrapped tool**
 
@@ -215,9 +209,7 @@ alias geminip='sync-rules launch gemini -p'
 alias claude-json='sync-rules launch claude --output-format json -p'
 alias gemini-pro='sync-rules launch gemini --model gemini-2.5-pro'
 
-# Skip sync for faster launches when iterating
-alias claude-fast='SYNC_RULES_NO_SYNC=1 sync-rules launch claude'
-alias gemini-fast='SYNC_RULES_NO_SYNC=1 sync-rules launch gemini'
+# (sync is always performed automatically when needed)
 
 ```
 
@@ -231,12 +223,7 @@ git diff | claude-json "Review these changes"
 
 Now your tools will always check rules before starting!
 
-### Logging
-
-- Default level: `info`.
-- CLI override: `--log-level <silent|fatal|error|warn|info|debug|trace>`.
-- Env override: set `LOG_LEVEL=<level>`.
-- Optional file logging: set `LOG_TO_FILE=1` (path is shown when level is `debug` or `trace`).
+<!-- Logging removed; CLI is silent except for Commander help -->
 
 ## Known Issues
 
