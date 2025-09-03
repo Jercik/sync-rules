@@ -169,31 +169,34 @@ The `launch` subcommand wraps AI coding tools to ensure rules are always up-to-d
 sync-rules launch claude
 sync-rules launch gemini
 
-# Headless mode with prompts
-sync-rules launch claude -- -p "How does the auth system work?"
-sync-rules launch gemini -- -p "Generate unit tests for main.ts"
+# Headless mode with prompts (no `--` needed)
+sync-rules launch claude -p "How does the auth system work?"
+sync-rules launch gemini -p "Generate unit tests for main.ts"
 
 # With specific models
-sync-rules launch gemini -- --model gemini-2.5-pro
-sync-rules launch claude -- -p "Fix the bug in parser.js" --output-format json
+sync-rules launch gemini --model gemini-2.5-pro
+sync-rules launch claude -p "Fix the bug in parser.js" --output-format json
 
-# Skip sync check when you know rules are current
-sync-rules launch --no-sync claude -- -p "Review this PR"
-sync-rules launch --no-sync gemini -- --style dark
+# Skip sync check when you know rules are current (via env var)
+SYNC_RULES_NO_SYNC=1 sync-rules launch claude -p "Review this PR"
+SYNC_RULES_NO_SYNC=1 sync-rules launch gemini --style dark
 
 
 # Piping input to AI tools
-cat error.log | sync-rules launch claude -- -p "What's causing this error?"
-git diff | sync-rules launch gemini -- -p "Review these changes"
+cat error.log | sync-rules launch claude -p "What's causing this error?"
+git diff | sync-rules launch gemini -p "Review these changes"
 ```
 
 Features:
 
 - Automatically detects project from current directory
 - Verifies rules match expected state before launching
-- Automatically syncs if rules are out-of-date (unless `--no-sync`)
+- Automatically syncs if rules are out-of-date (unless `SYNC_RULES_NO_SYNC=1`)
 - Exits with error if adapter not configured for project
-- Passes through all arguments to the wrapped tool
+- **Passes through all arguments after `<tool>` to the wrapped tool**
+
+**Important:** Any `sync-rules` options must come _before_ `launch`.
+Everything after `<tool>` is forwarded to the tool unchanged.
 
 ### Shell Aliases
 
@@ -205,16 +208,16 @@ alias claude='sync-rules launch claude'
 alias gemini='sync-rules launch gemini'
 
 # Headless mode aliases for quick prompts
-alias claudep='sync-rules launch claude -- -p'
-alias geminip='sync-rules launch gemini -- -p'
+alias claudep='sync-rules launch claude -p'
+alias geminip='sync-rules launch gemini -p'
 
 # With specific preferences
-alias claude-json='sync-rules launch claude -- --output-format json -p'
-alias gemini-pro='sync-rules launch gemini -- --model gemini-2.5-pro'
+alias claude-json='sync-rules launch claude --output-format json -p'
+alias gemini-pro='sync-rules launch gemini --model gemini-2.5-pro'
 
 # Skip sync for faster launches when iterating
-alias claude-fast='sync-rules launch --no-sync claude --'
-alias gemini-fast='sync-rules launch --no-sync gemini --'
+alias claude-fast='SYNC_RULES_NO_SYNC=1 sync-rules launch claude'
+alias gemini-fast='SYNC_RULES_NO_SYNC=1 sync-rules launch gemini'
 
 ```
 

@@ -88,8 +88,92 @@ async function runSync(options: {
  * @param argv - The raw argv array (typically `process.argv`)
  */
 export async function main(argv: string[]): Promise<number> {
+  /**
+   * Special-case: if user invoked the `launch` subcommand, we intercept early
+   * and ensure that *all* arguments after <tool> go to the target command,
+   * and none are consumed by sync-rules. Root/global options are only honored
+   * if they appear *before* `launch`.
+   */
+  const launchIndex = argv.indexOf("launch");
+  if (launchIndex !== -1) {
+    // Parse only root options that appear *before* `launch`
+    const rootSlice = argv.slice(0, launchIndex);
+    const root = new Command()
+      .exitOverride()
+      .option(
+        "-c, --config <path>",
+        "Path to configuration file",
+        DEFAULT_CONFIG_PATH,
+      )
+      .addOption(
+        new Option("--log-level <level>", "Set log level")
+          .choices(LogLevel.options as unknown as string[])
+          .default("info"),
+      )
+      .configureOutput({
+        writeErr: (str) => console.error(str),
+        writeOut: (str) => console.log(str),
+      });
+
+    try {
+      // Only parse the part before `launch` so flags after <tool> are untouched
+      await root.parseAsync(rootSlice);
+    } catch (error) {
+      const err = ensureError(error);
+      if (err instanceof CommanderError) {
+        return typeof err.exitCode === "number" ? err.exitCode : 1;
+      }
+      return 1;
+    }
+
+    const parentOpts = root.opts<{ config?: string; logLevel?: string }>();
+
+    // Apply logging from root flags (if any)
+    applyCliLogging(parentOpts.logLevel);
+    if (parentOpts.logLevel === "debug" || parentOpts.logLevel === "trace") {
+      logger.info(`log file: ${getLogFilePath()}`);
+    }
+
+    // Now extract the tool and pass *everything* after it as tool args
+    const tool = argv[launchIndex + 1];
+    if (!tool) {
+      console.error("Usage: sync-rules launch <tool> [args...]");
+      return 1;
+    }
+    const toolArgs = argv.slice(launchIndex + 2); // verbatim pass-through
+
+    const { launchTool } = await import("../launch/launch.js");
+    const noSync =
+      process.env.SYNC_RULES_NO_SYNC === "1" ||
+      process.env.SYNC_RULES_NO_SYNC === "true";
+
+    try {
+      const result = await launchTool(tool, toolArgs, {
+        configPath: parentOpts.config || DEFAULT_CONFIG_PATH,
+        noSync,
+      });
+
+      printProjectReport([result.projectReport], { dryRun: false });
+
+      if (result.exitCode === 0) {
+        logger.info(`✓ Launched ${tool} successfully`);
+      } else {
+        logger.info(`${tool} exited with code ${result.exitCode}`);
+      }
+      return result.exitCode;
+    } catch (error) {
+      const err = ensureError(error);
+      // Reuse existing CLI error handler format
+      handleError(err);
+      if (err instanceof SpawnError && err.exitCode != null) {
+        return err.exitCode;
+      }
+      return 1;
+    }
+  }
+
   const program = new Command();
-  let exitCode = 0;
+  const exitCode = 0;
 
   program
     .name(packageJson.name)
@@ -169,41 +253,29 @@ export async function main(argv: string[]): Promise<number> {
   const launchCommand = program
     .command("launch <tool> [toolArgs...]")
     .description("Launch an AI tool with automatic rule syncing")
-    .option("--no-sync", "Skip rule synchronization check")
     .addHelpText(
       "after",
-      "\nPass arguments to the tool after --. Examples:\n  $ sync-rules launch claude -- -p 'Review these changes'\n  $ sync-rules launch gemini -- --model gemini-2.5-pro\n  $ sync-rules launch --no-sync claude -- -p 'Quick run'",
+      [
+        "",
+        "All arguments after <tool> are passed to the tool verbatim.",
+        "You no longer need '--'. Examples:",
+        "  $ sync-rules launch claude -p 'Review these changes'",
+        "  $ sync-rules -c custom.json launch gemini --model gemini-2.5-pro",
+        "Notes:",
+        "  • Any flags after <tool> are not parsed by sync-rules.",
+        "  • To skip syncing, set SYNC_RULES_NO_SYNC=1 in your environment.",
+      ].join("\n"),
     );
 
-  launchCommand.action(async (tool, toolArgs) => {
-    const parentOpts = program.opts();
-    const opts = launchCommand.opts();
-
-    // Configure logger level for launch subcommand as well
-    applyCliLogging(parentOpts.logLevel);
-
-    if (parentOpts.logLevel === "debug" || parentOpts.logLevel === "trace") {
-      logger.info(`log file: ${getLogFilePath()}`);
-    }
-
-    const { launchTool } = await import("../launch/launch.js");
-    const result = await launchTool(tool, toolArgs, {
-      configPath: parentOpts.config || DEFAULT_CONFIG_PATH,
-      noSync: opts.noSync,
-    });
-
-    printProjectReport([result.projectReport], {
-      dryRun: false,
-    });
-
-    if (result.exitCode === 0) {
-      logger.info(`✓ Launched ${tool} successfully`);
-    } else {
-      logger.info(`${tool} exited with code ${result.exitCode}`);
-    }
-
-    // Capture exit code for return from main()
-    exitCode = result.exitCode;
+  launchCommand.action(async () => {
+    // This handler is now only used when running through Commander for help/doc flows.
+    // Actual `launch` execution is intercepted above to guarantee flag pass-through.
+    logger.info(
+      "Tip: when using `launch`, put sync-rules flags before `launch` and put tool flags after the tool.",
+    );
+    logger.info(
+      "Example: sync-rules -c custom.json launch claude -p 'Review changes'",
+    );
   });
 
   try {
