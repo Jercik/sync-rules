@@ -138,7 +138,7 @@ describe("config", () => {
           const zodError = error as z.ZodError;
           expect(
             zodError.issues.some((i) =>
-              String(i.message).includes("at least one positive glob pattern"),
+              i.message.includes("at least one positive glob pattern"),
             ),
           ).toBe(true);
         }

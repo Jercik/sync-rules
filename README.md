@@ -50,28 +50,22 @@ Edit the `config.json` file to define your setup.
     {
       "path": "~/Developer/my-backend-api",
       "adapters": ["claude", "kilocode"],
-      "rules": [
-        "backend/**/*.md",
-        "python-style.md",
-        "!backend/legacy/**"
-      ]
+      "rules": ["backend/**/*.md", "python-style.md", "!backend/legacy/**"]
     },
     {
       "path": "~/Developer/my-frontend-app",
       "adapters": ["gemini"],
-      "rules": [
-        "frontend/**/*.md"
-      ]
+      "rules": ["frontend/**/*.md"]
     }
   ]
 }
 ```
 
-  - `rulesSource`: The central directory where you store your rule files (e.g., Markdown files). If omitted, it defaults to the system's data directory.
-  - `projects`: An array defining each project.
-      - `path`: The root directory of the project (supports `~` for home directory).
-      - `adapters`: The AI tools you use in this project.
-      - `rules`: POSIX-style glob patterns to select files from `rulesSource`. Supports negation (`!`).
+- `rulesSource`: The central directory where you store your rule files (e.g., Markdown files). If omitted, it defaults to the system's data directory.
+- `projects`: An array defining each project.
+  - `path`: The root directory of the project (supports `~` for home directory).
+  - `adapters`: The AI tools you use in this project.
+  - `rules`: POSIX-style glob patterns to select files from `rulesSource`. Supports negation (`!`).
 
 ### 3\. Synchronize Rules
 
@@ -87,7 +81,7 @@ This will read the rules and write the resulting files into the project director
 
 ### 4\. Automatic Syncing (Launch Wrapper)
 
-A key feature is the `launch` command. It acts as a wrapper around your AI tools. When you launch a recognized tool via `sync-rules launch`, it first detects the current project, synchronizes the rules, and *then* starts the tool.
+A key feature is the `launch` command. It acts as a wrapper around your AI tools. When you launch a recognized tool via `sync-rules launch`, it first detects the current project, synchronizes the rules, and _then_ starts the tool.
 
 ```bash
 cd ~/Developer/my-backend-api
@@ -112,13 +106,13 @@ alias claude='sync-rules launch claude'
 
 The tool includes built-in support for the following adapters:
 
-| Adapter    | Type          | Output Location        | Description                                     |
-|------------|---------------|------------------------|-------------------------------------------------|
-| `claude`   | `single-file` | `CLAUDE.md`            | Consolidates all rules into a single file.      |
-| `gemini`   | `single-file` | `GEMINI.md`            | Consolidates all rules into a single file.      |
-| `codex`    | `single-file` | `AGENTS.md`            | Consolidates all rules into a single file.      |
-| `kilocode` | `multi-file`  | `.kilocode/rules/`     | Copies rules individually into the directory.   |
-| `cline`    | `multi-file`  | `.clinerules/`         | Copies rules individually into the directory.   |
+| Adapter    | Type          | Output Location    | Description                                   |
+| ---------- | ------------- | ------------------ | --------------------------------------------- |
+| `claude`   | `single-file` | `CLAUDE.md`        | Consolidates all rules into a single file.    |
+| `gemini`   | `single-file` | `GEMINI.md`        | Consolidates all rules into a single file.    |
+| `codex`    | `single-file` | `AGENTS.md`        | Consolidates all rules into a single file.    |
+| `kilocode` | `multi-file`  | `.kilocode/rules/` | Copies rules individually into the directory. |
+| `cline`    | `multi-file`  | `.clinerules/`     | Copies rules individually into the directory. |
 
 ## License
 
