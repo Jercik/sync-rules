@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 // Root directory for test temp files; allows override for debugging
-export function testTmpRoot(): string {
+function testTmpRoot(): string {
   return process.env.TEST_TMPDIR || tmpdir();
 }
 

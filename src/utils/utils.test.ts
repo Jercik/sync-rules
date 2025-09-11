@@ -7,28 +7,38 @@ describe("utils", () => {
   describe("normalizePath", () => {
     const home = homedir();
 
-    it("should resolve home directory (~) correctly", () => {
-      expect(normalizePath("~/test")).toBe(resolve(home, "test"));
-      expect(normalizePath("~/Developer/project")).toBe(
-        resolve(home, "Developer/project"),
-      );
-    });
+    it("normalizes various path forms", () => {
+      const cases = [
+        {
+          name: "home directory (~)",
+          input: "~/test",
+          expected: resolve(home, "test"),
+        },
+        {
+          name: "home directory nested (~)",
+          input: "~/Developer/project",
+          expected: resolve(home, "Developer/project"),
+        },
+        {
+          name: "absolute path",
+          input: resolve(home, "Projects/my-app"),
+          expected: resolve(home, "Projects/my-app"),
+        },
+        {
+          name: "relative path",
+          input: "./test",
+          expected: resolve(process.cwd(), "test"),
+        },
+        {
+          name: "multiple slashes",
+          input: `${home}//Documents///project`,
+          expected: resolve(home, "Documents/project"),
+        },
+      ] as const;
 
-    it("should handle absolute paths", () => {
-      const absolutePath = resolve(home, "Projects/my-app");
-      expect(normalizePath(absolutePath)).toBe(absolutePath);
-    });
-
-    it("should handle relative paths by resolving them", () => {
-      // Relative paths should be resolved from current directory
-      const result = normalizePath("./test");
-      expect(result).toBe(resolve(process.cwd(), "test"));
-    });
-
-    it("should normalize paths with multiple slashes", () => {
-      const input = `${home}//Documents///project`;
-      const expected = resolve(home, "Documents/project");
-      expect(normalizePath(input)).toBe(expected);
+      for (const c of cases) {
+        expect(normalizePath(c.input)).toBe(c.expected);
+      }
     });
   });
 });

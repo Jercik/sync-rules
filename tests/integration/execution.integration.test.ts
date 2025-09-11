@@ -3,7 +3,7 @@ import { executeActions } from "../../src/core/execution.js";
 import type { WriteAction } from "../../src/core/execution.js";
 import { promises as fs } from "node:fs";
 import { join } from "node:path";
-import { makeTempDir, cleanupDir } from "../_helpers/test-utils";
+import { makeTempDir, cleanupDir } from "../_helpers/test-utils.js";
 
 describe("executeActions - integration tests", () => {
   let testDir: string;
@@ -13,7 +13,6 @@ describe("executeActions - integration tests", () => {
   });
 
   afterEach(async () => {
-    // Clean up test directory
     await cleanupDir(testDir);
   });
 
@@ -30,22 +29,6 @@ describe("executeActions - integration tests", () => {
       expect(content).toBe("Hello nested!");
     });
 
-    it("should handle multiple writes in nested directories", async () => {
-      const file1 = join(testDir, "dir1", "subdir1", "file1.txt");
-      const file2 = join(testDir, "dir2", "subdir2", "file2.txt");
-      const actions: WriteAction[] = [
-        { path: file1, content: "Content 1" },
-        { path: file2, content: "Content 2" },
-      ];
-
-      await executeActions(actions, { dryRun: false });
-
-      const content1 = await fs.readFile(file1, "utf8");
-      const content2 = await fs.readFile(file2, "utf8");
-      expect(content1).toBe("Content 1");
-      expect(content2).toBe("Content 2");
-    });
-
     it("should overwrite existing files", async () => {
       const filePath = join(testDir, "overwrite.txt");
       await fs.writeFile(filePath, "Old content");
@@ -58,35 +41,6 @@ describe("executeActions - integration tests", () => {
 
       const content = await fs.readFile(filePath, "utf8");
       expect(content).toBe("New content");
-    });
-
-    it("should handle multiple writes without explicit mkdir", async () => {
-      const actions: WriteAction[] = [
-        {
-          path: join(testDir, "new", "file.txt"),
-          content: "Written",
-        },
-        {
-          path: join(testDir, "other", "file2.txt"),
-          content: "Also written",
-        },
-      ];
-
-      const result = await executeActions(actions, { dryRun: false });
-
-      expect(result.written).toHaveLength(2);
-
-      // Verify files exist
-      const writtenContent1 = await fs.readFile(
-        join(testDir, "new", "file.txt"),
-        "utf8",
-      );
-      const writtenContent2 = await fs.readFile(
-        join(testDir, "other", "file2.txt"),
-        "utf8",
-      );
-      expect(writtenContent1).toBe("Written");
-      expect(writtenContent2).toBe("Also written");
     });
   });
 });

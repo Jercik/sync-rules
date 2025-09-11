@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    /* Not transpiling with TypeScript */
+    "noEmit": true,
+
+    /* Not running in the DOM */
+    "lib": ["es2022"],
+
+    /* Allow importing .ts extensions for config files */
+    "allowImportingTsExtensions": true
+  },
+  "include": ["vitest.config.ts", "eslint.config.js"]
+}

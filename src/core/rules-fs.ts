@@ -8,7 +8,6 @@ import { ensureError } from "../utils/errors.js";
  * Finds all paths in the rules directory that match the given glob patterns.
  * Uses globby for efficient pattern matching with support for negation patterns.
  *
- * @returns A sorted array of matching file paths
  * Note: Glob patterns must use POSIX-style slashes (/).
  */
 export async function globRulePaths(
@@ -17,11 +16,9 @@ export async function globRulePaths(
 ): Promise<string[]> {
   const normalizedDir = normalizePath(rulesDir);
 
-  // Filter out empty patterns to prevent glob errors
-  const validPatterns = patterns.filter((p) => p && p.trim() !== "");
-
+  // Trust that patterns have been validated by Zod at ingress
   // globby naturally returns empty array for no matches or only negative patterns
-  const paths = await globby(validPatterns, {
+  const paths = await globby(patterns, {
     cwd: normalizedDir,
     unique: true,
     onlyFiles: true,
@@ -51,8 +48,10 @@ export async function readRuleContents(
         return { path: relPath, content };
       } catch (error) {
         // Fail explicitly instead of silently skipping
+        const err = ensureError(error);
         throw new Error(
-          `Failed to read rule file '${fullPath}': ${ensureError(error).message}`,
+          `Failed to read rule file '${fullPath}': ${err.message}`,
+          { cause: err },
         );
       }
     }),
@@ -61,10 +60,6 @@ export async function readRuleContents(
   return results;
 }
 
-/**
- * Convenience function to load rules from the central repository
- * Combines globRulePaths and readRuleContents
- */
 export async function loadRules(
   rulesDir: string,
   patterns: string[],

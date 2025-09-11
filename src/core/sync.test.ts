@@ -8,12 +8,8 @@ import type { WriteAction } from "./execution.js";
 import type { Rule } from "./rules-fs.js";
 import { SyncError } from "../utils/errors.js";
 
-vi.mock("../adapters/adapters.js", () => ({
-  createAdapter: vi.fn(),
-}));
-
-vi.mock("../adapters/registry.js", () => ({
-  adapterRegistry: {
+vi.mock("../adapters/registry.js", () => {
+  const adapterRegistry = {
     claude: {
       planWrites: vi.fn(),
       meta: { type: "single-file", location: "CLAUDE.md" },
@@ -34,8 +30,12 @@ vi.mock("../adapters/registry.js", () => ({
       planWrites: vi.fn(),
       meta: { type: "single-file", location: "AGENTS.md" },
     },
-  },
-}));
+  } as const;
+
+  const isAdapterName = (name: string): boolean => name in adapterRegistry;
+
+  return { adapterRegistry, isAdapterName };
+});
 
 vi.mock("./rules-fs.js", () => ({
   loadRules: vi.fn(),
@@ -80,14 +80,15 @@ describe("sync", () => {
         registryModule.adapterRegistry.claude.planWrites,
       ).mockImplementation(mockAdapter);
 
+      const firstAction = mockActions[0];
       vi.mocked(executionModule.executeActions).mockResolvedValue({
-        written: [mockActions[0].path],
+        written: firstAction ? [firstAction.path] : [],
       });
 
       const result = await syncProject(
         singleAdapterProject,
         { dryRun: false },
-        { rulesSource: "/path/to/rules" },
+        { rulesSource: "/path/to/rules", projects: [] },
       );
 
       expect(filesystemModule.loadRules).toHaveBeenCalledWith(
@@ -107,10 +108,11 @@ describe("sync", () => {
           dryRun: false,
         },
       );
+      const firstActionPath = mockActions[0];
       expect(result).toEqual({
         projectPath: "/home/user/project",
         report: {
-          written: [mockActions[0].path],
+          written: firstActionPath ? [firstActionPath.path] : [],
         },
       });
     });
@@ -128,14 +130,19 @@ describe("sync", () => {
         registryModule.adapterRegistry.gemini.planWrites,
       ).mockImplementation(geminiAdapter);
 
+      const firstAction = mockActions[0];
+      const secondAction = mockActions[1];
       vi.mocked(executionModule.executeActions).mockResolvedValue({
-        written: [mockActions[0].path, mockActions[1].path],
+        written: [
+          ...(firstAction ? [firstAction.path] : []),
+          ...(secondAction ? [secondAction.path] : []),
+        ],
       });
 
       const result = await syncProject(
         mockProject,
         { dryRun: false },
-        { rulesSource: "/path/to/rules" },
+        { rulesSource: "/path/to/rules", projects: [] },
       );
 
       expect(
@@ -178,7 +185,7 @@ describe("sync", () => {
       await syncProject(
         singleAdapterProject,
         { dryRun: true },
-        { rulesSource: "/path/to/rules" },
+        { rulesSource: "/path/to/rules", projects: [] },
       );
 
       expect(executionModule.executeActions).toHaveBeenCalledWith(
@@ -189,7 +196,7 @@ describe("sync", () => {
       );
     });
 
-    it("should execute with debug logs available when level is debug", async () => {
+    it("executes planned adapter actions (smoke)", async () => {
       const singleAdapterProject: Project = {
         ...mockProject,
         adapters: ["claude"],
@@ -202,14 +209,15 @@ describe("sync", () => {
         registryModule.adapterRegistry.claude.planWrites,
       ).mockImplementation(mockAdapter);
 
+      const firstAction = mockActions[0];
       vi.mocked(executionModule.executeActions).mockResolvedValue({
-        written: [mockActions[0].path],
+        written: firstAction ? [firstAction.path] : [],
       });
 
       await syncProject(
         singleAdapterProject,
         { dryRun: false },
-        { rulesSource: "/path/to/rules" },
+        { rulesSource: "/path/to/rules", projects: [] },
       );
 
       expect(executionModule.executeActions).toHaveBeenCalledWith(
@@ -235,12 +243,11 @@ describe("sync", () => {
         throw adapterError;
       });
 
-      // Should throw error with context details
       await expect(
         syncProject(
           singleAdapterProject,
           { dryRun: false },
-          { rulesSource: "/path/to/rules" },
+          { rulesSource: "/path/to/rules", projects: [] },
         ),
       ).rejects.toThrow(Error);
 
@@ -248,7 +255,7 @@ describe("sync", () => {
         await syncProject(
           singleAdapterProject,
           { dryRun: false },
-          { rulesSource: "/path/to/rules" },
+          { rulesSource: "/path/to/rules", projects: [] },
         );
       } catch (error) {
         if (error instanceof SyncError) {
@@ -258,7 +265,6 @@ describe("sync", () => {
         }
       }
 
-      // Should fail before reaching executeActions
       expect(executionModule.executeActions).not.toHaveBeenCalled();
     });
 
@@ -277,10 +283,9 @@ describe("sync", () => {
       await syncProject(
         mockProject,
         { dryRun: false },
-        { rulesSource: "/path/to/rules" },
+        { rulesSource: "/path/to/rules", projects: [] },
       );
 
-      // Should only load rules once, not twice (one per adapter)
       expect(filesystemModule.loadRules).toHaveBeenCalledTimes(1);
     });
 
@@ -308,14 +313,19 @@ describe("sync", () => {
         registryModule.adapterRegistry.gemini.planWrites,
       ).mockImplementation(() => geminiActions);
 
+      const firstAction = mockActions[0];
+      const secondAction = mockActions[1];
       vi.mocked(executionModule.executeActions).mockResolvedValue({
-        written: [mockActions[0].path, mockActions[1].path],
+        written: [
+          ...(firstAction ? [firstAction.path] : []),
+          ...(secondAction ? [secondAction.path] : []),
+        ],
       });
 
       await syncProject(
         mockProject,
         { dryRun: false },
-        { rulesSource: "/path/to/rules" },
+        { rulesSource: "/path/to/rules", projects: [] },
       );
 
       expect(executionModule.executeActions).toHaveBeenCalledWith(

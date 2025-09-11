@@ -4,118 +4,187 @@ import {
   ConfigNotFoundError,
   ConfigParseError,
   SpawnError,
+  ensureError,
 } from "./errors.js";
 
 describe("SyncError class", () => {
-  it("should create a SyncError with message", () => {
-    const error = new SyncError("Test error");
-    expect(error).toBeInstanceOf(Error);
-    expect(error).toBeInstanceOf(SyncError);
-    expect(error.message).toBe("Test error");
-    expect(error.name).toBe("SyncError");
-  });
+  it("SyncError sets name/message and optionally stores details and cause", () => {
+    const cases = [
+      {
+        title: "basic error with message only",
+        message: "Test error",
+        details: undefined,
+        cause: undefined,
+        expectedDetails: {},
+      },
+      {
+        title: "error with adapter/project details",
+        message: "Adapter failed",
+        details: { adapter: "claude", project: "/test/project" },
+        cause: undefined,
+        expectedDetails: { adapter: "claude", project: "/test/project" },
+      },
+      {
+        title: "error with action/path details",
+        message: "Write failed",
+        details: { action: "write", path: "/file.txt" },
+        cause: undefined,
+        expectedDetails: { action: "write", path: "/file.txt" },
+      },
+      {
+        title: "error with cause",
+        message: "Wrapped error",
+        details: undefined,
+        cause: new Error("Original cause"),
+        expectedDetails: {},
+      },
+    ];
 
-  it("should have details property", () => {
-    const error = new SyncError("Test error", {
-      adapter: "claude",
-      project: "/test/project",
-    });
-
-    expect(error.details).toEqual({
-      adapter: "claude",
-      project: "/test/project",
-    });
-  });
-
-  it("should have empty details by default", () => {
-    const error = new SyncError("Test error");
-    expect(error.details).toEqual({});
-  });
-
-  it("should maintain proper stack trace", () => {
-    const error = new SyncError("Test error");
-    expect(error.stack).toBeDefined();
-    expect(error.stack).toContain("Test error");
-  });
-
-  it("should support various detail combinations", () => {
-    const adapterError = new SyncError("Adapter failed", {
-      adapter: "gemini",
-      project: "/path",
-    });
-
-    const executionError = new SyncError("Write failed", {
-      action: "write",
-      path: "/file.txt",
-    });
-
-    expect(adapterError.details.adapter).toBe("gemini");
-    expect(adapterError.details.project).toBe("/path");
-
-    expect(executionError.details.action).toBe("write");
-    expect(executionError.details.path).toBe("/file.txt");
+    for (const c of cases) {
+      const error = new SyncError(c.message, c.details, c.cause);
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toBeInstanceOf(SyncError);
+      expect(error.name).toBe("SyncError");
+      expect(error.message).toBe(c.message);
+      expect(error.details).toEqual(c.expectedDetails);
+      if (c.cause) expect(error.cause).toBe(c.cause);
+    }
   });
 });
 
 describe("ConfigNotFoundError", () => {
-  it("should create error for missing config", () => {
-    const error = new ConfigNotFoundError("/path/to/config.json");
-    expect(error.name).toBe("ConfigNotFoundError");
-    expect(error.path).toBe("/path/to/config.json");
-    expect(error.isDefault).toBe(false);
-    expect(error.message).toBe("Config file not found at /path/to/config.json");
-  });
+  const cases = [
+    {
+      title: "missing non-default config",
+      path: "/path/to/config.json",
+      isDefault: false,
+      message: "Config file not found at /path/to/config.json",
+    },
+    {
+      title: "missing default config",
+      path: "/default/config.json",
+      isDefault: true,
+      message: "Default config file not found at /default/config.json",
+    },
+  ] as const;
 
-  it("should handle default config message", () => {
-    const error = new ConfigNotFoundError("/default/config.json", true);
-    expect(error.isDefault).toBe(true);
-    expect(error.message).toBe(
-      "Default config file not found at /default/config.json",
-    );
-  });
+  for (const c of cases) {
+    it(`should create error for ${c.title}`, () => {
+      const error = new ConfigNotFoundError(c.path, c.isDefault);
+      expect(error.name).toBe("ConfigNotFoundError");
+      expect(error.path).toBe(c.path);
+      expect(error.isDefault).toBe(c.isDefault);
+      expect(error.message).toBe(c.message);
+    });
+  }
 });
 
 describe("ConfigParseError", () => {
-  it("should create error for parse failures", () => {
-    const error = new ConfigParseError("/path/to/config.json");
-    expect(error).toBeInstanceOf(Error);
-    expect(error.name).toBe("ConfigParseError");
-    expect(error.path).toBe("/path/to/config.json");
-    expect(error.message).toBe(
-      "Failed to parse config from /path/to/config.json",
-    );
-  });
+  const cases = [
+    {
+      title: "parse failure without original error",
+      path: "/path/to/config.json",
+      original: undefined,
+      expectedMessage: "Failed to parse config from /path/to/config.json",
+    },
+    {
+      title: "parse failure with original error",
+      path: "/path/to/config.json",
+      original: new Error("Invalid JSON"),
+      expectedMessage:
+        "Failed to load config from /path/to/config.json: Invalid JSON",
+    },
+  ] as const;
 
-  it("should include original error message", () => {
-    const originalError = new Error("Invalid JSON");
-    const error = new ConfigParseError("/path/to/config.json", originalError);
-    expect(error.originalError).toBe(originalError);
-    expect(error.message).toBe(
-      "Failed to load config from /path/to/config.json: Invalid JSON",
-    );
-  });
+  for (const c of cases) {
+    it(`should create error for ${c.title}`, () => {
+      const error = new ConfigParseError(c.path, c.original);
+      expect(error).toBeInstanceOf(Error);
+      expect(error.name).toBe("ConfigParseError");
+      expect(error.path).toBe(c.path);
+      if (c.original) expect(error.originalError).toBe(c.original);
+      expect(error.message).toBe(c.expectedMessage);
+    });
+  }
 });
 
 describe("SpawnError", () => {
-  it("should create error for command not found", () => {
-    const error = new SpawnError("nonexistent", "ENOENT", 1);
-    expect(error).toBeInstanceOf(Error);
-    expect(error.name).toBe("SpawnError");
-    expect(error.command).toBe("nonexistent");
-    expect(error.code).toBe("ENOENT");
-    expect(error.exitCode).toBe(1);
-    expect(error.message).toBe(
-      '"nonexistent" not found on PATH or cwd invalid. Install it or verify working directory.',
-    );
+  const cases = [
+    {
+      title: "command not found (ENOENT)",
+      input: {
+        command: "nonexistent",
+        code: "ENOENT",
+        exitCode: undefined,
+        signal: undefined,
+      },
+      expectedMessage:
+        '"nonexistent" not found on PATH or cwd invalid. Install it or verify working directory.',
+    },
+    {
+      title: "default message when not ENOENT",
+      input: {
+        command: "cmd",
+        code: undefined,
+        exitCode: undefined,
+        signal: undefined,
+      },
+      expectedMessage: 'Failed to launch "cmd"',
+    },
+    {
+      title: "tool exited with non-zero code",
+      input: {
+        command: "test",
+        code: undefined,
+        exitCode: 42,
+        signal: undefined,
+      },
+      expectedMessage: "Tool 'test' exited with code 42",
+    },
+    {
+      title: "process killed with signal",
+      input: {
+        command: "killed",
+        code: undefined,
+        exitCode: undefined,
+        signal: "SIGTERM",
+      },
+      expectedMessage: 'Process "killed" killed by signal SIGTERM',
+    },
+  ] as const;
+
+  for (const c of cases) {
+    it(`should create error: ${c.title}`, () => {
+      const error = new SpawnError(
+        c.input.command,
+        c.input.code,
+        c.input.exitCode,
+        c.input.signal,
+      );
+      expect(error).toBeInstanceOf(Error);
+      expect(error.name).toBe("SpawnError");
+      expect(error.command).toBe(c.input.command);
+      expect(error.code).toBe(c.input.code);
+      expect(error.exitCode).toBe(c.input.exitCode);
+      expect(error.signal).toBe(c.input.signal);
+      expect(error.message).toBe(c.expectedMessage);
+    });
+  }
+
+  it("preserves cause on SpawnError for error chaining", () => {
+    const cause = new Error("Original error");
+    const error = new SpawnError("cmd", undefined, 1, undefined, cause);
+    expect(error.cause).toBe(cause);
+    expect(error.message).toBe("Tool 'cmd' exited with code 1");
   });
 
-  it("should use custom message when provided", () => {
-    const error = new SpawnError("cmd", "ERROR", 42, "Custom failure");
-    expect(error.message).toBe("Custom failure");
-  });
+  // buildMessage static method testing removed - constructor tests already cover message branches
+});
 
-  it("should use default message when not ENOENT", () => {
-    const error = new SpawnError("cmd", "ERROR", 1);
-    expect(error.message).toBe('Failed to launch "cmd"');
+describe("ensureError / isNodeError extras", () => {
+  it("ensureError wraps non-Error values", () => {
+    const e = ensureError("boom");
+    expect(e).toBeInstanceOf(Error);
+    expect(e.message).toBe("boom");
   });
 });

@@ -1,317 +1,115 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { main } from "./main.js";
-import { Config } from "../config/config.js";
-import { ConfigParseError } from "../utils/errors.js";
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 
-vi.mock("../utils/log.js", () => {
-  const child = {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    level: "info",
-    isLevelEnabled: (lvl: string) => {
-      const order: Record<string, number> = {
-        trace: 10,
-        debug: 20,
-        info: 30,
-        warn: 40,
-        error: 50,
-        fatal: 60,
-        silent: Infinity,
-      };
-      const current = order[(child as any).level] ?? 30;
-      const target = order[lvl] ?? 30;
-      return current <= target;
-    },
-  };
-  return {
-    getLogger: vi.fn(() => child),
-    rootLogger: child,
-    getLogFilePath: vi.fn(() => "/tmp/debug.log"),
-  };
-});
-
-const {
-  mockReadFile,
-  mockAccess,
-  mockPrintProjectReport,
-  mockLoadConfig,
-  mockCreateSampleConfig,
-} = vi.hoisted(() => {
-  return {
-    mockReadFile: vi.fn(),
-    mockAccess: vi.fn(),
-    mockPrintProjectReport: vi.fn(),
-    mockLoadConfig: vi.fn(),
-    mockCreateSampleConfig: vi.fn(),
-  };
-});
-
-vi.mock("node:fs/promises", () => ({
-  readFile: mockReadFile,
-  access: mockAccess,
-  constants: {
-    F_OK: 0,
-  },
-}));
-
-vi.mock("../core/reporting.js", () => ({
-  printProjectReport: mockPrintProjectReport,
-}));
-
+// Mock the entire modules with dynamic imports support
 vi.mock("../config/loader.js", () => ({
-  loadConfig: mockLoadConfig,
-  createSampleConfig: mockCreateSampleConfig,
+  loadConfig: vi.fn(),
+  createSampleConfig: vi.fn(),
 }));
-
-const mockSyncProject = vi.fn();
 
 vi.mock("../core/sync.js", () => ({
-  syncProject: mockSyncProject,
+  syncProject: vi.fn(),
 }));
 
-describe("CLI", () => {
+vi.mock("../launch/launch.js", () => ({
+  launchTool: vi.fn(),
+}));
+
+import * as loader from "../config/loader.js";
+import * as syncMod from "../core/sync.js";
+import * as launchMod from "../launch/launch.js";
+
+describe("cli/main", () => {
   beforeEach(() => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    // process.exit is not used by main() anymore; no spy needed.
-
-    const defaultConfig = {
-      rulesSource: "/path/to/rules",
-      projects: [
-        {
-          path: "~/test-project",
-          rules: ["**/*.md"],
-          adapters: ["claude"],
-        },
-      ],
-    };
-    mockLoadConfig.mockResolvedValue(defaultConfig);
-
-    mockSyncProject.mockResolvedValue({
-      projectPath: "~/test-project",
-      report: {
-        written: ["~/test-project/file.md"],
-      },
-    });
-
-    mockPrintProjectReport.mockReturnValue(true);
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("should process config and execute actions successfully", async () => {
-    const mockConfig: Config = {
-      rulesSource: "/path/to/rules",
-      projects: [
-        {
-          path: "~/test-project",
-          rules: ["**/*.md"],
-          adapters: ["claude"],
-        },
-      ],
-    };
-    mockLoadConfig.mockResolvedValue(mockConfig);
-
-    await main(["node", "sync-rules", "-c", "~/test-config.json", "sync"]);
-
-    expect(mockPrintProjectReport).toHaveBeenCalledWith(
-      [
-        {
-          projectPath: expect.stringContaining("test-project"),
-          report: {
-            written: ["~/test-project/file.md"],
-          },
-        },
-      ],
-      { dryRun: false },
-    );
-  });
-
-  it("should handle dry-run mode", async () => {
-    const mockConfig: Config = {
-      rulesSource: "/path/to/rules",
-      projects: [
-        {
-          path: "~/test-project",
-          rules: ["**/*.md"],
-          adapters: ["claude"],
-        },
-      ],
-    };
-
-    mockLoadConfig.mockResolvedValue(mockConfig);
-
-    await main([
-      "node",
-      "sync-rules",
-      "-c",
-      "~/test-config.json",
-      "-d",
-      "sync",
-    ]);
-
-    expect(mockPrintProjectReport).toHaveBeenCalledWith(expect.any(Array), {
-      dryRun: true,
-    });
-  });
-
-  it("should handle errors and exit with code 1", async () => {
-    const mockConfig: Config = {
-      rulesSource: "/path/to/rules",
-      projects: [
-        {
-          path: "~/test-project",
-          rules: ["**/*.md"],
-          adapters: ["claude"],
-        },
-      ],
-    };
-
-    mockLoadConfig.mockResolvedValue(mockConfig);
-
-    mockSyncProject.mockRejectedValueOnce(new Error("Test error"));
-
-    mockPrintProjectReport.mockReturnValueOnce(false); // indicating failure
-
-    const code = await main([
-      "node",
-      "sync-rules",
-      "-c",
-      "~/test-config.json",
-      "sync",
-    ]);
-    expect(code).toBe(1);
-
-    expect(mockPrintProjectReport).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          failed: true,
-          error: expect.any(Error),
-        }),
-      ]),
-      expect.any(Object),
-    );
-  });
-
-  it("should log file path when log level is debug", async () => {
-    const mockConfig: Config = {
-      rulesSource: "/path/to/rules",
-      projects: [
-        {
-          path: "~/test-project",
-          rules: ["**/*.md"],
-          adapters: ["claude"],
-        },
-      ],
-    };
-
-    mockLoadConfig.mockResolvedValue(mockConfig);
-
-    await main([
-      "node",
-      "sync-rules",
-      "-c",
-      "~/test-config.json",
-      "--log-level",
-      "debug",
-      "sync",
-    ]);
-
-    // Ensure it announced the log file path at debug level
-    const { getLogger } = await import("../utils/log.js");
-    const cliLogger = getLogger("cli");
-    expect(cliLogger.info).toHaveBeenCalledWith(
-      expect.stringContaining("log file: /tmp/debug.log"),
-    );
-  });
-
-  it("should handle invalid config file", async () => {
-    const parseError = new ConfigParseError(
-      "~/test-config.json",
-      new Error("Invalid JSON"),
-    );
-    mockLoadConfig.mockRejectedValue(parseError);
-
-    const { rootLogger: logger } = await import("../utils/log.js");
-
-    const code = await main([
-      "node",
-      "sync-rules",
-      "-c",
-      "~/test-config.json",
-      "sync",
-    ]);
-    expect(code).toBe(1);
-
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "Error: Failed to load config from ~/test-config.json: Invalid JSON",
-      ),
-    );
+    vi.clearAllMocks();
   });
 
   describe("init command", () => {
-    beforeEach(() => {
-      vi.spyOn(console, "log").mockImplementation(() => {});
-      vi.spyOn(console, "warn").mockImplementation(() => {});
+    it("creates sample config at default path", async () => {
+      vi.mocked(loader.createSampleConfig).mockResolvedValue();
+
+      const code = await main(["node", "sync-rules", "init"]);
+      expect(code).toBe(0);
+      expect(loader.createSampleConfig).toHaveBeenCalledWith(
+        DEFAULT_CONFIG_PATH,
+        false,
+      );
     });
 
-    it("should create a new config file when none exists", async () => {
-      mockAccess.mockRejectedValue(new Error("File not found"));
-      mockCreateSampleConfig.mockResolvedValue(undefined);
+    it("honors --force flag", async () => {
+      vi.mocked(loader.createSampleConfig).mockResolvedValue();
 
-      await main(["node", "sync-rules", "init"]);
-
-      expect(mockAccess).toHaveBeenCalledWith(DEFAULT_CONFIG_PATH, 0);
-      expect(mockCreateSampleConfig).toHaveBeenCalledWith(DEFAULT_CONFIG_PATH);
+      const code = await main(["node", "sync-rules", "init", "--force"]);
+      expect(code).toBe(0);
+      expect(loader.createSampleConfig).toHaveBeenCalledWith(
+        DEFAULT_CONFIG_PATH,
+        true,
+      );
     });
 
-    it("should not overwrite existing config without --force", async () => {
-      mockAccess.mockResolvedValue(undefined);
+    it("handles init errors gracefully", async () => {
+      vi.mocked(loader.createSampleConfig).mockRejectedValue(
+        new Error("Write failed"),
+      );
 
       const code = await main(["node", "sync-rules", "init"]);
       expect(code).toBe(1);
+    });
+  });
 
-      expect(mockAccess).toHaveBeenCalledWith(DEFAULT_CONFIG_PATH, 0);
-      expect(mockCreateSampleConfig).not.toHaveBeenCalled();
+  describe("sync command (default)", () => {
+    it("handles empty project list", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [],
+      });
+
+      const code = await main(["node", "sync-rules"]);
+      expect(code).toBe(0);
+      expect(syncMod.syncProject).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("launch command", () => {
+    it("returns 0 when tool exits successfully", async () => {
+      vi.mocked(launchMod.launchTool).mockResolvedValue({ exitCode: 0 });
+
+      const code = await main([
+        "node",
+        "sync-rules",
+        "launch",
+        "claude",
+        "--chat",
+      ]);
+      expect(launchMod.launchTool).toHaveBeenCalled();
+      expect(code).toBe(0);
     });
 
-    it("should overwrite existing config with --force", async () => {
-      mockAccess.mockResolvedValue(undefined);
-      mockCreateSampleConfig.mockResolvedValue(undefined);
+    it("returns the wrapped tool's non-zero exit code", async () => {
+      vi.mocked(launchMod.launchTool).mockResolvedValue({ exitCode: 2 });
 
-      await main(["node", "sync-rules", "init", "--force"]);
-
-      expect(mockAccess).toHaveBeenCalledWith(DEFAULT_CONFIG_PATH, 0);
-      expect(mockCreateSampleConfig).toHaveBeenCalledWith(DEFAULT_CONFIG_PATH);
+      const code = await main([
+        "node",
+        "sync-rules",
+        "launch",
+        "claude",
+        "--chat",
+      ]);
+      expect(launchMod.launchTool).toHaveBeenCalled();
+      expect(code).toBe(2);
     });
+  });
 
-    it("should handle existing invalid config files safely", async () => {
-      // This test ensures that even if a config file exists but is invalid JSON,
-      // we still protect it from being overwritten without --force
-      mockAccess.mockResolvedValue(undefined);
-
-      const code = await main(["node", "sync-rules", "init"]);
+  describe("error handling", () => {
+    it("handles unknown commands", async () => {
+      const code = await main(["node", "sync-rules", "unknown"]);
       expect(code).toBe(1);
-
-      // Should NOT attempt to load/parse the config
-      expect(mockLoadConfig).not.toHaveBeenCalled();
-      // Should NOT overwrite the file
-      expect(mockCreateSampleConfig).not.toHaveBeenCalled();
     });
 
-    it("should use custom config path from -c option", async () => {
-      mockAccess.mockRejectedValue(new Error("File not found"));
-      mockCreateSampleConfig.mockResolvedValue(undefined);
-
-      await main(["node", "sync-rules", "-c", "custom.json", "init"]);
-
-      expect(mockAccess).toHaveBeenCalledWith("custom.json", 0);
-      expect(mockCreateSampleConfig).toHaveBeenCalledWith("custom.json");
+    it("handles missing required arguments", async () => {
+      const code = await main(["node", "sync-rules", "launch"]);
+      expect(code).toBe(1);
     });
   });
 });

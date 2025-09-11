@@ -1,5 +1,4 @@
 import { createAdapter } from "./adapters.js";
-import type { AdapterName } from "../config/config.js";
 import type { AdapterDefinition, AdapterMetadata } from "./adapters.js";
 
 /**
@@ -10,21 +9,18 @@ const ADAPTER_DEFS = Object.freeze({
     meta: {
       type: "single-file",
       location: "CLAUDE.md",
-      title: "CLAUDE.md - Rules for Claude Code",
     } as const,
   },
   gemini: {
     meta: {
       type: "single-file",
       location: "GEMINI.md",
-      title: "GEMINI.md - Rules for Gemini Code",
     } as const,
   },
   codex: {
     meta: {
       type: "single-file",
       location: "AGENTS.md",
-      title: "AGENTS.md - Project docs for Codex CLI",
     } as const,
   },
   cline: {
@@ -33,7 +29,9 @@ const ADAPTER_DEFS = Object.freeze({
   kilocode: {
     meta: { type: "multi-file", directory: ".kilocode/rules" } as const,
   },
-}) satisfies Record<AdapterName, { meta: AdapterMetadata }>;
+}) satisfies Record<string, { meta: AdapterMetadata }>;
+
+export type AdapterName = keyof typeof ADAPTER_DEFS;
 
 export const adapterRegistry: Record<AdapterName, AdapterDefinition> = (() => {
   const reg: Record<AdapterName, AdapterDefinition> = {} as Record<
@@ -49,7 +47,3 @@ export const adapterRegistry: Record<AdapterName, AdapterDefinition> = (() => {
   }
   return reg;
 })();
-
-export const adapterNames: readonly AdapterName[] = Object.keys(
-  ADAPTER_DEFS,
-) as AdapterName[];

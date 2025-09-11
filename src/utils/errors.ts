@@ -67,31 +67,57 @@ export class SpawnError extends Error {
   readonly command: string;
   readonly exitCode?: number;
   readonly code?: string;
+  readonly signal?: string;
 
   constructor(
     command: string,
     code?: string,
     exitCode?: number,
-    message?: string,
+    signal?: string,
     cause?: Error,
   ) {
-    const baseMessage =
-      code === "ENOENT"
-        ? `"${command}" not found on PATH or cwd invalid. Install it or verify working directory.`
-        : message || `Failed to launch "${command}"`;
-
-    super(baseMessage, { cause });
+    const message = SpawnError.buildMessage(command, code, exitCode, signal);
+    super(message, { cause });
     this.name = this.constructor.name;
     this.command = command;
     this.code = code;
     this.exitCode = exitCode;
+    this.signal = signal;
+  }
+
+  /**
+   * Builds the appropriate error message based on the error conditions.
+   * Centralizes all spawn error message strings in one place.
+   */
+  static buildMessage(
+    command: string,
+    code?: string,
+    exitCode?: number,
+    signal?: string,
+  ): string {
+    // Command not found (ENOENT)
+    if (code === "ENOENT") {
+      return `"${command}" not found on PATH or cwd invalid. Install it or verify working directory.`;
+    }
+
+    // Process killed by signal with specific signal name
+    if (signal) {
+      return `Process "${command}" killed by signal ${signal}`;
+    }
+
+    // Tool exited with non-zero code
+    if (exitCode !== undefined && exitCode !== 0) {
+      return `Tool '${command}' exited with code ${String(exitCode)}`;
+    }
+
+    // Generic failure
+    return `Failed to launch "${command}"`;
   }
 }
 
 /**
  * Ensures that an unknown caught value is an Error object.
  * @param e - The unknown value to ensure is an Error
- * @returns An Error object
  */
 export function ensureError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
@@ -100,7 +126,6 @@ export function ensureError(e: unknown): Error {
 /**
  * Type guard to safely check if an error is a Node.js ErrnoException
  * @param e - The error to check
- * @returns true if the error is a NodeJS.ErrnoException
  */
 export function isNodeError(e: unknown): e is NodeJS.ErrnoException {
   return (

@@ -1,31 +1,75 @@
 import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
-import { defineConfig, globalIgnores } from "eslint/config";
+import { includeIgnoreFile } from "@eslint/compat";
 import eslintConfigPrettier from "eslint-config-prettier/flat";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "eslint/config";
 import vitest from "@vitest/eslint-plugin";
 
-export default defineConfig([
-  globalIgnores(["coverage/*", "dist/*"]),
+const gitignorePath = fileURLToPath(new URL(".gitignore", import.meta.url));
+
+// Restrict the TS "strict type-checked" presets to TS files only.
+const tsTypeChecked = tseslint.configs.strictTypeChecked.map((c) => ({
+  ...c,
+  files: ["**/*.{ts,tsx,mts,cts}"],
+}));
+
+export default defineConfig(
+  // Respect .gitignore
+  includeIgnoreFile(gitignorePath),
+
+  // Base JS rules
+  { languageOptions: { globals: globals.node } },
+  js.configs.recommended,
+  tseslint.configs.strict,
+
+  // TypeScript rules + typed linting (TS only)
+  ...tsTypeChecked,
   {
-    files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
-    plugins: { js },
-    extends: ["js/recommended"],
-  },
-  {
-    files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
-    languageOptions: { globals: globals.node },
-  },
-  tseslint.configs.recommended,
-  {
-    files: ["tests/**", "**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}"],
-    plugins: {
-      vitest,
+    files: ["**/*.{ts,tsx,mts,cts}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+      },
     },
+  },
+
+  // Tests: Vitest plugin
+  {
+    files: [
+      "**/*.{test,spec}.{ts,tsx,js,mjs,cjs,mts,cts}",
+      "tests/**/*.{ts,tsx,js,mjs,cjs,mts,cts}",
+    ],
+    ...vitest.configs.recommended,
+    languageOptions: {
+      globals: { ...vitest.environments.env.globals },
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+
+  // Additional rules
+  {
+    files: ["**/*.{js,mjs,cjs,ts,tsx,mts,cts}"],
     rules: {
-      ...vitest.configs.recommended.rules, // you can also use vitest.configs.all.rules to enable all rules
-      "@typescript-eslint/no-explicit-any": "off", // Allow 'any' in tests for mocking
+      "no-eval": "error",
+      "no-new-func": "error",
+      "no-script-url": "error",
+      "no-return-assign": ["error", "always"],
+      radix: ["error", "as-needed"],
+      "guard-for-in": "error",
+      "prefer-object-has-own": "error",
+      "prefer-regex-literals": ["error", { disallowRedundantWrapping: true }],
+      "require-unicode-regexp": "error",
+      "no-extend-native": "error",
+      "no-new-wrappers": "error",
+      "no-implicit-coercion": ["error", { allow: ["!!"] }],
     },
   },
+
+  // Prettier last
   eslintConfigPrettier,
-]);
+);

@@ -7,7 +7,7 @@ export default defineConfig({
     testTimeout: 30000,
     coverage: {
       reporter: ["text", "html"],
-      exclude: ["bin/*", "src/cli/main.ts", ...coverageConfigDefaults.exclude],
+      exclude: ["bin/*", ...coverageConfigDefaults.exclude],
     },
   },
 });

@@ -23,18 +23,15 @@ describe("constants", () => {
   });
 
   describe("environment variable path normalization", () => {
-    it("should normalize SYNC_RULES_CONFIG with tilde expansion", async () => {
+    it("resolves SYNC_RULES_CONFIG '~' to an absolute path", async () => {
       process.env.SYNC_RULES_CONFIG = "~/custom/config.json";
 
       // Clear module cache to re-evaluate constants
       vi.resetModules();
       const { DEFAULT_CONFIG_PATH } = await import("./constants.js");
 
-      // Should expand ~ and resolve to absolute path
       expect(DEFAULT_CONFIG_PATH).not.toContain("~");
       expect(DEFAULT_CONFIG_PATH).toContain("/custom/config.json");
     });
   });
-
-  // getRulesSource removed; normalization now handled by Zod in Config schema
 });

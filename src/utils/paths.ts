@@ -5,11 +5,10 @@ import { isAbsolute, relative, resolve } from "node:path";
  * Normalize a path by expanding `~` and resolving to an absolute path.
  * No boundary or permission checks are performed here.
  * @param input - The path to normalize (supports ~ for home directory)
- * @returns The normalized absolute path
  */
 export function normalizePath(input: string): string {
   const expanded = input.startsWith("~")
-    ? input.replace(/^~/, homedir())
+    ? input.replace(/^~/u, homedir())
     : input;
   return resolve(expanded);
 }
