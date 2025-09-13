@@ -25,6 +25,14 @@ Requires Node.js v22.0.0 or higher.
 npm install -g sync-rules
 ```
 
+Or run without installing globally using npx:
+
+```bash
+npx sync-rules --help
+# e.g.
+npx sync-rules init
+```
+
 ## Usage
 
 The workflow involves initializing a configuration file, defining your projects and rules, and then running the synchronization.
