@@ -3,6 +3,7 @@
   "compilerOptions": {
     /* Not transpiling with TypeScript */
     "noEmit": true,
+    "composite": true,
 
     /* Not running in the DOM */
     "lib": ["es2022"],
@@ -10,5 +11,11 @@
     /* Test environment types */
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src/**/*.test.ts", "src/**/*.spec.ts", "tests/**/*.ts"]
+  "include": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "tests/**/*.ts",
+    "src/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
 }

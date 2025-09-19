@@ -3,6 +3,7 @@
   "compilerOptions": {
     /* Not transpiling with TypeScript */
     "noEmit": true,
+    "composite": true,
 
     /* Not running in the DOM */
     "lib": ["es2022"],
