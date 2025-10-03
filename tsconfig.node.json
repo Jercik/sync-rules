@@ -11,5 +11,5 @@
     /* Allow importing .ts extensions for config files */
     "allowImportingTsExtensions": true
   },
-  "include": ["vitest.config.ts", "eslint.config.js"]
+  "include": ["vitest.config.ts", "eslint.config.js", "types/**/*.d.ts"]
 }

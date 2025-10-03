@@ -13,6 +13,6 @@
     /* Not running in the DOM */
     "lib": ["es2022"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "types/**/*.d.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
 }
