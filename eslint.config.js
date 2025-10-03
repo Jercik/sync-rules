@@ -20,7 +20,13 @@ export default defineConfig(
   includeIgnoreFile(gitignorePath),
 
   // Base JS rules
-  { languageOptions: { globals: globals.node } },
+  {
+    languageOptions: {
+      ecmaVersion: "latest", // Explicit for clarity
+      sourceType: "module", // Explicit for clarity
+      globals: globals.node,
+    },
+  },
   js.configs.recommended,
   tseslint.configs.strict,
 
@@ -30,7 +36,10 @@ export default defineConfig(
     files: ["**/*.{ts,tsx,mts,cts}"],
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["*.js", "*.mjs", "*.ts", "*.mts"], // Lint root config files
+        },
+        tsconfigRootDir: import.meta.dirname, // Required for Project Service
       },
     },
   },
@@ -41,7 +50,8 @@ export default defineConfig(
       "**/*.{test,spec}.{ts,tsx,js,mjs,cjs,mts,cts}",
       "tests/**/*.{ts,tsx,js,mjs,cjs,mts,cts}",
     ],
-    ...vitest.configs.recommended,
+    plugins: { vitest },
+    extends: [vitest.configs.recommended], // Modern extends property
     languageOptions: {
       globals: { ...vitest.environments.env.globals },
       parserOptions: {
@@ -51,17 +61,22 @@ export default defineConfig(
     },
   },
 
-  // Additional rules
+  // Additional security and quality rules
   {
     files: ["**/*.{js,mjs,cjs,ts,tsx,mts,cts}"],
     rules: {
+      // Security rules
       "no-eval": "error",
       "no-new-func": "error",
       "no-script-url": "error",
+
+      // Correctness rules
       "no-return-assign": ["error", "always"],
       radix: ["error", "as-needed"],
       "guard-for-in": "error",
       "prefer-object-has-own": "error",
+
+      // Clarity rules
       "prefer-regex-literals": ["error", { disallowRedundantWrapping: true }],
       "require-unicode-regexp": "error",
       "no-extend-native": "error",
