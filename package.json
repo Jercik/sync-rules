@@ -22,8 +22,6 @@
     "rebuild": "pnpm run clean && pnpm run build",
     "prepublishOnly": "pnpm run rebuild",
     "typecheck": "tsc -b --noEmit",
-    "typecheck:app": "tsc -p tsconfig.app.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint",

@@ -13,6 +13,7 @@ const gitignorePath = fileURLToPath(new URL(".gitignore", import.meta.url));
 const tsTypeChecked = tseslint.configs.strictTypeChecked.map((c) => ({
   ...c,
   files: ["**/*.{ts,tsx,mts,cts}"],
+  ignores: ["*.config.ts"], // Config files get basic linting only
 }));
 
 export default defineConfig(
@@ -22,13 +23,10 @@ export default defineConfig(
   // Base JS rules
   {
     languageOptions: {
-      ecmaVersion: "latest", // Explicit for clarity
-      sourceType: "module", // Explicit for clarity
       globals: globals.node,
     },
   },
   js.configs.recommended,
-  tseslint.configs.strict,
 
   // TypeScript rules + typed linting (TS only)
   ...tsTypeChecked,
@@ -36,10 +34,8 @@ export default defineConfig(
     files: ["**/*.{ts,tsx,mts,cts}"],
     languageOptions: {
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ["*.js", "*.mjs", "*.ts", "*.mts"], // Lint root config files
-        },
-        tsconfigRootDir: import.meta.dirname, // Required for Project Service
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
       },
     },
   },
@@ -54,10 +50,6 @@ export default defineConfig(
     extends: [vitest.configs.recommended], // Modern extends property
     languageOptions: {
       globals: { ...vitest.environments.env.globals },
-      parserOptions: {
-        projectService: true,
-        tsconfigRootDir: import.meta.dirname,
-      },
     },
   },
 
