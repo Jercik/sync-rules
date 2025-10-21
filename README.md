@@ -6,16 +6,16 @@ A CLI tool to synchronize AI coding assistant rule files between a central repos
 
 ## What is this tool for?
 
-Many AI coding assistants (like Claude, Gemini, etc.) can be customized using files stored within your project directory to understand context, coding standards, and specific instructions.
+Many AI coding assistants (Claude Code, Gemini, OpenCode, Codex CLI) read a local rules file to understand context, coding standards, and specific instructions.
 
-Managing these rules across numerous projects and different tools can become tedious. `sync-rules` solves this by allowing you to maintain a **single, centralized directory** of rules and automatically synchronize the relevant subsets into your various projects, formatted correctly for each tool.
+Managing these rules across numerous projects can be tedious. `sync-rules` lets you maintain a **single, centralized directory** of rules and automatically synchronize the relevant subsets into your projects using a single standard file.
 
 ## Key Features
 
 - **Centralized Rule Management:** Keep all your AI guidelines in one place.
 - **Project-Specific Configuration:** Use flexible glob patterns to define exactly which rules apply to which projects.
-- **Adapter System:** Automatically formats rules for different AI tools (e.g., consolidating into `CLAUDE.md` or splitting into subdirectories).
-- **Seamless Integration:** A `launch` command wrapper ensures your AI assistant always has the latest rules before it starts.
+- **Single Standard File:** Always generates `AGENTS.md` with all selected rules and creates a `CLAUDE.md` symlink for Claude Code.
+  // Seamless integration via shell: chain with your tool, e.g. `sync-rules && claude --chat`.
 
 ## Installation
 
@@ -57,12 +57,10 @@ Edit the `config.json` file to define your setup.
   "projects": [
     {
       "path": "~/Developer/my-backend-api",
-      "adapters": ["claude", "kilocode"],
       "rules": ["backend/**/*.md", "python-style.md", "!backend/legacy/**"]
     },
     {
       "path": "~/Developer/my-frontend-app",
-      "adapters": ["gemini"],
       "rules": ["frontend/**/*.md"]
     }
   ]
@@ -72,7 +70,6 @@ Edit the `config.json` file to define your setup.
 - `rulesSource`: The central directory where you store your rule files (e.g., Markdown files). If omitted, it defaults to the system's data directory.
 - `projects`: An array defining each project.
   - `path`: The root directory of the project (supports `~` for home directory).
-  - `adapters`: The AI tools you use in this project.
   - `rules`: POSIX-style glob patterns to select files from `rulesSource`. Supports negation (`!`).
 
 ### 3\. Synchronize Rules
@@ -85,42 +82,26 @@ sync-rules
 sync-rules sync
 ```
 
-This will read the rules and write the resulting files into the project directories (e.g., creating `CLAUDE.md` in `~/Developer/my-backend-api`).
+This reads the rules and writes `AGENTS.md` in each project. On macOS, a `CLAUDE.md` symlink pointing to `AGENTS.md` is also created for Claude Code.
 
-### 4\. Automatic Syncing (Launch Wrapper)
+### 4\. Run With Your Tool
 
-A key feature is the `launch` command. It acts as a wrapper around your AI tools. When you launch a recognized tool via `sync-rules launch`, it first detects the current project, synchronizes the rules, and _then_ starts the tool.
+Use standard shell chaining so your tool runs only after a successful sync:
 
 ```bash
 cd ~/Developer/my-backend-api
-
-# Instead of running 'claude --chat'
-sync-rules launch claude --chat
+sync-rules && claude --chat
 ```
 
-**How it works:**
+Tip: define a small shell function to forward args cleanly:
 
-1.  It detects the current working directory and finds the corresponding project configuration.
-2.  It synchronizes the rules for that project.
-3.  It launches the specified tool (`claude`), passing through any arguments (`--chat`).
+- bash/zsh: `sr() { sync-rules && command "$@"; }` → `sr claude --chat`
+- fish: `function sr; sync-rules; and command $argv; end`
 
-This guarantees the AI assistant always has the most up-to-date instructions. You can set up shell aliases for a seamless experience:
+## Output Files
 
-```bash
-alias claude='sync-rules launch claude'
-```
-
-## Supported Adapters
-
-The tool includes built-in support for the following adapters:
-
-| Adapter    | Type          | Output Location    | Description                                   |
-| ---------- | ------------- | ------------------ | --------------------------------------------- |
-| `claude`   | `single-file` | `CLAUDE.md`        | Consolidates all rules into a single file.    |
-| `gemini`   | `single-file` | `GEMINI.md`        | Consolidates all rules into a single file.    |
-| `codex`    | `single-file` | `AGENTS.md`        | Consolidates all rules into a single file.    |
-| `kilocode` | `multi-file`  | `.kilocode/rules/` | Copies rules individually into the directory. |
-| `cline`    | `multi-file`  | `.clinerules/`     | Copies rules individually into the directory. |
+- `AGENTS.md`: Canonical rules file read by Codex CLI, Gemini, and OpenCode.
+- `CLAUDE.md`: Symlink to `AGENTS.md` for Claude Code on macOS.
 
 ## License
 

@@ -2,7 +2,7 @@
   "name": "sync-rules",
   "author": "Łukasz Jerciński",
   "license": "MIT",
-  "version": "4.1.0",
+  "version": "5.0.0",
   "description": "CLI tool to synchronize AI coding assistant rule files between projects.",
   "type": "module",
   "bin": {
@@ -16,7 +16,7 @@
   "bugs": "https://github.com/Jercik/sync-rules/issues",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "start": "node dist/cli/main.js",
+    "start": "node bin/sync-rules",
     "build": "tsc -p tsconfig.app.json",
     "clean": "rm -rf dist",
     "rebuild": "pnpm run clean && pnpm run build",
@@ -44,7 +44,6 @@
   "dependencies": {
     "commander": "^14.0.0",
     "env-paths": "^3.0.0",
-    "execa": "^9.6.0",
     "globby": "^14.1.0",
     "zod": "^4.0.5"
   },

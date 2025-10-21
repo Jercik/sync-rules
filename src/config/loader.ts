@@ -18,7 +18,6 @@ const SAMPLE_CONFIG = `{
   "projects": [
     {
       "path": "/path/to/project",
-      "adapters": ["claude"],
       "rules": ["**/*.md"]
     }
   ]
@@ -53,10 +52,12 @@ export async function createSampleConfig(
     if (isNodeError(err) && err.code === "EEXIST" && !force) {
       throw new Error(
         `Config file already exists at ${normalizedPath}. Use --force to overwrite`,
+        { cause: err },
       );
     }
     throw new Error(
       `Failed to create config file at ${normalizedPath}: ${err.message}`,
+      { cause: err },
     );
   }
 }

@@ -20,7 +20,6 @@ describe("config", () => {
             {
               path: "~/Developer/project",
               rules: ["python.md"],
-              adapters: ["claude"],
             },
           ],
         });
@@ -30,52 +29,26 @@ describe("config", () => {
         // normalizePath will expand ~ to full home directory
         expect(config.projects[0]?.path).toMatch(/\/Developer\/project$/u);
         expect(config.projects[0]?.rules).toEqual(["python.md"]);
-        expect(config.projects[0]?.adapters).toEqual(["claude"]);
       });
 
-      it("parses multiple projects with multiple adapters", () => {
+      it("parses multiple projects", () => {
         const json = JSON.stringify({
           rulesSource: "/path/to/rules",
           projects: [
             {
               path: "./backend",
               rules: ["python.md", "devops/docker.md"],
-              adapters: ["claude", "kilocode"],
             },
             {
               path: "./frontend",
               rules: ["frontend/**/*.md"],
-              adapters: ["gemini"],
             },
           ],
         });
 
         const config = parseConfig(json);
         expect(config.projects).toHaveLength(2);
-        expect(config.projects[0]?.adapters).toEqual(["claude", "kilocode"]);
         expect(config.projects[1]?.rules).toEqual(["frontend/**/*.md"]);
-      });
-
-      it("validates adapter names against the runtime registry", () => {
-        const json = JSON.stringify({
-          rulesSource: "/path/to/rules",
-          projects: [
-            {
-              path: "./project",
-              rules: ["rule.md"],
-              adapters: ["claude", "gemini", "kilocode", "cline", "codex"],
-            },
-          ],
-        });
-
-        const config = parseConfig(json);
-        expect(config.projects[0]?.adapters).toEqual([
-          "claude",
-          "gemini",
-          "kilocode",
-          "cline",
-          "codex",
-        ]);
       });
 
       it("accepts positive and negative POSIX globs in 'rules'", () => {
@@ -85,7 +58,6 @@ describe("config", () => {
             {
               path: "./project",
               rules: ["**/*.md", "frontend/**", "!test/**"],
-              adapters: ["claude"],
             },
           ],
         });
@@ -100,13 +72,7 @@ describe("config", () => {
 
       it("applies DEFAULT_RULES_SOURCE when rulesSource is omitted", () => {
         const json = JSON.stringify({
-          projects: [
-            {
-              path: "~/Developer/project",
-              rules: ["test.md"],
-              adapters: ["claude"],
-            },
-          ],
+          projects: [{ path: "~/Developer/project", rules: ["test.md"] }],
         });
         const config = parseConfig(json);
         expect(typeof config.rulesSource).toBe("string");
@@ -114,20 +80,13 @@ describe("config", () => {
         expect(config.projects).toHaveLength(1);
         expect(config.projects[0]?.path).toMatch(/\//u);
         expect(config.projects[0]?.rules).toEqual(["test.md"]);
-        expect(config.projects[0]?.adapters).toEqual(["claude"]);
       });
     });
 
     describe("invalid configurations", () => {
       it("rejects 'rules' arrays that contain only negations", () => {
         const json = JSON.stringify({
-          projects: [
-            {
-              path: "./test",
-              rules: ["!test/**", "!**/*.md"],
-              adapters: ["claude"],
-            },
-          ],
+          projects: [{ path: "./test", rules: ["!test/**", "!**/*.md"] }],
         });
 
         expect(() => parseConfig(json)).toThrow(z.ZodError);
@@ -158,25 +117,12 @@ describe("config", () => {
           },
         },
         {
-          name: "invalid adapter name",
-          payload: {
-            projects: [
-              {
-                path: "./test",
-                rules: ["test.md"],
-                adapters: ["invalid-adapter"],
-              },
-            ],
-          },
-        },
-        {
           name: "wrong field type for rules",
           payload: {
             projects: [
               {
                 path: "./test",
                 rules: "test.md" as unknown as string[],
-                adapters: ["claude"],
               },
             ],
           },
@@ -191,21 +137,8 @@ describe("config", () => {
         const json = JSON.stringify({
           rulesSource: "/path/to/rules",
           projects: [
-            {
-              path: "./valid1",
-              rules: [],
-              adapters: ["claude"],
-            },
-            {
-              path: "./valid2",
-              rules: ["test.md"],
-              adapters: [],
-            },
-            {
-              path: "./valid3",
-              rules: ["rule.md"],
-              adapters: ["InvalidAdapter"],
-            },
+            { path: "./valid1", rules: [] },
+            { path: "./valid2", rules: ["test.md"] },
           ],
         });
 
@@ -215,7 +148,7 @@ describe("config", () => {
           parseConfig(json);
         } catch (error) {
           const zodError = error as z.ZodError;
-          expect(zodError.issues.length).toBe(4);
+          expect(zodError.issues.length).toBeGreaterThanOrEqual(1);
         }
       });
 
@@ -232,22 +165,18 @@ describe("config", () => {
         {
           path: "/home/user/projects/web-app",
           rules: ["**/*.md"],
-          adapters: ["claude"],
         },
         {
           path: "/home/user/projects/web-app/frontend",
           rules: ["**/*.md"],
-          adapters: ["gemini"],
         },
         {
           path: "/home/user/projects/api",
           rules: ["**/*.md"],
-          adapters: ["kilocode"],
         },
         {
           path: "/home/user/documents",
           rules: ["**/*.md"],
-          adapters: ["cline"],
         },
       ],
     };
@@ -267,7 +196,7 @@ describe("config", () => {
       const result = findProjectForPath("/home/user/projects/api", mockConfig);
       expect(result).toBeDefined();
       expect(result?.path).toBe("/home/user/projects/api");
-      expect(result?.adapters).toEqual(["kilocode"]);
+      expect(result?.rules).toEqual(["**/*.md"]);
     });
 
     it("should find parent project for nested path", () => {
@@ -286,7 +215,6 @@ describe("config", () => {
       );
       expect(result).toBeDefined();
       expect(result?.path).toBe("/home/user/projects/web-app/frontend");
-      expect(result?.adapters).toEqual(["gemini"]);
     });
 
     it("does not match sibling paths (e.g., 'api' vs 'api-v2')", () => {
@@ -314,17 +242,14 @@ describe("config", () => {
           {
             path: "/app",
             rules: ["**/*.md"],
-            adapters: ["claude"],
           },
           {
             path: "/app/frontend",
             rules: ["**/*.md"],
-            adapters: ["gemini"],
           },
           {
             path: "/app/frontend/components",
             rules: ["**/*.md"],
-            adapters: ["kilocode"],
           },
         ],
       };
@@ -355,7 +280,6 @@ describe("config", () => {
           {
             path: "/home/user/project",
             rules: ["**/*.md"],
-            adapters: ["claude"],
           },
         ],
       });
@@ -366,7 +290,6 @@ describe("config", () => {
 
       expect(fs.readFile).toHaveBeenCalledWith("/path/to/config.json", "utf8");
       expect(config.projects).toHaveLength(1);
-      expect(config.projects[0]?.adapters).toEqual(["claude"]);
     });
 
     it("should throw ConfigNotFoundError for missing default config", async () => {
@@ -430,7 +353,6 @@ describe("config", () => {
           {
             path: "~/project",
             rules: ["**/*.md"],
-            adapters: ["claude"],
           },
         ],
       });

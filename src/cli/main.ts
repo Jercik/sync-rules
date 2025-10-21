@@ -3,7 +3,9 @@ import packageJson from "../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 import { loadConfig, createSampleConfig } from "../config/loader.js";
 import type { Project } from "../config/config.js";
-import { SpawnError, SyncError, ensureError } from "../utils/errors.js";
+import { findProjectForPath } from "../config/config.js";
+import { SyncError, ensureError } from "../utils/errors.js";
+import { normalizePath } from "../utils/paths.js";
 
 /**
  * Entry point for the CLI application.
@@ -51,17 +53,41 @@ export async function main(argv: string[]): Promise<number> {
   program
     .command("sync", { isDefault: true })
     .description("Synchronize rules across all configured projects (default)")
+    .option(
+      "-p, --path <dir>",
+      "Sync only the most specific project containing this path",
+    )
     .addHelpText(
       "after",
-      "\nThis is the default command when no subcommand is specified.",
+      "\nThis is the default command when no subcommand is specified.\n\n" +
+        "Use --path to sync only one project:\n" +
+        "  sync-rules sync --path /home/user/my-project\n" +
+        "  sync-rules sync --path .\n\n" +
+        "This is useful for large configurations with many projects.",
     )
-    .action(async () => {
-      const options = program.opts<{ config?: string }>();
-      const config = await loadConfig(options.config || DEFAULT_CONFIG_PATH);
+    .action(async (options: { path?: string }) => {
+      const parentOpts = program.opts<{ config?: string }>();
+      const config = await loadConfig(parentOpts.config || DEFAULT_CONFIG_PATH);
 
+      // Filter to specific project if --path is provided
+      let projectsToSync: Project[];
+      if (options.path) {
+        const targetPath = normalizePath(options.path);
+        const project = findProjectForPath(targetPath, config);
+        if (!project) {
+          throw new Error(
+            `No configured project found for path: ${targetPath}\n\n` +
+              `Configured projects:\n${config.projects.map((p) => `  - ${p.path}`).join("\n")}`,
+          );
+        }
+        projectsToSync = [project];
+      } else {
+        projectsToSync = config.projects;
+      }
+
+      const { syncProject } = await import("../core/sync.js");
       const settlements = await Promise.allSettled(
-        config.projects.map(async (project: Project) => {
-          const { syncProject } = await import("../core/sync.js");
+        projectsToSync.map(async (project: Project) => {
           return await syncProject(project, { dryRun: false }, config);
         }),
       );
@@ -71,7 +97,7 @@ export async function main(argv: string[]): Promise<number> {
 
       settlements.forEach((settlement, index) => {
         if (settlement.status === "rejected") {
-          const project = config.projects[index];
+          const project = projectsToSync[index];
           if (project) {
             failures.push({
               project,
@@ -88,9 +114,6 @@ export async function main(argv: string[]): Promise<number> {
 
           // Extract SyncError details if available
           if (error instanceof SyncError) {
-            if (error.details.adapter) {
-              message += `\n    Adapter: ${error.details.adapter}`;
-            }
             message += `\n    Error: ${error.message}`;
             if (error.cause) {
               const causeMessage =
@@ -113,23 +136,35 @@ export async function main(argv: string[]): Promise<number> {
 
         throw new Error(`${summary}\n${errorMessages.join("\n")}`);
       }
-    });
 
-  program
-    .command("launch <tool> [toolArgs...]")
-    .description("Launch an AI tool with automatic rule syncing")
-    .passThroughOptions()
-    .allowUnknownOption()
-    .action(async (tool: string, toolArgs: string[], cmd: Command) => {
-      const parentOpts = cmd.parent?.opts<{ config?: string }>();
-      const { launchTool } = await import("../launch/launch.js");
-
-      const result = await launchTool(tool, toolArgs, {
-        configPath: parentOpts?.config || DEFAULT_CONFIG_PATH,
-      });
-
-      if (result.exitCode !== 0) {
-        throw new SpawnError(tool, undefined, result.exitCode, undefined);
+      // Success summary for better UX
+      const successes = settlements.filter(
+        (
+          s,
+        ): s is PromiseFulfilledResult<import("../core/sync.js").SyncResult> =>
+          s.status === "fulfilled",
+      );
+      const totalWrites = successes.reduce(
+        (acc, s) => acc + s.value.report.written.length,
+        0,
+      );
+      if (projectsToSync.length === 0) {
+        console.log("No projects configured; nothing to do.");
+      } else if (totalWrites === 0) {
+        console.log("No changes. Rules matched no files or files up to date.");
+      } else {
+        let projectInfo: string;
+        if (projectsToSync.length === 1) {
+          const [firstProject] = projectsToSync;
+          projectInfo = firstProject
+            ? `project (${firstProject.path})`
+            : "1 project(s)";
+        } else {
+          projectInfo = `${String(projectsToSync.length)} project(s)`;
+        }
+        console.log(
+          `Synchronized ${projectInfo}; wrote ${String(totalWrites)} file(s).`,
+        );
       }
     });
 
@@ -138,11 +173,15 @@ export async function main(argv: string[]): Promise<number> {
   } catch (error) {
     const err = ensureError(error);
 
+    // Always print an error message to avoid silent failures.
+    // Commander may also print its own message; duplication is acceptable.
+    console.error(err.message);
+
     if (err instanceof CommanderError) {
       return typeof err.exitCode === "number" ? err.exitCode : 1;
     }
 
-    return err instanceof SpawnError && err.exitCode != null ? err.exitCode : 1;
+    return 1;
   }
 
   return 0;

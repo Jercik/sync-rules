@@ -45,9 +45,15 @@ describe("createSampleConfig", () => {
     const eexist = Object.assign(new Error("exists"), { code: "EEXIST" });
     vi.mocked(fs.writeFile).mockRejectedValue(eexist);
 
-    await expect(createSampleConfig("/tmp/config.json", false)).rejects.toThrow(
-      /already exists.*--force/iu,
+    const error = await createSampleConfig("/tmp/config.json", false).catch(
+      (e: unknown) => e,
     );
+
+    expect(error).toBeInstanceOf(Error);
+    if (error instanceof Error) {
+      expect(error.message).toMatch(/already exists.*--force/iu);
+      expect(error.cause).toBe(eexist);
+    }
   });
 
   it("non-EEXIST errors are wrapped with normalized path context", async () => {
@@ -56,8 +62,16 @@ describe("createSampleConfig", () => {
     const eacces = Object.assign(new Error("EACCES"), { code: "EACCES" });
     vi.mocked(fs.writeFile).mockRejectedValue(eacces);
 
-    await expect(createSampleConfig("/tmp/config.json", true)).rejects.toThrow(
-      /Failed to create config file at \/tmp\/config\.json: EACCES/u,
+    const error = await createSampleConfig("/tmp/config.json", true).catch(
+      (e: unknown) => e,
     );
+
+    expect(error).toBeInstanceOf(Error);
+    if (error instanceof Error) {
+      expect(error.message).toMatch(
+        /Failed to create config file at \/tmp\/config\.json: EACCES/u,
+      );
+      expect(error.cause).toBe(eacces);
+    }
   });
 });

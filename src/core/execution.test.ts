@@ -8,6 +8,7 @@ import * as fsPromises from "node:fs/promises";
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(),
   writeFile: vi.fn(),
+  rename: vi.fn((_, dest: string) => Promise.resolve(dest)),
 }));
 
 describe("executeActions - algorithm tests", () => {

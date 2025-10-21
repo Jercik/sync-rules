@@ -1,8 +1,7 @@
 /**
  * Type for SyncError details with specific fields for different error contexts
  */
-export interface SyncErrorDetails {
-  adapter?: string;
+interface SyncErrorDetails {
   project?: string;
   action?: string;
   path?: string;
@@ -135,34 +134,4 @@ export function isNodeError(e: unknown): e is NodeJS.ErrnoException {
     (typeof (e as { code: unknown }).code === "string" ||
       typeof (e as { code: unknown }).code === "number")
   );
-}
-
-/**
- * Error thrown when the current working directory does not match any
- * configured project in the provided config file.
- */
-export class ProjectNotFoundError extends Error {
-  constructor(
-    readonly cwd: string,
-    readonly configPath: string,
-  ) {
-    super(`Project at ${cwd} not found in config at ${configPath}`);
-    this.name = this.constructor.name;
-  }
-}
-
-/**
- * Error thrown when a managed adapter is not configured for the detected project.
- */
-export class AdapterNotConfiguredError extends Error {
-  constructor(
-    readonly adapter: string,
-    readonly projectPath: string,
-    readonly configPath: string,
-  ) {
-    super(
-      `${adapter} adapter not configured for project at ${projectPath} (config: ${configPath})`,
-    );
-    this.name = this.constructor.name;
-  }
 }

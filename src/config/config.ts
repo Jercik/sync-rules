@@ -2,12 +2,10 @@ import { z } from "zod";
 import { isAbsolute, relative } from "node:path";
 import { normalizePath } from "../utils/paths.js";
 import { DEFAULT_RULES_SOURCE } from "./constants.js";
-import { adapterRegistry } from "../adapters/registry.js";
-
-// Adapter names are validated against the runtime registry to avoid duplication
 
 /**
- * Project configuration schema
+ * Project configuration schema.
+ * Each project specifies its path and glob patterns for selecting rules.
  */
 export const Project = z
   .object({
@@ -32,18 +30,12 @@ export const Project = z
       .describe(
         "POSIX-style glob patterns for selecting rule files. Use forward slashes even on Windows.",
       ),
-    adapters: z
-      .array(
-        z.string().refine((name) => name in adapterRegistry, {
-          message: `Unsupported adapter name`,
-        }),
-      )
-      .nonempty(),
   })
-  .strict();
+  .strip();
 
 /**
- * Main configuration schema
+ * Main configuration schema.
+ * Defines the central rules directory and all projects to sync.
  */
 export const Config = z
   .object({
@@ -58,7 +50,7 @@ export const Config = z
       .array(Project)
       .nonempty("At least one project must be specified"),
   })
-  .strict();
+  .strip();
 
 /**
  * Inferred types from Zod schemas
@@ -67,9 +59,11 @@ export type Project = z.infer<typeof Project>;
 export type Config = z.infer<typeof Config>;
 
 /**
- * Parses and validates a JSON configuration string
- * @param jsonContent - The JSON string to parse
- * @throws ZodError for validation issues
+ * Parse and validate configuration from JSON string.
+ *
+ * @param jsonContent - Raw JSON configuration string
+ * @returns Validated and normalized configuration object
+ * @throws {ZodError} If validation fails (invalid structure, missing fields, etc.)
  */
 export function parseConfig(jsonContent: string): Config {
   const data: unknown = JSON.parse(jsonContent);
@@ -79,9 +73,18 @@ export function parseConfig(jsonContent: string): Config {
 }
 
 /**
- * Find the most specific project configuration for a given path.
- * Handles nested projects correctly by returning the deepest matching path.
- * Uses path.relative for robust boundary checking to avoid partial matches.
+ * Find the most specific project configuration containing the given path.
+ *
+ * When multiple projects match (e.g., nested projects), returns the deepest one.
+ * Uses path.relative for robust boundary checking to prevent partial matches.
+ *
+ * @param currentPath - Path to search for (can be a file or directory)
+ * @param config - Configuration containing all projects
+ * @returns The most specific matching project, or undefined if no match
+ * @example
+ * // Given projects: ["/app", "/app/frontend"]
+ * findProjectForPath("/app/frontend/src", config)
+ * // Returns project with path "/app/frontend" (not "/app")
  */
 export function findProjectForPath(
   currentPath: string,

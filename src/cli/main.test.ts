@@ -12,13 +12,9 @@ vi.mock("../core/sync.js", () => ({
   syncProject: vi.fn(),
 }));
 
-vi.mock("../launch/launch.js", () => ({
-  launchTool: vi.fn(),
-}));
-
 import * as loader from "../config/loader.js";
 import * as syncMod from "../core/sync.js";
-import * as launchMod from "../launch/launch.js";
+// launch command removed; no related imports
 
 describe("cli/main", () => {
   beforeEach(() => {
@@ -69,37 +65,108 @@ describe("cli/main", () => {
       expect(code).toBe(0);
       expect(syncMod.syncProject).not.toHaveBeenCalled();
     });
-  });
 
-  describe("launch command", () => {
-    it("returns 0 when tool exits successfully", async () => {
-      vi.mocked(launchMod.launchTool).mockResolvedValue({ exitCode: 0 });
+    it("syncs all projects when no --path option is provided", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [
+          { path: "/home/user/project1", rules: ["**/*.md"] },
+          { path: "/home/user/project2", rules: ["**/*.md"] },
+        ],
+      });
 
-      const code = await main([
-        "node",
-        "sync-rules",
-        "launch",
-        "claude",
-        "--chat",
-      ]);
-      expect(launchMod.launchTool).toHaveBeenCalled();
+      vi.mocked(syncMod.syncProject).mockResolvedValue({
+        projectPath: "/home/user/project1",
+        report: { written: [] },
+      });
+
+      const code = await main(["node", "sync-rules"]);
       expect(code).toBe(0);
+      expect(syncMod.syncProject).toHaveBeenCalledTimes(2);
     });
 
-    it("returns the wrapped tool's non-zero exit code", async () => {
-      vi.mocked(launchMod.launchTool).mockResolvedValue({ exitCode: 2 });
+    it("syncs only the specific project when --path is provided", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [
+          { path: "/home/user/project1", rules: ["**/*.md"] },
+          { path: "/home/user/project2", rules: ["**/*.md"] },
+        ],
+      });
+
+      vi.mocked(syncMod.syncProject).mockResolvedValue({
+        projectPath: "/home/user/project2",
+        report: { written: [] },
+      });
 
       const code = await main([
         "node",
         "sync-rules",
-        "launch",
-        "claude",
-        "--chat",
+        "sync",
+        "--path",
+        "/home/user/project2",
       ]);
-      expect(launchMod.launchTool).toHaveBeenCalled();
-      expect(code).toBe(2);
+      expect(code).toBe(0);
+      expect(syncMod.syncProject).toHaveBeenCalledTimes(1);
+      expect(syncMod.syncProject).toHaveBeenCalledWith(
+        { path: "/home/user/project2", rules: ["**/*.md"] },
+        { dryRun: false },
+        expect.objectContaining({ rulesSource: "/rules" }),
+      );
+    });
+
+    it("syncs the most specific project when --path matches nested projects", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [
+          { path: "/home/user/project", rules: ["**/*.md"] },
+          { path: "/home/user/project/frontend", rules: ["**/*.md"] },
+        ],
+      });
+
+      vi.mocked(syncMod.syncProject).mockResolvedValue({
+        projectPath: "/home/user/project/frontend",
+        report: { written: [] },
+      });
+
+      const code = await main([
+        "node",
+        "sync-rules",
+        "sync",
+        "--path",
+        "/home/user/project/frontend/src",
+      ]);
+      expect(code).toBe(0);
+      expect(syncMod.syncProject).toHaveBeenCalledTimes(1);
+      expect(syncMod.syncProject).toHaveBeenCalledWith(
+        { path: "/home/user/project/frontend", rules: ["**/*.md"] },
+        { dryRun: false },
+        expect.objectContaining({ rulesSource: "/rules" }),
+      );
+    });
+
+    it("throws error when --path does not match any configured project", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [
+          { path: "/home/user/project1", rules: ["**/*.md"] },
+          { path: "/home/user/project2", rules: ["**/*.md"] },
+        ],
+      });
+
+      const code = await main([
+        "node",
+        "sync-rules",
+        "sync",
+        "--path",
+        "/home/other/project",
+      ]);
+      expect(code).toBe(1);
+      expect(syncMod.syncProject).not.toHaveBeenCalled();
     });
   });
+
+  // launch command removed
 
   describe("error handling", () => {
     it("handles unknown commands", async () => {
@@ -107,9 +174,6 @@ describe("cli/main", () => {
       expect(code).toBe(1);
     });
 
-    it("handles missing required arguments", async () => {
-      const code = await main(["node", "sync-rules", "launch"]);
-      expect(code).toBe(1);
-    });
+    // no required-arg commands remain
   });
 });
