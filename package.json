@@ -2,7 +2,7 @@
   "name": "sync-rules",
   "author": "Łukasz Jerciński",
   "license": "MIT",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "CLI tool to synchronize AI coding assistant rule files between projects.",
   "type": "module",
   "bin": {
