@@ -15,7 +15,6 @@
   "homepage": "https://github.com/Jercik/sync-rules#readme",
   "bugs": "https://github.com/Jercik/sync-rules/issues",
   "scripts": {
-    "preinstall": "npx only-allow pnpm",
     "start": "node bin/sync-rules",
     "build": "tsc -p tsconfig.app.json",
     "clean": "rm -rf dist *.tsbuildinfo",
