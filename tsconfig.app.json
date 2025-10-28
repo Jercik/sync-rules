@@ -4,10 +4,6 @@
     /* Transpiling with TypeScript */
     "outDir": "./dist",
     "rootDir": "./src",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "rewriteRelativeImportExtensions": true,
     "composite": true,
 
     /* Not running in the DOM */
