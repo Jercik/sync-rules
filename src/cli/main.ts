@@ -63,7 +63,6 @@ export async function main(argv: string[]): Promise<number> {
 
       const { syncProject } = await import("../core/sync.js");
       const { syncGlobal } = await import("../core/sync-global.js");
-      const { syncGlobal } = await import("../core/sync-global.js");
 
       const globalReport = await syncGlobal({ dryRun: false }, config);
 
