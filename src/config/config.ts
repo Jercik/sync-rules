@@ -50,6 +50,10 @@ export const Config = z
       .array(z.string())
       .optional()
       .refine(
+        (patterns) => patterns === undefined || patterns.length > 0,
+        { message: "global cannot be empty when provided" },
+      )
+      .refine(
         (patterns) =>
           patterns === undefined ||
           patterns.some((p) => {
