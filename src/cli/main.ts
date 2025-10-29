@@ -3,9 +3,7 @@ import packageJson from "../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 import { loadConfig, createSampleConfig } from "../config/loader.js";
 import type { Project } from "../config/config.js";
-import { findProjectForPath } from "../config/config.js";
 import { SyncError, ensureError } from "../utils/errors.js";
-import { normalizePath } from "../utils/paths.js";
 
 /**
  * Entry point for the CLI application.
@@ -53,37 +51,15 @@ export async function main(argv: string[]): Promise<number> {
   program
     .command("sync", { isDefault: true })
     .description("Synchronize rules across all configured projects (default)")
-    .option(
-      "-p, --path <dir>",
-      "Sync only the most specific project containing this path",
-    )
     .addHelpText(
       "after",
-      "\nThis is the default command when no subcommand is specified.\n\n" +
-        "Use --path to sync only one project:\n" +
-        "  sync-rules sync --path /home/user/my-project\n" +
-        "  sync-rules sync --path .\n\n" +
-        "This is useful for large configurations with many projects.",
+      "\nThis is the default command when no subcommand is specified.",
     )
-    .action(async (options: { path?: string }) => {
+    .action(async () => {
       const parentOpts = program.opts<{ config?: string }>();
       const config = await loadConfig(parentOpts.config || DEFAULT_CONFIG_PATH);
 
-      // Filter to specific project if --path is provided
-      let projectsToSync: Project[];
-      if (options.path) {
-        const targetPath = normalizePath(options.path);
-        const project = findProjectForPath(targetPath, config);
-        if (!project) {
-          throw new Error(
-            `No configured project found for path: ${targetPath}\n\n` +
-              `Configured projects:\n${config.projects.map((p) => `  - ${p.path}`).join("\n")}`,
-          );
-        }
-        projectsToSync = [project];
-      } else {
-        projectsToSync = config.projects;
-      }
+      const projectsToSync: Project[] = config.projects;
 
       const { syncProject } = await import("../core/sync.js");
       const { syncGlobal } = await import("../core/sync-global.js");

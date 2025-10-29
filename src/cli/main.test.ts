@@ -70,7 +70,7 @@ describe("cli/main", () => {
       expect(syncMod.syncProject).not.toHaveBeenCalled();
     });
 
-    it("syncs all projects when no --path option is provided", async () => {
+    it("syncs all configured projects", async () => {
       vi.mocked(loader.loadConfig).mockResolvedValue({
         rulesSource: "/rules",
         projects: [
@@ -87,86 +87,6 @@ describe("cli/main", () => {
       const code = await main(["node", "sync-rules"]);
       expect(code).toBe(0);
       expect(syncMod.syncProject).toHaveBeenCalledTimes(2);
-    });
-
-    it("syncs only the specific project when --path is provided", async () => {
-      vi.mocked(loader.loadConfig).mockResolvedValue({
-        rulesSource: "/rules",
-        projects: [
-          { path: "/home/user/project1", rules: ["**/*.md"] },
-          { path: "/home/user/project2", rules: ["**/*.md"] },
-        ],
-      });
-
-      vi.mocked(syncMod.syncProject).mockResolvedValue({
-        projectPath: "/home/user/project2",
-        report: { written: [] },
-      });
-
-      const code = await main([
-        "node",
-        "sync-rules",
-        "sync",
-        "--path",
-        "/home/user/project2",
-      ]);
-      expect(code).toBe(0);
-      expect(syncMod.syncProject).toHaveBeenCalledTimes(1);
-      expect(syncMod.syncProject).toHaveBeenCalledWith(
-        { path: "/home/user/project2", rules: ["**/*.md"] },
-        { dryRun: false },
-        expect.objectContaining({ rulesSource: "/rules" }),
-      );
-    });
-
-    it("syncs the most specific project when --path matches nested projects", async () => {
-      vi.mocked(loader.loadConfig).mockResolvedValue({
-        rulesSource: "/rules",
-        projects: [
-          { path: "/home/user/project", rules: ["**/*.md"] },
-          { path: "/home/user/project/frontend", rules: ["**/*.md"] },
-        ],
-      });
-
-      vi.mocked(syncMod.syncProject).mockResolvedValue({
-        projectPath: "/home/user/project/frontend",
-        report: { written: [] },
-      });
-
-      const code = await main([
-        "node",
-        "sync-rules",
-        "sync",
-        "--path",
-        "/home/user/project/frontend/src",
-      ]);
-      expect(code).toBe(0);
-      expect(syncMod.syncProject).toHaveBeenCalledTimes(1);
-      expect(syncMod.syncProject).toHaveBeenCalledWith(
-        { path: "/home/user/project/frontend", rules: ["**/*.md"] },
-        { dryRun: false },
-        expect.objectContaining({ rulesSource: "/rules" }),
-      );
-    });
-
-    it("throws error when --path does not match any configured project", async () => {
-      vi.mocked(loader.loadConfig).mockResolvedValue({
-        rulesSource: "/rules",
-        projects: [
-          { path: "/home/user/project1", rules: ["**/*.md"] },
-          { path: "/home/user/project2", rules: ["**/*.md"] },
-        ],
-      });
-
-      const code = await main([
-        "node",
-        "sync-rules",
-        "sync",
-        "--path",
-        "/home/other/project",
-      ]);
-      expect(code).toBe(1);
-      expect(syncMod.syncProject).not.toHaveBeenCalled();
     });
   });
 
