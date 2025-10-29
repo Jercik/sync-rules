@@ -51,7 +51,8 @@ export async function syncProject(
   const report = await executeActions(actions, flags);
 
   // If no rules were written this run but AGENTS.md already exists, ensure CLAUDE.md is present
-  if (!flags.dryRun && rules.length === 0) {
+  // Also include this in dry-run mode for consistent reporting
+  if (rules.length === 0) {
     let agentsExists = report.written.includes(agentsPath);
     if (!agentsExists) {
       try {
@@ -68,7 +69,7 @@ export async function syncProject(
         flags,
       );
       // Merge CLAUDE.md write result into the main report so callers see full outcome
-      report.written = [...report.written, ...claudeReport.written];
+      report.written.push(...claudeReport.written);
     }
   }
 
