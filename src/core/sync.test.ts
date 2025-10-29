@@ -6,6 +6,7 @@ import type { Project } from "../config/config.js";
 import type { Rule } from "./rules-fs.js";
 import * as fsPromises from "node:fs/promises";
 import type { Stats } from "node:fs";
+import type { WriteAction } from "./execution.js";
 
 vi.mock("./rules-fs.js", () => ({
   loadRules: vi.fn(),
@@ -46,7 +47,7 @@ describe("sync", () => {
         ],
       });
 
-      const result = await syncProject(
+      await syncProject(
         mockProject,
         { dryRun: false },
         { rulesSource: "/path/to/rules", projects: [] },
@@ -57,12 +58,14 @@ describe("sync", () => {
         ["**/*.md"],
       );
       expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
-      const actionsArg = vi.mocked(executionModule.executeActions).mock
-        .calls[0]?.[0];
-      const paths = actionsArg?.map((a: any) => a.path);
+      const callArgs = vi.mocked(executionModule.executeActions).mock.calls[0];
+      const actionsArg: WriteAction[] = callArgs?.[0] ?? [];
+      const paths = actionsArg.map((action) => action.path);
       expect(paths).toContain("/home/user/project/AGENTS.md");
       expect(paths).toContain("/home/user/project/CLAUDE.md");
-      const claude = actionsArg?.find((a: any) => a.path.endsWith("CLAUDE.md"));
+      const claude = actionsArg.find((action) =>
+        action.path.endsWith("CLAUDE.md"),
+      );
       expect(claude?.content).toBe("@AGENTS.md");
     });
 
@@ -82,9 +85,11 @@ describe("sync", () => {
       );
 
       expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
-      const actionsArg = vi.mocked(executionModule.executeActions).mock
-        .calls[0]?.[0];
-      const claude = actionsArg?.find((a: any) => a.path.endsWith("CLAUDE.md"));
+      const callArgs = vi.mocked(executionModule.executeActions).mock.calls[0];
+      const actionsArg: WriteAction[] = callArgs?.[0] ?? [];
+      const claude = actionsArg.find((action) =>
+        action.path.endsWith("CLAUDE.md"),
+      );
       expect(claude?.content).toBe("@AGENTS.md");
     });
 
@@ -101,9 +106,9 @@ describe("sync", () => {
       );
 
       expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
-      const actionsArg = vi.mocked(executionModule.executeActions).mock
-        .calls[0]?.[0];
-      const paths = actionsArg?.map((a: any) => a.path);
+      const callArgs = vi.mocked(executionModule.executeActions).mock.calls[0];
+      const actionsArg: WriteAction[] = callArgs?.[0] ?? [];
+      const paths = actionsArg.map((action) => action.path);
       expect(paths).toContain("/home/user/project/AGENTS.md");
       expect(paths).toContain("/home/user/project/CLAUDE.md");
     });
@@ -124,11 +129,12 @@ describe("sync", () => {
       );
 
       expect(executionModule.executeActions).toHaveBeenCalledTimes(2);
-      const secondCallArgs = vi.mocked(executionModule.executeActions).mock
-        .calls[1]?.[0];
-      const paths = secondCallArgs?.map((a: any) => a.path);
+      const secondCallArgs =
+        vi.mocked(executionModule.executeActions).mock.calls[1];
+      const secondActions: WriteAction[] = secondCallArgs?.[0] ?? [];
+      const paths = secondActions.map((action) => action.path);
       expect(paths).toEqual(["/home/user/project/CLAUDE.md"]);
-      const claude = secondCallArgs?.[0];
+      const [claude] = secondActions;
       expect(claude?.content).toBe("@AGENTS.md");
     });
   });

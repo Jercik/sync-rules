@@ -15,6 +15,7 @@ import type { Config } from "./config.js";
  * Sample configuration template for new installations
  */
 const SAMPLE_CONFIG = `{
+  "global": ["global-rules/*.md"],
   "projects": [
     {
       "path": "/path/to/project",
