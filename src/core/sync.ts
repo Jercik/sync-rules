@@ -63,10 +63,12 @@ export async function syncProject(
     }
     if (agentsExists) {
       const claudePath = resolveInside(project.path, "CLAUDE.md");
-      await executeActions(
+      const claudeReport = await executeActions(
         [{ path: claudePath, content: "@AGENTS.md" }],
         flags,
       );
+      // Merge CLAUDE.md write result into the main report so callers see full outcome
+      report.written = [...report.written, ...claudeReport.written];
     }
   }
 
