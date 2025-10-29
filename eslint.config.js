@@ -9,35 +9,28 @@ import vitest from "@vitest/eslint-plugin";
 
 const gitignorePath = fileURLToPath(new URL(".gitignore", import.meta.url));
 
-// Restrict the TS "strict type-checked" presets to TS files only.
-const tsTypeChecked = tseslint.configs.strictTypeChecked.map((c) => ({
-  ...c,
-  files: ["**/*.{ts,tsx,mts,cts}"],
-  ignores: ["*.config.ts"], // Config files get basic linting only
-}));
-
 export default defineConfig(
   // Respect .gitignore
-  includeIgnoreFile(gitignorePath),
+  includeIgnoreFile(gitignorePath, "Copy patterns from .gitignore"),
 
-  // Base JS rules
+  // Base config for all JS/TS files
   {
+    name: "Base config for all JS/TS files",
+    files: ["**/*.{js,mjs,cjs,ts,tsx,mts,cts}"],
+    extends: [js.configs.recommended, tseslint.configs.strictTypeChecked],
     languageOptions: {
-      globals: globals.node,
-    },
-  },
-  js.configs.recommended,
-
-  // TypeScript rules + typed linting (TS only)
-  ...tsTypeChecked,
-  {
-    files: ["**/*.{ts,tsx,mts,cts}"],
-    languageOptions: {
+      globals: { ...globals.node },
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
       },
     },
+  },
+
+  // Config files - disable type-aware linting
+  {
+    name: "Config files - disable type-aware linting",
+    files: ["*.config.{js,ts,mts,cts}"],
+    ...tseslint.configs.disableTypeChecked,
   },
 
   // Tests: Vitest plugin
@@ -47,7 +40,7 @@ export default defineConfig(
       "tests/**/*.{ts,tsx,js,mjs,cjs,mts,cts}",
     ],
     plugins: { vitest },
-    extends: [vitest.configs.recommended], // Modern extends property
+    extends: [vitest.configs.recommended],
     languageOptions: {
       globals: { ...vitest.environments.env.globals },
     },
