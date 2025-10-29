@@ -35,10 +35,7 @@ export async function syncGlobal(
   if (rules.length === 0) {
     return { written: [] };
   }
-
-  const header = `# AGENTS.md\n\nTo modify rules, edit the source ".md" files and run "sync-rules".\n\n`;
-  const body = rules.map((r) => r.content).join("\n\n---\n\n");
-  const content = header + body;
+  const content = rules.map((r) => r.content).join("\n\n---\n\n");
 
   const targets = getGlobalTargetPaths();
   const actions: WriteAction[] = targets.map((path) => ({ path, content }));

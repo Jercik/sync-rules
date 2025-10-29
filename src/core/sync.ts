@@ -39,8 +39,8 @@ export async function syncProject(
 
   if (rules.length > 0) {
     // Write AGENTS.md with concatenated content
-    const body = rules.map((r) => r.content).join("\n\n---\n\n");
-    actions.push({ path: agentsPath, content: body });
+    const content = rules.map((r) => r.content).join("\n\n---\n\n");
+    actions.push({ path: agentsPath, content });
 
     // Also write CLAUDE.md include file (Claude Code supported syntax)
     const claudePath = resolveInside(project.path, "CLAUDE.md");
