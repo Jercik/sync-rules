@@ -2,9 +2,7 @@ import { executeActions } from "./execution.js";
 import type { ExecutionReport, WriteAction, RunFlags } from "./execution.js";
 import { loadRules } from "./rules-fs.js";
 import type { Project, Config } from "../config/config.js";
-import { SyncError, ensureError } from "../utils/errors.js";
-import { join } from "node:path";
-import { lstat, rm, symlink } from "node:fs/promises";
+import { lstat } from "node:fs/promises";
 import { resolveInside } from "../utils/paths.js";
 
 export interface SyncResult {
@@ -35,26 +33,26 @@ export async function syncProject(
   // Load rules once
   const rules = await loadRules(rulesDir, project.rules);
 
-  // Plan a single write: AGENTS.md with concatenated content
+  // Plan writes
   const actions: WriteAction[] = [];
+  const agentsPath = resolveInside(project.path, "AGENTS.md");
+
   if (rules.length > 0) {
-    const agentsPath = resolveInside(project.path, "AGENTS.md");
+    // Write AGENTS.md with concatenated content
     const header = `# AGENTS.md\n\nTo modify rules, edit the source ".md" files and run "sync-rules".\n\n`;
     const body = rules.map((r) => r.content).join("\n\n---\n\n");
     actions.push({ path: agentsPath, content: header + body });
+
+    // Also write CLAUDE.md include file (Claude Code supported syntax)
+    const claudePath = resolveInside(project.path, "CLAUDE.md");
+    actions.push({ path: claudePath, content: "@AGENTS.md" });
   }
 
   const report = await executeActions(actions, flags);
 
-  // Create/refresh CLAUDE.md symlink pointing to AGENTS.md
-  if (!flags.dryRun) {
-    const claudePath = join(project.path, "CLAUDE.md");
-    const target = "AGENTS.md"; // relative within project
-
-    // Guard: only symlink if AGENTS.md exists (was written now or already present)
-    const agentsPath = resolveInside(project.path, "AGENTS.md");
-    const wroteAgents = report.written.includes(agentsPath);
-    let agentsExists = wroteAgents;
+  // If no rules were written this run but AGENTS.md already exists, ensure CLAUDE.md is present
+  if (!flags.dryRun && rules.length === 0) {
+    let agentsExists = report.written.includes(agentsPath);
     if (!agentsExists) {
       try {
         await lstat(agentsPath);
@@ -64,22 +62,11 @@ export async function syncProject(
       }
     }
     if (agentsExists) {
-      try {
-        // If something exists at CLAUDE.md, remove it (file or symlink)
-        try {
-          await lstat(claudePath);
-          await rm(claudePath, { force: true });
-        } catch {
-          // ignore if it doesn't exist
-        }
-        await symlink(target, claudePath);
-      } catch (err) {
-        throw new SyncError(
-          `Failed to create symlink ${claudePath} -> ${target}`,
-          { action: "symlink", path: claudePath, project: project.path },
-          ensureError(err),
-        );
-      }
+      const claudePath = resolveInside(project.path, "CLAUDE.md");
+      await executeActions(
+        [{ path: claudePath, content: "@AGENTS.md" }],
+        flags,
+      );
     }
   }
 

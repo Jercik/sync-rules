@@ -19,8 +19,6 @@ vi.mock("node:fs/promises", () => ({
   lstat: vi
     .fn()
     .mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" })),
-  rm: vi.fn(),
-  symlink: vi.fn(),
 }));
 
 describe("sync", () => {
@@ -42,7 +40,10 @@ describe("sync", () => {
     it("writes AGENTS.md with concatenated rules", async () => {
       vi.mocked(filesystemModule.loadRules).mockResolvedValue(mockRules);
       vi.mocked(executionModule.executeActions).mockResolvedValue({
-        written: ["/home/user/project/AGENTS.md"],
+        written: [
+          "/home/user/project/AGENTS.md",
+          "/home/user/project/CLAUDE.md",
+        ],
       });
 
       const result = await syncProject(
@@ -55,18 +56,23 @@ describe("sync", () => {
         expect.any(String),
         ["**/*.md"],
       );
-      expect(executionModule.executeActions).toHaveBeenCalled();
+      expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
       const actionsArg = vi.mocked(executionModule.executeActions).mock
         .calls[0]?.[0];
-      expect(actionsArg?.[0]?.path).toBe("/home/user/project/AGENTS.md");
-      expect(actionsArg?.[0]?.content).toContain("# AGENTS.md");
-      expect(result.report.written).toEqual(["/home/user/project/AGENTS.md"]);
+      const paths = actionsArg?.map((a: any) => a.path);
+      expect(paths).toContain("/home/user/project/AGENTS.md");
+      expect(paths).toContain("/home/user/project/CLAUDE.md");
+      const claude = actionsArg?.find((a: any) => a.path.endsWith("CLAUDE.md"));
+      expect(claude?.content).toBe("@AGENTS.md");
     });
 
-    it("creates CLAUDE.md symlink to AGENTS.md when not dry-run", async () => {
+    it("creates CLAUDE.md file referencing AGENTS.md when not dry-run", async () => {
       vi.mocked(filesystemModule.loadRules).mockResolvedValue(mockRules);
       vi.mocked(executionModule.executeActions).mockResolvedValue({
-        written: ["/home/user/project/AGENTS.md"],
+        written: [
+          "/home/user/project/AGENTS.md",
+          "/home/user/project/CLAUDE.md",
+        ],
       });
 
       await syncProject(
@@ -75,13 +81,14 @@ describe("sync", () => {
         { rulesSource: "/path/to/rules", projects: [] },
       );
 
-      expect(fsPromises.symlink).toHaveBeenCalledWith(
-        "AGENTS.md",
-        "/home/user/project/CLAUDE.md",
-      );
+      expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
+      const actionsArg = vi.mocked(executionModule.executeActions).mock
+        .calls[0]?.[0];
+      const claude = actionsArg?.find((a: any) => a.path.endsWith("CLAUDE.md"));
+      expect(claude?.content).toBe("@AGENTS.md");
     });
 
-    it("does not attempt symlink in dry-run mode", async () => {
+    it("does not attempt extra writes in dry-run mode", async () => {
       vi.mocked(filesystemModule.loadRules).mockResolvedValue(mockRules);
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         written: [],
@@ -93,16 +100,21 @@ describe("sync", () => {
         { rulesSource: "/path/to/rules", projects: [] },
       );
 
-      expect(fsPromises.symlink).not.toHaveBeenCalled();
+      expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
+      const actionsArg = vi.mocked(executionModule.executeActions).mock
+        .calls[0]?.[0];
+      const paths = actionsArg?.map((a: any) => a.path);
+      expect(paths).toContain("/home/user/project/AGENTS.md");
+      expect(paths).toContain("/home/user/project/CLAUDE.md");
     });
 
-    it("removes existing CLAUDE.md before creating symlink", async () => {
-      vi.mocked(filesystemModule.loadRules).mockResolvedValue(mockRules);
-      vi.mocked(executionModule.executeActions).mockResolvedValue({
-        written: ["/home/user/project/AGENTS.md"],
-      });
+    it("writes CLAUDE.md when AGENTS.md exists but no rules were selected", async () => {
+      vi.mocked(filesystemModule.loadRules).mockResolvedValue([]);
+      vi.mocked(executionModule.executeActions)
+        .mockResolvedValueOnce({ written: [] }) // first call (no actions)
+        .mockResolvedValueOnce({ written: ["/home/user/project/CLAUDE.md"] }); // second call to write CLAUDE.md
 
-      // lstat resolves to an object to simulate existence
+      // Simulate AGENTS.md existing already
       vi.mocked(fsPromises.lstat).mockResolvedValueOnce({} as unknown as Stats);
 
       await syncProject(
@@ -111,11 +123,13 @@ describe("sync", () => {
         { rulesSource: "/path/to/rules", projects: [] },
       );
 
-      expect(fsPromises.rm).toHaveBeenCalledWith(
-        "/home/user/project/CLAUDE.md",
-        { force: true },
-      );
-      expect(fsPromises.symlink).toHaveBeenCalled();
+      expect(executionModule.executeActions).toHaveBeenCalledTimes(2);
+      const secondCallArgs = vi.mocked(executionModule.executeActions).mock
+        .calls[1]?.[0];
+      const paths = secondCallArgs?.map((a: any) => a.path);
+      expect(paths).toEqual(["/home/user/project/CLAUDE.md"]);
+      const claude = secondCallArgs?.[0];
+      expect(claude?.content).toBe("@AGENTS.md");
     });
   });
 });

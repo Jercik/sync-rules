@@ -14,7 +14,7 @@ Managing these rules across numerous projects can be tedious. `sync-rules` lets 
 
 - **Centralized Rule Management:** Keep all your AI guidelines in one place.
 - **Project-Specific Configuration:** Use flexible glob patterns to define exactly which rules apply to which projects.
-- **Single Standard File:** Always generates `AGENTS.md` with all selected rules and creates a `CLAUDE.md` symlink for Claude Code.
+- **Single Standard File:** Always generates `AGENTS.md` with all selected rules and writes a `CLAUDE.md` file containing `@AGENTS.md` for Claude Code.
   // Seamless integration via shell: chain with your tool, e.g. `sync-rules && claude --chat`.
 
 ## Installation
@@ -82,7 +82,7 @@ sync-rules
 sync-rules sync
 ```
 
-This reads the rules and writes `AGENTS.md` in each project. On macOS, a `CLAUDE.md` symlink pointing to `AGENTS.md` is also created for Claude Code.
+This reads the rules and writes `AGENTS.md` in each project. It also writes `CLAUDE.md` containing `@AGENTS.md` for Claude Code.
 
 ### 4\. Run With Your Tool
 
@@ -101,7 +101,7 @@ Tip: define a small shell function to forward args cleanly:
 ## Output Files
 
 - `AGENTS.md`: Canonical rules file read by Codex CLI, Gemini, and OpenCode.
-- `CLAUDE.md`: Symlink to `AGENTS.md` for Claude Code on macOS.
+- `CLAUDE.md`: A tiny include file with `@AGENTS.md` (Claude Code supported syntax).
 
 ## License
 
