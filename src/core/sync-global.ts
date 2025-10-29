@@ -15,7 +15,7 @@ const BUILT_IN_GLOBAL_TARGETS = [
 export function getGlobalTargetPaths(): string[] {
   // Normalize and deduplicate
   const targets = BUILT_IN_GLOBAL_TARGETS.map((p) => normalizePath(p));
-  return targets.filter((p, idx, arr) => arr.indexOf(p) === idx);
+  return [...new Set(targets)];
 }
 
 /**
