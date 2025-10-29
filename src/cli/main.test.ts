@@ -12,6 +12,10 @@ vi.mock("../core/sync.js", () => ({
   syncProject: vi.fn(),
 }));
 
+vi.mock("../core/sync-global.js", () => ({
+  syncGlobal: vi.fn().mockResolvedValue({ written: [] }),
+}));
+
 import * as loader from "../config/loader.js";
 import * as syncMod from "../core/sync.js";
 // launch command removed; no related imports

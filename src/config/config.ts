@@ -46,6 +46,24 @@ export const Config = z
       .describe(
         "Path to the central rules directory. If not specified, defaults to system app data folder.",
       ),
+    global: z
+      .array(z.string())
+      .optional()
+      .refine(
+        (patterns) =>
+          patterns === undefined ||
+          patterns.some((p) => {
+            const t = p.trim();
+            return t !== "" && !t.startsWith("!");
+          }),
+        {
+          message:
+            'global must include at least one positive glob pattern (e.g., "global-rules/*.md") when provided',
+        },
+      )
+      .describe(
+        "Optional POSIX-style globs for global rules to sync to tool-specific global files.",
+      ),
     projects: z
       .array(Project)
       .nonempty("At least one project must be specified"),

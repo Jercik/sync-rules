@@ -86,6 +86,7 @@ export async function main(argv: string[]): Promise<number> {
       }
 
       const { syncProject } = await import("../core/sync.js");
+      const { syncGlobal } = await import("../core/sync-global.js");
       const settlements = await Promise.allSettled(
         projectsToSync.map(async (project: Project) => {
           return await syncProject(project, { dryRun: false }, config);
@@ -144,10 +145,13 @@ export async function main(argv: string[]): Promise<number> {
         ): s is PromiseFulfilledResult<import("../core/sync.js").SyncResult> =>
           s.status === "fulfilled",
       );
-      const totalWrites = successes.reduce(
+      const projectWrites = successes.reduce(
         (acc, s) => acc + s.value.report.written.length,
         0,
       );
+      // Perform global sync (once per run)
+      const globalReport = await syncGlobal({ dryRun: false }, config);
+      const totalWrites = projectWrites + globalReport.written.length;
       if (projectsToSync.length === 0) {
         console.log("No projects configured; nothing to do.");
       } else if (totalWrites === 0) {
