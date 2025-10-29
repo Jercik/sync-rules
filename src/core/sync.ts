@@ -17,7 +17,7 @@ export interface SyncResult {
  * 1. Load rule files from the central repository using project-specific glob patterns
  * 2. Generate AGENTS.md with concatenated rule content
  * 3. Execute write actions (respecting dry-run flag)
- * 4. Create CLAUDE.md symlink pointing to AGENTS.md for Claude Code compatibility
+ * 4. Ensure a CLAUDE.md include file points to AGENTS.md for Claude Code compatibility
  *
  * @param project - The project configuration specifying path and rule patterns
  * @param flags - Execution options (e.g., `{ dryRun: true }` to preview changes)
