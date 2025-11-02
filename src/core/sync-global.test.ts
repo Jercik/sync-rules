@@ -24,20 +24,26 @@ describe("sync-global", () => {
   });
 
   it("returns no writes when no global patterns configured", async () => {
-    const result = await syncGlobal({ dryRun: false }, {
-      rulesSource: "/rules",
-      projects: [],
-    });
+    const result = await syncGlobal(
+      { dryRun: false },
+      {
+        rulesSource: "/rules",
+        projects: [],
+      },
+    );
     expect(result.written).toEqual([]);
   });
 
   it("returns no writes when no rules match", async () => {
     vi.mocked(filesystemModule.loadRules).mockResolvedValue([]);
-    const result = await syncGlobal({ dryRun: false }, {
-      rulesSource: "/rules",
-      global: ["global-rules/*.md"],
-      projects: [],
-    });
+    const result = await syncGlobal(
+      { dryRun: false },
+      {
+        rulesSource: "/rules",
+        global: ["global-rules/*.md"],
+        projects: [],
+      },
+    );
     expect(filesystemModule.loadRules).toHaveBeenCalled();
     expect(result.written).toEqual([]);
   });
@@ -48,17 +54,17 @@ describe("sync-global", () => {
 
     // Mock executeActions
     vi.mocked(executionModule.executeActions).mockResolvedValue({
-      written: [
-        "/home/user/.claude/CLAUDE.md",
-        "/home/user/.codex/AGENTS.md",
-      ],
+      written: ["/home/user/.claude/CLAUDE.md", "/home/user/.codex/AGENTS.md"],
     });
 
-    const result = await syncGlobal({ dryRun: false }, {
-      rulesSource: "/rules",
-      global: ["global-rules/*.md"],
-      projects: [],
-    });
+    const result = await syncGlobal(
+      { dryRun: false },
+      {
+        rulesSource: "/rules",
+        global: ["global-rules/*.md"],
+        projects: [],
+      },
+    );
 
     expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
     const callArgs = vi.mocked(executionModule.executeActions).mock.calls[0];

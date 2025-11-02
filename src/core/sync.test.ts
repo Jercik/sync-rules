@@ -129,8 +129,8 @@ describe("sync", () => {
       );
 
       expect(executionModule.executeActions).toHaveBeenCalledTimes(2);
-      const secondCallArgs =
-        vi.mocked(executionModule.executeActions).mock.calls[1];
+      const secondCallArgs = vi.mocked(executionModule.executeActions).mock
+        .calls[1];
       const secondActions: WriteAction[] = secondCallArgs?.[0] ?? [];
       const paths = secondActions.map((action) => action.path);
       expect(paths).toEqual(["/home/user/project/CLAUDE.md"]);

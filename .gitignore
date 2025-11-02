@@ -138,13 +138,3 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
-
-# AI coding assistants
-CLAUDE.md
-GEMINI.md
-AGENTS.md
-.kilocode
-.clinerules
-
-repomix-output.*
-repomix.config.json
