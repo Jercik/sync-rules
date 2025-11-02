@@ -5,7 +5,7 @@ import type { Project, Config } from "../config/config.js";
 import { lstat } from "node:fs/promises";
 import { resolveInside } from "../utils/paths.js";
 
-interface SyncResult {
+export interface SyncResult {
   projectPath: string;
   report: ExecutionReport;
 }

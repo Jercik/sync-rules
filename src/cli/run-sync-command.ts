@@ -3,7 +3,7 @@ import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 import { loadConfig } from "../config/loader.js";
 import type { Project } from "../config/config.js";
 import { SyncError, ensureError } from "../utils/errors.js";
-import type { ExecutionReport } from "../core/execution.js";
+import type { SyncResult } from "../core/sync.js";
 
 export async function runSyncCommand(program: Command): Promise<void> {
   const parentOpts = program.opts<{ config?: string }>();
@@ -61,13 +61,9 @@ export async function runSyncCommand(program: Command): Promise<void> {
     throw new Error(`${summary}\n${errorMessages.join("\n")}`);
   }
 
-  interface SyncResultLite {
-    projectPath: string;
-    report: ExecutionReport;
-  }
   const isFulfilled = (
     s: PromiseSettledResult<unknown>,
-  ): s is PromiseFulfilledResult<SyncResultLite> => s.status === "fulfilled";
+  ): s is PromiseFulfilledResult<SyncResult> => s.status === "fulfilled";
   const successes = settlements.filter(isFulfilled);
   const projectWrites = successes.reduce(
     (acc, s) => acc + s.value.report.written.length,
