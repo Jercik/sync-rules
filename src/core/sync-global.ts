@@ -12,7 +12,7 @@ const BUILT_IN_GLOBAL_TARGETS = [
   "~/.codex/AGENTS.md", // Codex CLI
 ] as const;
 
-export function getGlobalTargetPaths(): string[] {
+function getGlobalTargetPaths(): string[] {
   // Normalize so paths stay consistent across platforms
   const targets = BUILT_IN_GLOBAL_TARGETS.map((p) => normalizePath(p));
   return targets;
