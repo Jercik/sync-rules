@@ -58,16 +58,14 @@ export async function executeActions(
       const parentStat = await stat(parentDir);
       if (!parentStat.isDirectory()) {
         console.warn(
-          `Warning: ${parentDir} exists but is not a directory, skipping ${path}`,
+          `${parentDir} exists but is not a directory, skipping ${path}`,
         );
         report.skipped.push(path);
         continue;
       }
     } catch (err) {
       if (isNodeError(err) && err.code === "ENOENT") {
-        console.warn(
-          `Warning: destination directory does not exist, skipping ${path}`,
-        );
+        console.warn(`${parentDir} does not exist, skipping ${path}`);
         report.skipped.push(path);
         continue;
       }

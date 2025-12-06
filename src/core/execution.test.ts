@@ -106,7 +106,7 @@ describe("executeActions - algorithm tests", () => {
       expect(result.written).toEqual([]);
       expect(result.skipped).toEqual(["/nonexistent/file.txt"]);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("destination directory does not exist"),
+        expect.stringContaining("does not exist, skipping"),
       );
       expect(fsPromises.writeFile).not.toHaveBeenCalled();
 
