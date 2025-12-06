@@ -28,12 +28,12 @@ export async function syncGlobal(
 ): Promise<ExecutionReport> {
   const patterns = config.global;
   if (!patterns || patterns.length === 0) {
-    return { written: [] };
+    return { written: [], skipped: [] };
   }
 
   const rules = await loadRules(config.rulesSource, patterns);
   if (rules.length === 0) {
-    return { written: [] };
+    return { written: [], skipped: [] };
   }
   const content = rules.map((r) => r.content).join("\n\n---\n\n");
 

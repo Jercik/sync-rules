@@ -17,16 +17,16 @@ describe("executeActions - integration tests", () => {
   });
 
   describe("native fs integration", () => {
-    it("should automatically create parent directories for write actions", async () => {
-      const nestedPath = join(testDir, "a", "b", "c", "file.txt");
+    it("should skip and warn when parent directory does not exist", async () => {
+      const nestedPath = join(testDir, "nonexistent", "file.txt");
       const actions: WriteAction[] = [
         { path: nestedPath, content: "Hello nested!" },
       ];
 
-      await executeActions(actions, { dryRun: false });
+      const result = await executeActions(actions, { dryRun: false });
 
-      const content = await fs.readFile(nestedPath, "utf8");
-      expect(content).toBe("Hello nested!");
+      expect(result.skipped).toContain(nestedPath);
+      expect(result.written).toEqual([]);
     });
 
     it("should overwrite existing files", async () => {

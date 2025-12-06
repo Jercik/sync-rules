@@ -69,6 +69,7 @@ export async function syncProject(
       );
       // Merge CLAUDE.md write result into the main report so callers see full outcome
       report.written.push(...claudeReport.written);
+      report.skipped.push(...claudeReport.skipped);
     }
   }
 

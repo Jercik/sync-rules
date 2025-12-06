@@ -1,8 +1,8 @@
-import { mkdir, writeFile, rename, rm } from "node:fs/promises";
+import { writeFile, rename, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { normalizePath } from "../utils/paths.js";
-import { SyncError, ensureError } from "../utils/errors.js";
+import { SyncError, ensureError, isNodeError } from "../utils/errors.js";
 export type RunFlags = {
   dryRun: boolean;
 };
@@ -13,6 +13,7 @@ export type WriteAction = {
 
 export interface ExecutionReport {
   written: string[];
+  skipped: string[];
 }
 
 /**
@@ -32,6 +33,7 @@ export async function executeActions(
   const { dryRun } = flags;
   const report: ExecutionReport = {
     written: [],
+    skipped: [],
   };
 
   if (actions.length === 0) {
@@ -48,9 +50,36 @@ export async function executeActions(
       report.written.push(path);
       continue;
     }
-    const tmp = join(dirname(path), `.${randomUUID()}.tmp`);
+
+    const parentDir = dirname(path);
+
+    // Check if parent directory exists
     try {
-      await mkdir(dirname(path), { recursive: true });
+      const parentStat = await stat(parentDir);
+      if (!parentStat.isDirectory()) {
+        console.warn(
+          `Warning: ${parentDir} exists but is not a directory, skipping ${path}`,
+        );
+        report.skipped.push(path);
+        continue;
+      }
+    } catch (err) {
+      if (isNodeError(err) && err.code === "ENOENT") {
+        console.warn(
+          `Warning: destination directory does not exist, skipping ${path}`,
+        );
+        report.skipped.push(path);
+        continue;
+      }
+      throw new SyncError(
+        `Failed to check directory ${parentDir}`,
+        { action: "stat", path: parentDir },
+        ensureError(err),
+      );
+    }
+
+    const tmp = join(parentDir, `.${randomUUID()}.tmp`);
+    try {
       // Atomic write: write to a temp file in the same directory, then rename
       await writeFile(tmp, content, "utf8");
       await rename(tmp, path);

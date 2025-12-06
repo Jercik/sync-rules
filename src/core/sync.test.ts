@@ -45,6 +45,7 @@ describe("sync", () => {
           "/home/user/project/AGENTS.md",
           "/home/user/project/CLAUDE.md",
         ],
+        skipped: [],
       });
 
       await syncProject(
@@ -76,6 +77,7 @@ describe("sync", () => {
           "/home/user/project/AGENTS.md",
           "/home/user/project/CLAUDE.md",
         ],
+        skipped: [],
       });
 
       await syncProject(
@@ -97,6 +99,7 @@ describe("sync", () => {
       vi.mocked(filesystemModule.loadRules).mockResolvedValue(mockRules);
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         written: [],
+        skipped: [],
       });
 
       await syncProject(
@@ -116,8 +119,11 @@ describe("sync", () => {
     it("writes CLAUDE.md when AGENTS.md exists but no rules were selected", async () => {
       vi.mocked(filesystemModule.loadRules).mockResolvedValue([]);
       vi.mocked(executionModule.executeActions)
-        .mockResolvedValueOnce({ written: [] }) // first call (no actions)
-        .mockResolvedValueOnce({ written: ["/home/user/project/CLAUDE.md"] }); // second call to write CLAUDE.md
+        .mockResolvedValueOnce({ written: [], skipped: [] }) // first call (no actions)
+        .mockResolvedValueOnce({
+          written: ["/home/user/project/CLAUDE.md"],
+          skipped: [],
+        }); // second call to write CLAUDE.md
 
       // Simulate AGENTS.md existing already
       vi.mocked(fsPromises.lstat).mockResolvedValueOnce({} as unknown as Stats);

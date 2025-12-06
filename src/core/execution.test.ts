@@ -6,9 +6,10 @@ import * as fsPromises from "node:fs/promises";
 // Trivial empty actions test removed - integration tests cover this
 
 vi.mock("node:fs/promises", () => ({
-  mkdir: vi.fn(),
   writeFile: vi.fn(),
   rename: vi.fn((_, dest: string) => Promise.resolve(dest)),
+  stat: vi.fn(() => Promise.resolve({ isDirectory: () => true })),
+  rm: vi.fn(),
 }));
 
 describe("executeActions - algorithm tests", () => {
@@ -18,7 +19,7 @@ describe("executeActions - algorithm tests", () => {
 
   it("returns immediately when there are no actions", async () => {
     const result = await executeActions([], { dryRun: false });
-    expect(result).toEqual({ written: [] });
+    expect(result).toEqual({ written: [], skipped: [] });
   });
 
   describe("dry-run mode", () => {
@@ -32,8 +33,9 @@ describe("executeActions - algorithm tests", () => {
       });
 
       expect(result.written).toContain("/test/file.txt");
+      expect(result.skipped).toEqual([]);
 
-      expect(fsPromises.mkdir).not.toHaveBeenCalled();
+      expect(fsPromises.stat).not.toHaveBeenCalled();
       expect(fsPromises.writeFile).not.toHaveBeenCalled();
     });
   });
@@ -83,6 +85,67 @@ describe("executeActions - algorithm tests", () => {
       });
 
       expect(result.written).toEqual(["/test/file1.txt", "/test/file2.txt"]);
+      expect(result.skipped).toEqual([]);
+    });
+  });
+
+  describe("directory existence check", () => {
+    it("skips write and warns when parent directory does not exist", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const enoentError = Object.assign(new Error("ENOENT"), {
+        code: "ENOENT",
+      });
+      vi.mocked(fsPromises.stat).mockRejectedValueOnce(enoentError);
+
+      const actions: WriteAction[] = [
+        { path: "/nonexistent/file.txt", content: "Hello" },
+      ];
+
+      const result = await executeActions(actions, { dryRun: false });
+
+      expect(result.written).toEqual([]);
+      expect(result.skipped).toEqual(["/nonexistent/file.txt"]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("destination directory does not exist"),
+      );
+      expect(fsPromises.writeFile).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
+
+    it("skips write and warns when path is not a directory", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.mocked(fsPromises.stat).mockResolvedValueOnce({
+        isDirectory: () => false,
+      } as Awaited<ReturnType<typeof fsPromises.stat>>);
+
+      const actions: WriteAction[] = [
+        { path: "/not-a-dir/file.txt", content: "Hello" },
+      ];
+
+      const result = await executeActions(actions, { dryRun: false });
+
+      expect(result.written).toEqual([]);
+      expect(result.skipped).toEqual(["/not-a-dir/file.txt"]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("is not a directory"),
+      );
+      expect(fsPromises.writeFile).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
+
+    it("writes file when parent directory exists", async () => {
+      const actions: WriteAction[] = [
+        { path: "/existing/file.txt", content: "Hello" },
+      ];
+
+      const result = await executeActions(actions, { dryRun: false });
+
+      expect(result.written).toEqual(["/existing/file.txt"]);
+      expect(result.skipped).toEqual([]);
+      expect(fsPromises.stat).toHaveBeenCalledWith("/existing");
+      expect(fsPromises.writeFile).toHaveBeenCalled();
     });
   });
 });
