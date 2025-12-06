@@ -6,11 +6,11 @@
   "description": "CLI tool to synchronize AI coding assistant rule files between projects.",
   "type": "module",
   "bin": {
-    "sync-rules": "./bin/sync-rules"
+    "sync-rules": "bin/sync-rules"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Jercik/sync-rules"
+    "url": "git+https://github.com/Jercik/sync-rules.git"
   },
   "homepage": "https://github.com/Jercik/sync-rules#readme",
   "bugs": {
