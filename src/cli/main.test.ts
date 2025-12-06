@@ -13,7 +13,7 @@ vi.mock("../core/sync.js", () => ({
 }));
 
 vi.mock("../core/sync-global.js", () => ({
-  syncGlobal: vi.fn().mockResolvedValue({ written: [] }),
+  syncGlobal: vi.fn().mockResolvedValue({ written: [], skipped: [] }),
 }));
 
 import * as loader from "../config/loader.js";
@@ -81,7 +81,7 @@ describe("cli/main", () => {
 
       vi.mocked(syncMod.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
-        report: { written: [] },
+        report: { written: [], skipped: [] },
       });
 
       const code = await main(["node", "sync-rules"]);

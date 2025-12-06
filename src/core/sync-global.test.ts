@@ -55,6 +55,7 @@ describe("sync-global", () => {
     // Mock executeActions
     vi.mocked(executionModule.executeActions).mockResolvedValue({
       written: ["/home/user/.claude/CLAUDE.md", "/home/user/.codex/AGENTS.md"],
+      skipped: [],
     });
 
     const result = await syncGlobal(
