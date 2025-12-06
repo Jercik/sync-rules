@@ -1,137 +1,78 @@
 # Rule: Child Process Selection
 
-When working with the Node.js `node:child_process` module, follow these guidelines to select the appropriate function for executing commands. The choice depends on factors like synchronicity, access to streams, output handling, shell usage, and error management. Always prefer the function that best matches your needs to avoid unnecessary complexity or performance issues.
+Choose the appropriate `node:child_process` function based on synchronicity, shell requirements, output size, and error handling. (Defaults from Node.js 25.2.1 docs.)
 
-## General Guidelines
+| Function       | Type  | Default shell?      | Output style                        | Best for                                                           |
+| :------------- | :---- | :------------------ | :---------------------------------- | :----------------------------------------------------------------- |
+| `spawn`        | Async | No (`shell: false`) | Streams                             | Long-running processes, real-time I/O, large output.               |
+| `exec`         | Async | Yes                 | Buffered (`maxBuffer` 1 MB default) | Simple commands needing shell features (pipes, globs).             |
+| `execFile`     | Async | No                  | Buffered (`maxBuffer` 1 MB default) | Direct binary execution with arg array; safer for user input.      |
+| `spawnSync`    | Sync  | No                  | Buffers + detailed result object    | Blocking scripts needing status/signal without exceptions.         |
+| `execSync`     | Sync  | Yes                 | Buffered                            | Blocking shell commands returning stdout; throws on non-zero exit. |
+| `execFileSync` | Sync  | No                  | Buffered                            | Blocking direct binary execution; throws on non-zero exit.         |
 
-- **Asynchronous vs. Synchronous Execution**:
-  - Use **asynchronous functions** (`spawn`, `exec`, `execFile`) if other tasks should run concurrently while the command executes, or if you need non-blocking I/O.
-  - Use **synchronous functions** (`spawnSync`, `execSync`, `execFileSync`) only if you execute one command at a time and can afford to block the event loop (e.g., in scripts or non-server environments).
+## Decision checklist
 
-- **Access to Streams (stdin/stdout/stderr)**:
-  - If you need to interact with the child process via streams in real-time (e.g., piping input/output), use asynchronous functions like `spawn()`. Synchronous functions cannot provide live stream access—you get the complete output only after execution finishes.
+- **Async vs sync:** Prefer async (`spawn`, `exec`, `execFile`) to keep the event loop free. Use sync only in short-lived CLI/setup scripts where blocking is acceptable.
+- **Streaming vs buffered:** If you need live stdin/stdout/stderr or expect output near/over `maxBuffer` (1 MB), use `spawn` (or `spawnSync` if you must block). `exec`/`execFile` buffer output and error if the buffer fills.
+- **Shell needs:** Use `exec`/`execSync` when you need shell features (pipes, globs, env expansion). Prefer `execFile`/`execFileSync` for direct binaries; set `shell: true` only when required.
+- **Security:** Never pass unsanitized user input when a shell is involved (`exec`, `execSync`, or any `{ shell: true }`). Prefer `execFile*` with an args array to avoid injection.
+- **Error handling:** `exec*` callbacks get an `error` on non-zero exit; sync `exec*` throw. `spawn` emits `'error'` only if the process fails to start; exit codes arrive via `'close'`/`'exit'`. `spawnSync` returns `{ status, signal, stdout, stderr, error }` without throwing on non-zero exit.
 
-- **Capturing Output as Strings**:
-  - For asynchronous: Use `exec()` or `execFile()` to get `stdout` and `stderr` as strings via callbacks.
-  - For synchronous: Use `execSync()` or `execFileSync()` for direct string returns of `stdout`. Use `spawnSync()` for more detailed output objects.
+## Shell behavior summary
 
-## Asynchronous Functions: Choosing Between `spawn()`, `exec()`, and `execFile()`
+| Function                   | Default `shell` | Notes                                                            |
+| :------------------------- | :-------------- | :--------------------------------------------------------------- |
+| `spawn`, `spawnSync`       | `false`         | Set `shell: true` to run through a shell.                        |
+| `exec`, `execSync`         | `true`          | Always uses a shell.                                             |
+| `execFile`, `execFileSync` | `false`         | Direct execution; `shell: true` opt-in removes injection safety. |
 
-- Prefer `exec()` or `execFile()` if:
-  - You need simple error handling (all failures reported via the callback's first parameter).
-  - You want `stdout` and `stderr` captured as strings automatically (default buffer limit: 200KB).
-- Use `spawn()` if:
-  - You don't need the callback-based output handling (its signature is simpler).
-  - You require direct stream access without buffering limits.
-  - Your output may exceed the 200KB default buffer limit of `exec()`/`execFile()`.
-
-Example:
+## Examples
 
 ```ts
-import { spawn, exec, execFile } from "node:child_process";
+import { spawn, exec, execFile, spawnSync, execSync } from "node:child_process";
 
-// spawn: Direct stream access, no buffering limits, no callback
+// Stream large or long-running output (no buffer cap)
 const child = spawn("find", ["/", "-name", "*.log"]);
-child.stdout.on("data", (chunk) => process.stdout.write(chunk));
-child.stderr.on("data", (chunk) => process.stderr.write(chunk));
+child.stdout.pipe(process.stdout);
+child.stderr.pipe(process.stderr);
 
-// exec: Shell features, buffered callback with error handling
-exec("ls -la | grep .js", (error, stdout, stderr) => {
-  if (error) return console.error(error); // All failures here
-  console.log(stdout); // Both outputs as strings
+// Shell features (pipes/globs); avoid unsanitized input
+exec("ls *.js | head -5", (error, stdout, stderr) => {
+  if (error) return console.error(error);
+  console.log(stdout);
+  console.error(stderr);
 });
 
-// execFile: No shell by default, safer with args array
-execFile("node", ["--version"], (error, stdout, stderr) => {
+// Safe direct execution with args array (no shell by default)
+execFile("node", ["--version"], (error, stdout) => {
   if (error) return console.error(error);
   console.log(stdout);
 });
-```
 
-## Synchronous Functions: Choosing Between `spawnSync()`, `execSync()`, and `execFileSync()`
+// Shell injection protection: input with shell metacharacters treated as literal
+const userInput = "hello; echo pwned";
+execFile("grep", [userInput, "data.txt"], (error, stdout) => {
+  // Safe: userInput is passed as argument, not interpreted by shell
+  if (error) return console.error(error);
+  console.log(stdout);
+});
 
-- Prefer `execSync()` or `execFileSync()` if:
-  - You only need `stdout` as a string return value.
-  - Errors should be handled uniformly via exceptions (throws on non-zero exit).
-- Use `spawnSync()` if:
-  - You need a detailed result object (including `status`, `signal`, `stdout`, `stderr` as Buffers, and `error` property).
-  - You want to handle different exit codes programmatically without exceptions.
-
-Example:
-
-```ts
-import { execSync, spawnSync } from "node:child_process";
-
-// execSync: Blocking with shell, throws on error
+// Blocking shell command (use sparingly in scripts)
 try {
-  const output = execSync("git status").toString();
-  console.log(output);
+  const summary = execSync("git status --short").toString();
+  console.log(summary);
 } catch (error) {
   console.error(error);
 }
 
-// spawnSync: Detailed result object, no live streams
+// Blocking with programmatic exit-code handling (no throw on non-zero)
 const result = spawnSync("ls", ["-la"]);
 if (result.error) console.error(result.error);
 if (result.status !== 0) console.error(`Exit code: ${result.status}`);
 console.log(result.stdout.toString());
 ```
 
-## Choosing Between `exec()`/`execSync()` and `execFile()`/`execFileSync()`
-
-- Use `exec()`/`execSync()` if:
-  - You need shell features like pipes (`|`), wildcards (`*`), or environment variable expansion.
-  - Commands are executed through a shell by default (internally sets `shell: true`).
-- Use `execFile()`/`execFileSync()` if:
-  - You want direct binary execution without shell interpretation (`shell: false` by default).
-  - You need to avoid shell injection risks by passing arguments as an array.
-  - You can explicitly set `shell: true` but this defeats the security benefit.
-
-Example:
-
-```ts
-import { exec, execFile } from "node:child_process";
-
-// exec: Shell interprets the command, enables pipes and wildcards
-exec("ls *.js | head -5", (error, stdout) => {
-  if (error) return console.error(error);
-  console.log(stdout);
-});
-
-// execFile: Direct execution, arguments safely passed as array
-const userInput = "file; rm -rf /";
-execFile("grep", [userInput, "data.txt"], (error, stdout) => {
-  // Safe: userInput treated as literal argument, not shell command
-  if (error) return console.error(error);
-  console.log(stdout);
-});
-```
-
-## Key Shell Behavior Summary
-
-| Function                       | Default `shell`     | Notes                                           |
-| ------------------------------ | ------------------- | ----------------------------------------------- |
-| `spawn()`, `spawnSync()`       | `false`             | Direct execution, no shell unless `shell: true` |
-| `exec()`, `execSync()`         | `true` (internally) | Always uses shell, enables pipes/wildcards      |
-| `execFile()`, `execFileSync()` | `false`             | Direct execution, safer for user input          |
-
-Consider security implications, especially with user-provided inputs to avoid shell injection.
-
----
-
-# Rule: Dynamic Imports
-
-Use dynamic `import()` to conditionally load modules at runtime, reducing bundle size and initial load time for features users might never need.
-
-```ts
-export async function loadAnalytics() {
-  if (process.env.ENABLE_ANALYTICS === "true") {
-    const mod = await import("#features/analytics.js");
-    return mod.default;
-  }
-  return null;
-}
-```
 
 ---
 
@@ -148,6 +89,7 @@ const program = new Command()
   .version(packageJson.version);
 ```
 
+
 ---
 
 # Rule: Package.json Imports
@@ -162,6 +104,22 @@ Use `package.json` "imports" field with `#` prefixes to create stable internal m
   }
 }
 ```
+
+
+---
+
+# Rule: Run TypeScript Natively
+
+Run TypeScript files directly with `node`. Do not use `tsx`, `ts-node`, or other external runners.
+
+```bash
+node script.ts           # ✅ Correct
+tsx script.ts            # ❌ Unnecessary
+pnpm exec tsx script.ts  # ❌ Unnecessary
+```
+
+Node.js v24 LTS (current) and later run `.ts` files natively without flags. External TypeScript runners add unnecessary dependencies and complexity.
+
 
 ---
 
@@ -205,6 +163,7 @@ const youSayGoodbyeISayHello = <TInput extends "hello" | "goodbye">(
 
 Outside of generic functions, use `any` extremely sparingly.
 
+
 ---
 
 # Rule: Default Exports
@@ -245,6 +204,7 @@ export default function MyPage() {
   return <div>Hello</div>;
 }
 ```
+
 
 ---
 
@@ -318,6 +278,7 @@ function Button(props: ButtonProps) {
 }
 ```
 
+
 ---
 
 # Rule: Enums Alternatives
@@ -365,6 +326,7 @@ enum Direction {
 Object.keys(Direction).length; // 8
 ```
 
+
 ---
 
 # Rule: Error Result Types
@@ -405,6 +367,28 @@ if (result.ok) {
 }
 ```
 
+
+---
+
+# Rule: ESLint Print Config
+
+Use `eslint --print-config` to check if a rule is enabled in the resolved configuration. This queries ESLint's actual computed config rather than searching config files for text strings.
+
+```bash
+# Simple example
+pnpm exec eslint --print-config src/index.ts | jq -e '.rules["no-console"][0]'
+```
+
+```bash
+# Complex example (namespaced rule)
+pnpm exec eslint --print-config src/index.ts | jq -e '.rules["@typescript-eslint/no-unnecessary-type-parameters"][0]'
+# Returns: 2 (error), 1 (warn), 0 (off)
+# Exit code 1 if rule not found
+```
+
+The `-e` flag makes jq exit with code 1 when the result is null, useful for scripting.
+
+
 ---
 
 # Rule: Import Type
@@ -432,6 +416,7 @@ import { type User } from "./user";
 // After transpilation
 import "./user";
 ```
+
 
 ---
 
@@ -471,6 +456,7 @@ interface C extends A, B {
 }
 ```
 
+
 ---
 
 # Rule: JSDoc Comments
@@ -493,6 +479,7 @@ const subtract = (a: number, b: number) => a - b;
 const add = (a: number, b: number) => a + b;
 ```
 
+
 ---
 
 # Rule: No Barrel Files
@@ -509,6 +496,7 @@ export { TabList } from "./tab-list";
 // Prefer direct import
 import { TabList } from "#components/tab/tab-list";
 ```
+
 
 ---
 
@@ -533,6 +521,7 @@ const arr: string[] = [];
 // Without it, value will be `string`
 const value = arr[0];
 ```
+
 
 ---
 
@@ -594,11 +583,6 @@ Avoid this pattern for:
 - Props without sensible defaults that should force explicit decisions
 - Situations where forgetting to pass the prop would cause bugs
 
----
-
-# Rule: Package Manager Detection
-
-Prefer the package.json "packageManager" field to determine the intended package manager (and version); if missing, fall back to lockfiles (pnpm-lock.yaml, package-lock.json, yarn.lock, bun.lockb), otherwise default to npm. On conflicts, trust "packageManager" and warn; in monorepos, read the nearest package.json for the targeted workspace.
 
 ---
 
@@ -611,6 +595,7 @@ pnpm exec tsc --noEmit    # ✅ Uses local package
 npx tsc --noEmit          # ✅ Uses local package
 pnpx tsc --noEmit         # ❌ Downloads from registry, ignores local
 ```
+
 
 ---
 
@@ -638,74 +623,29 @@ const MyComponent = () => {
 
 For React hooks returning objects, annotate: `(): { state: string; }`.
 
+
 ---
 
 # Rule: TypeScript Config File Patterns
 
-Use explicit `include` and `exclude` patterns in environment-specific TypeScript configs to ensure production builds exclude test files and test configs include all necessary sources.
-
-## App/Library Config Pattern
+Use explicit `include`/`exclude` patterns in environment-specific configs. Exclude test files from production; include them in test configs.
 
 ```json
-{
-  "include": ["src/**/*.ts", "types/**/*.d.ts"],
-  "exclude": ["node_modules", "dist", "**/*.test.*", "**/*.spec.*"]
-}
+// tsconfig.json (production)
+{ "include": ["src/**/*.ts"], "exclude": ["**/*.test.*", "**/*.spec.*"] }
+
+// tsconfig.test.json
+{ "include": ["**/*.test.*", "**/*.spec.*"], "exclude": ["node_modules", "dist"] }
 ```
 
-**Why:**
+## Glob Support
 
-- `include` captures all source files and type definitions
-- `exclude` prevents test files from being compiled into your production bundle
-- Test files would add unnecessary code and test framework type dependencies to the build
-- Keeps the output bundle clean and minimal
+TypeScript globs are limited: `*`, `**`, `{a,b}` work; extended patterns (`?(x)`, `!(x)`) do not. Use `**/*.test.*` instead of `**/*.{test,spec}.?(c|m)[jt]s?(x)`.
 
-## Test Config Pattern
+## Resolution Priority
 
-```json
-{
-  "include": ["**/*.test.*", "**/*.spec.*", "types/**/*.d.ts"],
-  "exclude": ["node_modules", "dist"]
-}
-```
+`files` > `include` > `exclude`. If a file matches both `include` and `exclude`, it is excluded. Exception: imported files bypass `exclude`.
 
-**Why:**
-
-- `include` explicitly matches test files (`.test.*` and `.spec.*` patterns)
-- Includes type definitions needed by both app and test code
-- Allows test-specific compiler options (like vitest/globals types)
-- `exclude` prevents duplicate compilation of dependencies and build artifacts
-
-## Pattern Limitations
-
-TypeScript's glob support is **limited** compared to bash or other tools:
-
-**✅ Supported:**
-
-- `*` - matches any characters except `/`
-- `**` - matches any directory depth
-- `{a,b}` - brace expansion (alternatives)
-
-**❌ Not Supported:**
-
-- `?(pattern)` - optional groups
-- `+(pattern)` - one or more
-- `@(pattern)` - exactly one
-- `!(pattern)` - negation
-
-**Use simple patterns:** `**/*.test.*` instead of `**/*.{test,spec}.?(c|m)[jt]s?(x)`
-
-## File Selection Priority
-
-TypeScript prioritizes files using this hierarchy:
-
-1. **`files`** (highest priority): Explicitly listed files are always included and cannot be excluded
-2. **`include`**: Defines broad sets of files to compile using glob patterns
-3. **`exclude`**: Filters out files from those matched by `include`
-
-**Key principle**: If a file matches both `include` and `exclude`, it is **excluded**. Use `exclude` to filter out unwanted files from broad `include` patterns.
-
-**Exception**: Files referenced via `import` statements or triple-slash directives (`/// <reference path="..." />`) can be included even if they match `exclude` patterns
 
 ---
 
