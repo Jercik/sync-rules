@@ -6,7 +6,7 @@ A CLI tool to synchronize AI coding assistant rule files between a central repos
 
 ## What is this tool for?
 
-Many AI coding assistants (Claude Code, Gemini, OpenCode, Codex CLI) read a local rules file to understand context, coding standards, and specific instructions.
+Many AI coding assistants (Claude Code, Gemini CLI, OpenCode, Codex CLI) read a local rules file to understand context, coding standards, and specific instructions.
 
 Managing these rules across numerous projects can be tedious. `sync-rules` lets you maintain a **single, centralized directory** of rules and automatically synchronize the relevant subsets into your projects using a single standard file.
 
@@ -102,7 +102,7 @@ Tip: define a small shell function to forward args cleanly:
 
 ## Output Files
 
-- `AGENTS.md`: Canonical rules file read by Codex CLI, Gemini, and OpenCode.
+- `AGENTS.md`: Canonical rules file read by Codex CLI, Gemini CLI, and OpenCode.
 - `CLAUDE.md`: A tiny include file with `@AGENTS.md` (Claude Code supported syntax).
 
 ## License
