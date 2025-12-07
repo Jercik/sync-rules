@@ -1,0 +1,94 @@
+name: PR Review with Claude Code
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review-with-claude-code:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: PR Review with Claude Code
+        uses: anthropics/claude-code-action@6610520549f7c056fddb45c344d353796da65b11
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Enable progress tracking
+          track_progress: true
+
+          # Your custom review instructions
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Act as a Principal Software Engineer. Conduct a high-leverage code review focusing on architectural integrity, logic errors, and security.
+
+            **Guidelines:**
+            - **Skip Linting:** Do NOT comment on formatting, naming conventions, or style issues (these are handled by CI).
+            - **Verify Facts:** You MUST use `askpplx` to confirm library behaviors, deprecations, or API signatures before claiming them as fact.
+            - **Be Specific:** Explain *why* code is problematic and suggest concrete alternatives.
+
+            **Focus Areas:**
+            1. **Correctness & Robustness:**
+               - Identify race conditions, off-by-one errors, and unhandled edge cases.
+               - Verify error handling is graceful and secure.
+
+            2. **Security:**
+               - Scrutinize input sanitization and data validation.
+               - Check for potential auth bypasses or sensitive data exposure.
+
+            3. **Performance:**
+               - Flag N+1 queries, memory leaks, or unnecessary complexity (Big O).
+               - Identify expensive re-renders or resource-heavy operations.
+
+            4. **Code Clarity:**
+               - Flag confusing, misleading, or ambiguous names (variables, functions, types).
+               - Identify overcomplicated code that could be simplified.
+               - Check for magic numbers/strings without explanation.
+               - Ensure code intent is clear without excessive comments.
+
+            5. **Architecture & Patterns:**
+               - Verify Functional Core, Imperative Shell principle: pure logic separated from side effects.
+               - Check for proper use of discriminated unions over bags of optionals.
+               - Prefer Result types over thrown errors where manual try-catch would be needed.
+
+            6. **Maintainability & Standards:**
+               - Check for over-abstraction or premature optimization.
+               - Ensure code is testable and idiomatic.
+
+            7. **Verification:**
+               - Ensure tests cover both happy paths and failure modes.
+               - Verify README and API documentation matches implementation.
+
+            **Output Format:**
+            - Use **Inline Comments** for specific line-level issues.
+            - **MANDATORY:** Place your full detailed analysis (architectural insights, pattern feedback, etc.) inside the collapsible block below.
+
+            <details>
+            <summary>PR Review Details</summary>
+
+            [FULL DETAILED REVIEW CONTENT GOES HERE]
+
+            </details>
+
+            [2-sentence summary of the review, listing blocking issues.]
+
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(npx -y askpplx:*),Bash(npx askpplx:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(tree:*),Bash(pwd:*),Bash(head:*),Bash(tail:*),Bash(jq:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status),Bash(git rev-parse:*)"
+            --model claude-opus-4-5
+            --append-system-prompt "Code review demands precision—verify aggressively with askpplx before asserting facts about libraries, APIs, or behaviors."
