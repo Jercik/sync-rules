@@ -86,6 +86,12 @@ sync-rules sync
 
 This reads the rules and writes `AGENTS.md` in each project. It also writes `CLAUDE.md` containing `@AGENTS.md` for Claude Code.
 
+#### Options
+
+- `--verbose` / `-v`: Show status messages (silent by default)
+- `--dry-run` / `-n`: Preview changes without writing files
+- `--porcelain`: Machine-readable TSV output (implies `--dry-run`)
+
 ### 4\. Run With Your Tool
 
 Use standard shell chaining so your tool runs only after a successful sync:
@@ -104,6 +110,27 @@ Tip: define a small shell function to forward args cleanly:
 
 - `AGENTS.md`: Canonical rules file read by Codex CLI, Gemini CLI, and OpenCode.
 - `CLAUDE.md`: A tiny include file with `@AGENTS.md` (Claude Code supported syntax).
+
+## Pipeline Examples
+
+The CLI follows Unix philosophy—silent success, machine-readable output modes, and composability with standard tools.
+
+```bash
+# Preview what would be written
+sync-rules --dry-run --verbose
+
+# Count files that would be written
+sync-rules --porcelain | tail -n +2 | wc -l
+
+# List only project files (exclude global targets)
+sync-rules --porcelain | tail -n +2 | grep -v '^\w*\t.*/.claude/' | cut -f2
+
+# Extract unique project directories
+sync-rules --porcelain | tail -n +2 | cut -f2 | xargs -n1 dirname | sort -u
+
+# Chain with AI tool (sync only on success)
+sync-rules && claude --chat
+```
 
 ## License
 

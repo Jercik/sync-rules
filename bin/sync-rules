@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+
+// Handle SIGINT (Ctrl+C) gracefully
+process.on("SIGINT", () => {
+  console.error("\nInterrupted");
+  process.exit(130); // 128 + SIGINT (2)
+});
+
 import("../dist/cli/main.js").then(async ({ main }) => {
   try {
     const code = await main(process.argv);

@@ -1,24 +1,32 @@
-import type { Command } from "commander";
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 import { loadConfig } from "../config/loader.js";
 import type { Project } from "../config/config.js";
 import { SyncError, ensureError } from "../utils/errors.js";
 import type { SyncResult } from "../core/sync.js";
 
-export async function runSyncCommand(program: Command): Promise<void> {
-  const parentOpts = program.opts<{ config?: string }>();
-  const config = await loadConfig(parentOpts.config || DEFAULT_CONFIG_PATH);
+interface SyncCommandOptions {
+  configPath: string;
+  verbose: boolean;
+  dryRun: boolean;
+  porcelain: boolean;
+}
+
+export async function runSyncCommand(
+  options: SyncCommandOptions,
+): Promise<void> {
+  const { configPath, verbose, dryRun, porcelain } = options;
+  const config = await loadConfig(configPath || DEFAULT_CONFIG_PATH);
 
   const projectsToSync: Project[] = config.projects;
 
   const { syncProject } = await import("../core/sync.js");
   const { syncGlobal } = await import("../core/sync-global.js");
 
-  const globalReport = await syncGlobal({ dryRun: false }, config);
+  const globalReport = await syncGlobal({ dryRun }, config);
 
   const settlements = await Promise.allSettled(
     projectsToSync.map(async (project: Project) => {
-      return await syncProject(project, { dryRun: false }, config);
+      return await syncProject(project, { dryRun }, config);
     }),
   );
 
@@ -65,16 +73,40 @@ export async function runSyncCommand(program: Command): Promise<void> {
     s: PromiseSettledResult<unknown>,
   ): s is PromiseFulfilledResult<SyncResult> => s.status === "fulfilled";
   const successes = settlements.filter(isFulfilled);
-  const projectWrites = successes.reduce(
-    (acc, s) => acc + s.value.report.written.length,
-    0,
-  );
-  const totalWrites = projectWrites + globalReport.written.length;
+
+  // Collect all written paths for porcelain output
+  const allWritten = [
+    ...globalReport.written,
+    ...successes.flatMap((s) => s.value.report.written),
+  ];
+  const allSkipped = [
+    ...globalReport.skipped,
+    ...successes.flatMap((s) => s.value.report.skipped),
+  ];
+
+  // Porcelain mode: machine-readable TSV output to stdout
+  if (porcelain) {
+    console.log("ACTION\tPATH");
+    for (const path of allWritten) {
+      console.log(`WRITE\t${path}`);
+    }
+    for (const path of allSkipped) {
+      console.log(`SKIP\t${path}`);
+    }
+    return;
+  }
+
+  // Human-readable mode: status messages to stderr (only if verbose)
+  if (!verbose) {
+    return; // Silent success per Unix convention
+  }
+
+  const totalWrites = allWritten.length;
 
   if (projectsToSync.length === 0) {
-    console.log("No projects configured; nothing to do.");
+    console.error("No projects configured; nothing to do.");
   } else if (totalWrites === 0) {
-    console.log("No changes. Rules matched no files or files up to date.");
+    console.error("No changes. Rules matched no files or files up to date.");
   } else {
     let projectInfo: string;
     if (projectsToSync.length === 1) {
@@ -85,8 +117,9 @@ export async function runSyncCommand(program: Command): Promise<void> {
     } else {
       projectInfo = `${String(projectsToSync.length)} project(s)`;
     }
-    console.log(
-      `Synchronized ${projectInfo}; wrote ${String(totalWrites)} file(s).`,
+    const action = dryRun ? "Would write" : "Wrote";
+    console.error(
+      `Synchronized ${projectInfo}; ${action} ${String(totalWrites)} file(s).`,
     );
   }
 }
