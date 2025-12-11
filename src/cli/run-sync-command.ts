@@ -85,12 +85,13 @@ export async function runSyncCommand(
   ];
 
   // Porcelain mode: machine-readable TSV output to stdout
+  // Sort paths for deterministic output (Promise.allSettled order is non-deterministic)
   if (porcelain) {
     console.log("ACTION\tPATH");
-    for (const path of allWritten) {
+    for (const path of allWritten.toSorted()) {
       console.log(`WRITE\t${path}`);
     }
-    for (const path of allSkipped) {
+    for (const path of allSkipped.toSorted()) {
       console.log(`SKIP\t${path}`);
     }
     return;
