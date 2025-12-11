@@ -132,16 +132,19 @@ function isWithinDirectory(base: string, target: string): boolean {
 ## Correct Implementation
 
 ```ts
-import { relative, isAbsolute } from "node:path";
+import { resolve, relative, isAbsolute, sep } from "node:path";
 
 function isWithinDirectory(base: string, target: string): boolean {
-  const rel = relative(base, target);
+  const resolvedBase = resolve(base);
+  const resolvedTarget = resolve(target);
+  const rel = relative(resolvedBase, resolvedTarget);
   // Empty string means they're equal
   if (rel === "") return true;
   // Absolute means different drive (Windows)
   if (isAbsolute(rel)) return false;
-  // Starts with ".." means path escapes the base directory
-  if (rel.startsWith("..")) return false;
+  // Starts with ".." followed by separator means path escapes the base directory
+  // Use sep to avoid false positives on files named "..foo"
+  if (rel === ".." || rel.startsWith(`..${sep}`)) return false;
   return true;
 }
 ```
@@ -158,14 +161,15 @@ function isWithinDirectory(base: string, target: string): boolean {
 | Sibling         | `"../other/file.txt"`    | Escapes upward |
 | Different drive | `"D:\\other"` (absolute) | Different root |
 
-On Windows, `relative()` handles case normalization internally, avoiding the case-sensitivity bug.
+**Note:** On Windows, `path.relative()` performs case-insensitive comparison (e.g., `path.win32.relative('C:/Foo', 'c:/foo/bar')` returns `'bar'`). This makes it suitable for path containment checks without manual case normalization.
 
 ## Key Points
 
-1. **Use `relative()` not `startsWith()`** - handles case-insensitive filesystems correctly
+1. **Use `relative()` not `startsWith()`** - avoids manual separator handling and different-drive detection
 2. **Check for absolute result** - indicates different drive/root on Windows
-3. **Check for `..` prefix** - indicates the path escapes the base directory
+3. **Check for `..` prefix with `sep`** - use `rel === ".." || rel.startsWith(".." + sep)` to avoid false positives on files named `..foo`
 4. **Empty string is valid** - means the paths are equal
+5. **Symlinks are not resolved** - `resolve()` and `relative()` operate lexically; use `fs.realpathSync()` if symlink traversal is a concern
 
 ## When to Apply
 
