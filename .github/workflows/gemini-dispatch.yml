@@ -10,10 +10,6 @@ on:
   pull_request_target:
     types:
       - "opened"
-  issues:
-    types:
-      - "opened"
-      - "reopened"
   issue_comment:
     types:
       - "created"
@@ -25,7 +21,7 @@ defaults:
 jobs:
   debugger:
     if: |-
-      ${{ fromJSON(vars.DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
+      ${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}
     runs-on: "ubuntu-latest"
     permissions:
       contents: "read"
@@ -44,15 +40,11 @@ jobs:
 
   dispatch:
     # For PRs: pull_request_target runs workflow from base branch (security)
-    # For issues: only on open/reopen
     # For comments: only if user types @gemini-cli and is OWNER/MEMBER/COLLABORATOR
     if: |-
       (
         github.event_name == 'pull_request_target' &&
         github.event.pull_request.head.repo.fork == false
-      ) || (
-        github.event_name == 'issues' &&
-        contains(fromJSON('["opened", "reopened"]'), github.event.action)
       ) || (
         github.event.sender.type == 'User' &&
         startsWith(github.event.comment.body || github.event.review.body || github.event.issue.body, '@gemini-cli') &&
@@ -95,14 +87,10 @@ jobs:
 
             if (eventType === 'pull_request_target.opened') {
               core.setOutput('command', 'review');
-            } else if (['issues.opened', 'issues.reopened'].includes(eventType)) {
-              core.setOutput('command', 'triage');
             } else if (request.startsWith("@gemini-cli /review")) {
               core.setOutput('command', 'review');
               const additionalContext = request.replace(/^@gemini-cli \/review/, '').trim();
               core.setOutput('additional_context', additionalContext);
-            } else if (request.startsWith("@gemini-cli /triage")) {
-              core.setOutput('command', 'triage');
             } else if (request.startsWith("@gemini-cli")) {
               const additionalContext = request.replace(/^@gemini-cli/, '').trim();
               core.setOutput('command', 'invoke');
@@ -137,20 +125,6 @@ jobs:
       additional_context: "${{ needs.dispatch.outputs.additional_context }}"
     secrets: "inherit"
 
-  triage:
-    needs: "dispatch"
-    if: |-
-      ${{ needs.dispatch.outputs.command == 'triage' }}
-    uses: "./.github/workflows/gemini-triage.yml"
-    permissions:
-      contents: "read"
-      id-token: "write"
-      issues: "write"
-      pull-requests: "write"
-    with:
-      additional_context: "${{ needs.dispatch.outputs.additional_context }}"
-    secrets: "inherit"
-
   invoke:
     needs: "dispatch"
     if: |-
@@ -169,7 +143,6 @@ jobs:
     needs:
       - "dispatch"
       - "review"
-      - "triage"
       - "invoke"
     if: |-
       ${{ always() && !cancelled() && (failure() || needs.dispatch.outputs.command == 'fallthrough') }}

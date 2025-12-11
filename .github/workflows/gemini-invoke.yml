@@ -25,6 +25,11 @@ jobs:
       issues: "write"
       pull-requests: "write"
     steps:
+      - name: "Checkout repository"
+        uses: "actions/checkout@v6"
+        with:
+          fetch-depth: 10
+
       - name: "Mint identity token"
         id: "mint_identity_token"
         if: |-
@@ -42,17 +47,20 @@ jobs:
       # plaintext in workflow output.
       - name: "Setup OAuth credentials"
         run: |
-          echo '${{ secrets.GEMINI_OAUTH_CREDS }}' > ${{ runner.temp }}/oauth-creds.json
+          umask 077
+          mkdir -p ~/.gemini
+          echo '${{ secrets.GEMINI_OAUTH_CREDS }}' > ~/.gemini/oauth_creds.json
 
       - name: "Run Gemini CLI"
         id: "run_gemini"
-        uses: "google-github-actions/run-gemini-cli@ad893a2bff74f4ff2715193f7c2c3e8527c62419" # ratchet:google-github-actions/run-gemini-cli@v0
+        uses: "Jercik/run-gemini-cli@e78af9b4efcaaab53ff7fe63067cdad8bd212d20" # ratchet:Jercik/run-gemini-cli@fix/pnpm-version-conflict
         env:
           TITLE: "${{ github.event.pull_request.title || github.event.issue.title }}"
           DESCRIPTION: "${{ github.event.pull_request.body || github.event.issue.body }}"
           EVENT_NAME: "${{ github.event_name }}"
           GITHUB_TOKEN: "${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}"
-          GOOGLE_APPLICATION_CREDENTIALS: "${{ runner.temp }}/oauth-creds.json"
+          GOOGLE_APPLICATION_CREDENTIALS: "${{ env.HOME }}/.gemini/oauth_creds.json"
+          PERPLEXITY_API_KEY: "${{ secrets.PERPLEXITY_API_KEY }}"
           IS_PULL_REQUEST: "${{ !!github.event.pull_request }}"
           ISSUE_NUMBER: "${{ github.event.pull_request.number || github.event.issue.number }}"
           REPOSITORY: "${{ github.repository }}"
@@ -64,7 +72,8 @@ jobs:
           gcp_workload_identity_provider: "${{ vars.GCP_WIF_PROVIDER }}"
           gemini_api_key: "${{ secrets.GEMINI_API_KEY }}"
           gemini_cli_version: "${{ vars.GEMINI_CLI_VERSION }}"
-          gemini_debug: "${{ fromJSON(vars.DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}"
+          gemini_debug: "${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}"
+          use_pnpm: "true"
           gemini_model: "${{ vars.GEMINI_MODEL }}"
           google_api_key: "${{ secrets.GOOGLE_API_KEY }}"
           use_gemini_code_assist: "true"
@@ -130,14 +139,35 @@ jobs:
               },
               "tools": {
                 "core": [
+                  "read_file",
+                  "read_many_files",
+                  "write_file",
+                  "replace",
+                  "list_directory",
+                  "glob",
+                  "search_file_content",
+                  "web_fetch",
+                  "google_web_search",
+                  "codebase_investigator",
                   "run_shell_command(cat)",
                   "run_shell_command(echo)",
                   "run_shell_command(grep)",
                   "run_shell_command(head)",
+                  "run_shell_command(tail)",
+                  "run_shell_command(ls)",
+                  "run_shell_command(find)",
+                  "run_shell_command(git diff)",
+                  "run_shell_command(git log)",
+                  "run_shell_command(git show)",
+                  "run_shell_command(git status)",
                   "run_shell_command(npx -y askpplx)",
-                  "run_shell_command(npx askpplx)",
-                  "run_shell_command(tail)"
+                  "run_shell_command(npx askpplx)"
                 ]
               }
             }
           prompt: "/gemini-invoke"
+
+      - name: "Cleanup OAuth credentials"
+        if: always()
+        run: |
+          rm -f ~/.gemini/oauth_creds.json
