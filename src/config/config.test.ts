@@ -91,16 +91,18 @@ describe("config", () => {
 
         expect(() => parseConfig(json)).toThrow(z.ZodError);
 
+        let zodError: z.ZodError | undefined;
         try {
           parseConfig(json);
         } catch (error) {
-          const zodError = error as z.ZodError;
-          expect(
-            zodError.issues.some((i) =>
-              i.message.includes("at least one positive glob pattern"),
-            ),
-          ).toBe(true);
+          zodError = error as z.ZodError;
         }
+        expect(zodError).toBeDefined();
+        expect(
+          zodError?.issues.some((i) =>
+            i.message.includes("at least one positive glob pattern"),
+          ),
+        ).toBe(true);
       });
       it("throws SyntaxError for invalid JSON syntax", () => {
         expect(() => parseConfig("{invalid}")).toThrow(SyntaxError);
@@ -144,12 +146,14 @@ describe("config", () => {
 
         expect(() => parseConfig(json)).toThrow(z.ZodError);
 
+        let zodError: z.ZodError | undefined;
         try {
           parseConfig(json);
         } catch (error) {
-          const zodError = error as z.ZodError;
-          expect(zodError.issues.length).toBeGreaterThanOrEqual(1);
+          zodError = error as z.ZodError;
         }
+        expect(zodError).toBeDefined();
+        expect(zodError?.issues.length).toBeGreaterThanOrEqual(1);
       });
 
       // Root-level validation errors are covered by the table-driven tests

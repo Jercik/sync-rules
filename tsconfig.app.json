@@ -7,7 +7,7 @@
     "composite": true,
 
     /* Not running in the DOM */
-    "lib": ["es2022"]
+    "lib": ["es2023"]
   },
   "include": ["src/**/*.ts", "types/**/*.d.ts"],
   "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]

@@ -18,7 +18,7 @@ vi.mock("../core/sync-global.js", () => ({
 
 import * as loader from "../config/loader.js";
 import * as syncMod from "../core/sync.js";
-// launch command removed; no related imports
+import * as syncGlobalMod from "../core/sync-global.js";
 
 describe("cli/main", () => {
   beforeEach(() => {
@@ -87,6 +87,78 @@ describe("cli/main", () => {
       const code = await main(["node", "sync-rules"]);
       expect(code).toBe(0);
       expect(syncMod.syncProject).toHaveBeenCalledTimes(2);
+    });
+
+    it("passes dryRun: false by default", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [{ path: "/home/user/project1", rules: ["**/*.md"] }],
+      });
+
+      vi.mocked(syncMod.syncProject).mockResolvedValue({
+        projectPath: "/home/user/project1",
+        report: { written: [], skipped: [] },
+      });
+
+      await main(["node", "sync-rules"]);
+
+      expect(syncGlobalMod.syncGlobal).toHaveBeenCalledWith(
+        { dryRun: false },
+        expect.any(Object),
+      );
+      expect(syncMod.syncProject).toHaveBeenCalledWith(
+        expect.any(Object),
+        { dryRun: false },
+        expect.any(Object),
+      );
+    });
+
+    it("passes dryRun: true with --dry-run flag", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [{ path: "/home/user/project1", rules: ["**/*.md"] }],
+      });
+
+      vi.mocked(syncMod.syncProject).mockResolvedValue({
+        projectPath: "/home/user/project1",
+        report: { written: [], skipped: [] },
+      });
+
+      await main(["node", "sync-rules", "--dry-run"]);
+
+      expect(syncGlobalMod.syncGlobal).toHaveBeenCalledWith(
+        { dryRun: true },
+        expect.any(Object),
+      );
+      expect(syncMod.syncProject).toHaveBeenCalledWith(
+        expect.any(Object),
+        { dryRun: true },
+        expect.any(Object),
+      );
+    });
+
+    it("implies dryRun: true with --porcelain flag", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [{ path: "/home/user/project1", rules: ["**/*.md"] }],
+      });
+
+      vi.mocked(syncMod.syncProject).mockResolvedValue({
+        projectPath: "/home/user/project1",
+        report: { written: [], skipped: [] },
+      });
+
+      await main(["node", "sync-rules", "--porcelain"]);
+
+      expect(syncGlobalMod.syncGlobal).toHaveBeenCalledWith(
+        { dryRun: true },
+        expect.any(Object),
+      );
+      expect(syncMod.syncProject).toHaveBeenCalledWith(
+        expect.any(Object),
+        { dryRun: true },
+        expect.any(Object),
+      );
     });
   });
 

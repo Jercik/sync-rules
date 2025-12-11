@@ -1,4 +1,4 @@
-import { Command, CommanderError } from "commander";
+import { Command, CommanderError } from "@commander-js/extra-typings";
 import packageJson from "../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 import { ensureError } from "../utils/errors.js";
@@ -12,18 +12,17 @@ import { registerSyncCommand } from "./register-sync-command.js";
  * @param argv - The raw argv array (typically `process.argv`)
  */
 export async function main(argv: string[]): Promise<number> {
-  const program = new Command();
-
-  program
+  const program = new Command()
     .name(packageJson.name)
     .description(packageJson.description)
     .version(packageJson.version)
     .enablePositionalOptions()
     .option(
       "-c, --config <path>",
-      "Path to configuration file",
+      "path to configuration file",
       DEFAULT_CONFIG_PATH,
     )
+    .option("-v, --verbose", "enable verbose output")
     .showHelpAfterError("(add --help for additional information)")
     .showSuggestionAfterError()
     .exitOverride()
@@ -32,6 +31,7 @@ export async function main(argv: string[]): Promise<number> {
       sortOptions: true,
       showGlobalOptions: true,
     });
+
   // Register subcommands
   registerInitCommand(program);
   registerSyncCommand(program);

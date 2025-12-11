@@ -47,7 +47,7 @@ describe("SyncError class", () => {
       expect(error.name).toBe("SyncError");
       expect(error.message).toBe(c.message);
       expect(error.details).toEqual(c.expectedDetails);
-      if (c.cause) expect(error.cause).toBe(c.cause);
+      expect(error.cause).toBe(c.cause);
     }
   });
 });
@@ -102,7 +102,7 @@ describe("ConfigParseError", () => {
       expect(error).toBeInstanceOf(Error);
       expect(error.name).toBe("ConfigParseError");
       expect(error.path).toBe(c.path);
-      if (c.original) expect(error.originalError).toBe(c.original);
+      expect(error.originalError).toBe(c.original);
       expect(error.message).toBe(c.expectedMessage);
     });
   }

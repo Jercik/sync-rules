@@ -50,10 +50,9 @@ describe("createSampleConfig", () => {
     );
 
     expect(error).toBeInstanceOf(Error);
-    if (error instanceof Error) {
-      expect(error.message).toMatch(/already exists.*--force/iu);
-      expect(error.cause).toBe(eexist);
-    }
+    const err = error as Error;
+    expect(err.message).toMatch(/already exists.*--force/iu);
+    expect(err.cause).toBe(eexist);
   });
 
   it("non-EEXIST errors are wrapped with normalized path context", async () => {
@@ -67,11 +66,10 @@ describe("createSampleConfig", () => {
     );
 
     expect(error).toBeInstanceOf(Error);
-    if (error instanceof Error) {
-      expect(error.message).toMatch(
-        /Failed to create config file at \/tmp\/config\.json: EACCES/u,
-      );
-      expect(error.cause).toBe(eacces);
-    }
+    const err = error as Error;
+    expect(err.message).toMatch(
+      /Failed to create config file at \/tmp\/config\.json: EACCES/u,
+    );
+    expect(err.cause).toBe(eacces);
   });
 });
