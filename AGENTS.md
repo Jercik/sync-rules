@@ -96,6 +96,89 @@ console.log(result.stdout.toString());
 
 ---
 
+# Rule: Cross-Platform Path Validation
+
+When validating that a file path stays within an expected directory (path traversal prevention), use `path.relative` instead of `startsWith` checks. This handles Windows case-insensitivity correctly.
+
+## The Problem
+
+On Windows, file paths are **case-insensitive** (`C:\Users` and `c:\users` are the same), but string comparison with `startsWith` is case-sensitive. This causes false positives:
+
+```ts
+// Windows: resolve() might return different cases
+const base = "C:\\Users\\alice\\project";
+const target = "c:\\users\\alice\\project\\file.txt"; // Same location, different case
+
+// FAILS even though target is within base
+target.startsWith(base); // false - case mismatch
+```
+
+## Incorrect Implementation
+
+```ts
+import { resolve, sep } from "node:path";
+
+function isWithinDirectory(base: string, target: string): boolean {
+  const resolvedBase = resolve(base);
+  const resolvedTarget = resolve(target);
+  // BAD: Case-sensitive comparison fails on Windows
+  return (
+    resolvedTarget.startsWith(resolvedBase + sep) ||
+    resolvedTarget === resolvedBase
+  );
+}
+```
+
+## Correct Implementation
+
+```ts
+import { relative, isAbsolute } from "node:path";
+
+function isWithinDirectory(base: string, target: string): boolean {
+  const rel = relative(base, target);
+  // Empty string means they're equal
+  if (rel === "") return true;
+  // Absolute means different drive (Windows)
+  if (isAbsolute(rel)) return false;
+  // Starts with ".." means path escapes the base directory
+  if (rel.startsWith("..")) return false;
+  return true;
+}
+```
+
+## Why `path.relative` Works
+
+`path.relative(from, to)` computes the relative path from `from` to `to`:
+
+| Scenario        | `relative(base, target)` | Meaning        |
+| --------------- | ------------------------ | -------------- |
+| Same path       | `""`                     | Equal paths    |
+| Inside base     | `"subdir/file.txt"`      | Valid child    |
+| Parent of base  | `"../file.txt"`          | Escapes upward |
+| Sibling         | `"../other/file.txt"`    | Escapes upward |
+| Different drive | `"D:\\other"` (absolute) | Different root |
+
+On Windows, `relative()` handles case normalization internally, avoiding the case-sensitivity bug.
+
+## Key Points
+
+1. **Use `relative()` not `startsWith()`** - handles case-insensitive filesystems correctly
+2. **Check for absolute result** - indicates different drive/root on Windows
+3. **Check for `..` prefix** - indicates the path escapes the base directory
+4. **Empty string is valid** - means the paths are equal
+
+## When to Apply
+
+Use this pattern when:
+
+- Validating user-provided file paths
+- Preventing path traversal attacks (e.g., `../../../etc/passwd`)
+- Ensuring files stay within a sandbox directory
+- Any path containment check that must work on Windows
+
+
+---
+
 # Rule: Import Metadata from package.json
 
 Import name, version, and description directly from package.json to maintain a single source of truth for your package metadata. In Node.js 20.10+ use `with { type: "json" }` syntax (the older `assert` keyword is deprecated); ensure TypeScript's `resolveJsonModule` is enabled in tsconfig.json. This approach eliminates manual version synchronization and reduces maintenance errors when updating package information. Always import from the nearest package.json using relative paths to ensure correct metadata for monorepo packages.
