@@ -96,6 +96,93 @@ console.log(result.stdout.toString());
 
 ---
 
+# Rule: Cross-Platform Path Validation
+
+When validating that a file path stays within an expected directory (path traversal prevention), use `path.relative` instead of `startsWith` checks. This handles Windows case-insensitivity correctly.
+
+## The Problem
+
+On Windows, file paths are **case-insensitive** (`C:\Users` and `c:\users` are the same), but string comparison with `startsWith` is case-sensitive. This causes false positives:
+
+```ts
+// Windows: resolve() might return different cases
+const base = "C:\\Users\\alice\\project";
+const target = "c:\\users\\alice\\project\\file.txt"; // Same location, different case
+
+// FAILS even though target is within base
+target.startsWith(base); // false - case mismatch
+```
+
+## Incorrect Implementation
+
+```ts
+import { resolve, sep } from "node:path";
+
+function isWithinDirectory(base: string, target: string): boolean {
+  const resolvedBase = resolve(base);
+  const resolvedTarget = resolve(target);
+  // BAD: Case-sensitive comparison fails on Windows
+  return (
+    resolvedTarget.startsWith(resolvedBase + sep) ||
+    resolvedTarget === resolvedBase
+  );
+}
+```
+
+## Correct Implementation
+
+```ts
+import { resolve, relative, isAbsolute, sep } from "node:path";
+
+function isWithinDirectory(base: string, target: string): boolean {
+  const resolvedBase = resolve(base);
+  const resolvedTarget = resolve(target);
+  const rel = relative(resolvedBase, resolvedTarget);
+  // Empty string means they're equal
+  if (rel === "") return true;
+  // Absolute means different drive (Windows)
+  if (isAbsolute(rel)) return false;
+  // Starts with ".." followed by separator means path escapes the base directory
+  // Use sep to avoid false positives on files named "..foo"
+  if (rel === ".." || rel.startsWith(`..${sep}`)) return false;
+  return true;
+}
+```
+
+## Why `path.relative` Works
+
+`path.relative(from, to)` computes the relative path from `from` to `to`:
+
+| Scenario        | `relative(base, target)` | Meaning        |
+| --------------- | ------------------------ | -------------- |
+| Same path       | `""`                     | Equal paths    |
+| Inside base     | `"subdir/file.txt"`      | Valid child    |
+| Parent of base  | `"../file.txt"`          | Escapes upward |
+| Sibling         | `"../other/file.txt"`    | Escapes upward |
+| Different drive | `"D:\\other"` (absolute) | Different root |
+
+**Note:** On Windows, `path.relative()` performs case-insensitive comparison (e.g., `path.win32.relative('C:/Foo', 'c:/foo/bar')` returns `'bar'`). This makes it suitable for path containment checks without manual case normalization.
+
+## Key Points
+
+1. **Use `relative()` not `startsWith()`** - avoids manual separator handling and different-drive detection
+2. **Check for absolute result** - indicates different drive/root on Windows
+3. **Check for `..` prefix with `sep`** - use `rel === ".." || rel.startsWith(".." + sep)` to avoid false positives on files named `..foo`
+4. **Empty string is valid** - means the paths are equal
+5. **Symlinks are not resolved** - `resolve()` and `relative()` operate lexically; use `fs.realpathSync()` if symlink traversal is a concern
+
+## When to Apply
+
+Use this pattern when:
+
+- Validating user-provided file paths
+- Preventing path traversal attacks (e.g., `../../../etc/passwd`)
+- Ensuring files stay within a sandbox directory
+- Any path containment check that must work on Windows
+
+
+---
+
 # Rule: Import Metadata from package.json
 
 Import name, version, and description directly from package.json to maintain a single source of truth for your package metadata. In Node.js 20.10+ use `with { type: "json" }` syntax (the older `assert` keyword is deprecated); ensure TypeScript's `resolveJsonModule` is enabled in tsconfig.json. This approach eliminates manual version synchronization and reduces maintenance errors when updating package information. Always import from the nearest package.json using relative paths to ensure correct metadata for monorepo packages.

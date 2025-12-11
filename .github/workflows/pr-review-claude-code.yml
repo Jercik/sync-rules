@@ -133,6 +133,6 @@ jobs:
             [2-sentence summary of the review, listing blocking issues.]
 
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(npx -y askpplx:*),Bash(npx askpplx:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(tree:*),Bash(pwd:*),Bash(head:*),Bash(tail:*),Bash(jq:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status),Bash(git rev-parse:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(npx -y askpplx:*),Bash(npx askpplx:*),Bash(ls:*),Bash(cat:*),Bash(grep:*),Bash(tree:*),Bash(pwd:*),Bash(head:*),Bash(tail:*),Bash(jq:*),Bash(wc:*),Bash(sort:*),Bash(uniq:*),Bash(cut:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git status),Bash(git rev-parse:*)"
             --model claude-opus-4-5
             --append-system-prompt "Code review demands precision—verify aggressively with askpplx before asserting facts about libraries, APIs, or behaviors."
