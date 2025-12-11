@@ -85,7 +85,7 @@ export async function runSyncCommand(
   ];
 
   // Porcelain mode: machine-readable TSV output to stdout
-  // Sort paths for deterministic output (Promise.allSettled order is non-deterministic)
+  // Sort paths for deterministic output (concurrent project execution produces non-deterministic order)
   if (porcelain) {
     console.log("ACTION\tPATH");
     for (const path of allWritten.toSorted()) {
