@@ -51,10 +51,11 @@ Examples:
     const err = ensureError(error);
 
     if (err instanceof CommanderError) {
-      if (typeof err.exitCode === "number" && err.exitCode !== 0) {
+      const exitCode = typeof err.exitCode === "number" ? err.exitCode : 1;
+      if (exitCode !== 0) {
         console.error(err.message);
       }
-      return typeof err.exitCode === "number" ? err.exitCode : 1;
+      return exitCode;
     }
 
     console.error(err.message);
