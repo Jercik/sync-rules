@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import envPaths from "env-paths";
 import { parseConfig } from "./config.js";
 import { normalizePath } from "../utils/paths.js";
-import { DEFAULT_CONFIG_PATH } from "./constants.js";
+import { BUILTIN_DEFAULT_CONFIG_PATH } from "./constants.js";
 import {
   ConfigNotFoundError,
   ConfigParseError,
@@ -85,8 +85,9 @@ export async function loadConfig(configPath: string): Promise<Config> {
     return parseConfig(configContent);
   } catch (error) {
     if (isNodeError(error) && error.code === "ENOENT") {
-      const isDefault = normalizedPath === normalizePath(DEFAULT_CONFIG_PATH);
-      if (isDefault) {
+      const isBuiltinDefault =
+        normalizedPath === normalizePath(BUILTIN_DEFAULT_CONFIG_PATH);
+      if (isBuiltinDefault) {
         const legacyPath = normalizePath(LEGACY_DEFAULT_CONFIG_PATH);
         if (legacyPath !== normalizedPath) {
           try {
@@ -113,7 +114,7 @@ export async function loadConfig(configPath: string): Promise<Config> {
           }
         }
       }
-      throw new ConfigNotFoundError(normalizedPath, isDefault);
+      throw new ConfigNotFoundError(normalizedPath, isBuiltinDefault);
     }
 
     // Handle other errors (permissions, invalid JSON, parsing errors, etc.)

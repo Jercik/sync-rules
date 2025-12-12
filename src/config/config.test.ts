@@ -337,6 +337,16 @@ describe("config", () => {
       );
     });
 
+    it("does not automigrate when config path is custom", async () => {
+      const error = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      vi.mocked(fs.readFile).mockRejectedValueOnce(error);
+
+      await expect(loadConfig("/custom/config.json")).rejects.toThrow(
+        ConfigNotFoundError,
+      );
+      expect(fs.readFile).toHaveBeenCalledTimes(1);
+    });
+
     it("should throw ConfigParseError for invalid JSON", async () => {
       vi.mocked(fs.readFile).mockResolvedValue("{invalid json}");
 

@@ -6,6 +6,11 @@ const paths = envPaths("sync-rules", { suffix: "" });
 const defaultConfigPath = resolve(paths.config, "config.json");
 
 /**
+ * Built-in default configuration file path, ignoring env overrides.
+ */
+export const BUILTIN_DEFAULT_CONFIG_PATH = defaultConfigPath;
+
+/**
  * Default configuration file path
  * Can be overridden via SYNC_RULES_CONFIG environment variable
  */
