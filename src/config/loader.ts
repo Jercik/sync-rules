@@ -95,6 +95,8 @@ export async function loadConfig(configPath: string): Promise<Config> {
             const parsedLegacy = parseConfig(legacyContent);
 
             // Best-effort automigration: copy legacy config to the new default location.
+            // If migration fails (permissions, race conditions), the legacy config is still
+            // returned and used successfully, so users experience no interruption.
             try {
               await mkdir(dirname(normalizedPath), { recursive: true });
               await writeFile(normalizedPath, legacyContent, {
@@ -102,7 +104,7 @@ export async function loadConfig(configPath: string): Promise<Config> {
                 flag: "wx",
               });
             } catch {
-              // Ignore migration errors; the legacy config is still usable.
+              // Ignore migration errors; legacy config is still returned.
             }
 
             return parsedLegacy;
