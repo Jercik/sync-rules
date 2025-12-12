@@ -116,7 +116,7 @@ export async function loadConfig(configPath: string): Promise<Config> {
                   );
                   configToReturn = parseConfig(existingContent);
                 } catch {
-                  // Ignore failures; legacy config is still returned.
+                  // Parsing/validation failed on existing file; fall back to legacy config.
                 }
               }
             }
