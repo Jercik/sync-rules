@@ -54,7 +54,8 @@ export class ConfigParseError extends Error {
       : `Failed to parse config from ${path}`;
     const hint =
       "Fix the JSON and glob patterns, then retry.\nTry 'sync-rules --help' for schema and examples.";
-    super(`${base}.\n${hint}`, { cause: originalError });
+    const baseWithPeriod = /[.!?]$/u.test(base) ? base : `${base}.`;
+    super(`${baseWithPeriod}\n${hint}`, { cause: originalError });
     this.name = this.constructor.name;
     this.path = path;
     this.originalError = originalError;
