@@ -28,10 +28,12 @@ export class ConfigNotFoundError extends Error {
   readonly isDefault: boolean;
 
   constructor(path: string, isDefault = false) {
+    const location = isDefault ? "Default config file" : "Config file";
+    const hint = isDefault
+      ? "Run 'sync-rules init' to create one, or pass --config <path>."
+      : "Check the path, or create one with 'sync-rules init --config <path>'.";
     super(
-      isDefault
-        ? `Default config file not found at ${path}`
-        : `Config file not found at ${path}`,
+      `${location} not found at ${path}.\n${hint}\nTry 'sync-rules --help' for details.`,
     );
     this.name = this.constructor.name;
     this.path = path;
@@ -47,12 +49,13 @@ export class ConfigParseError extends Error {
   readonly originalError?: Error;
 
   constructor(path: string, originalError?: Error) {
-    super(
-      originalError
-        ? `Failed to load config from ${path}: ${originalError.message}`
-        : `Failed to parse config from ${path}`,
-      { cause: originalError },
-    );
+    const base = originalError
+      ? `Failed to load config from ${path}: ${originalError.message}`
+      : `Failed to parse config from ${path}`;
+    const hint =
+      "Fix the JSON and glob patterns, then retry.\nTry 'sync-rules --help' for schema and examples.";
+    const baseWithPeriod = /[.!?]$/u.test(base) ? base : `${base}.`;
+    super(`${baseWithPeriod}\n${hint}`, { cause: originalError });
     this.name = this.constructor.name;
     this.path = path;
     this.originalError = originalError;

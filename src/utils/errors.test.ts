@@ -59,12 +59,14 @@ describe("ConfigNotFoundError", () => {
       path: "/path/to/config.json",
       isDefault: false,
       message: "Config file not found at /path/to/config.json",
+      hintContains: "init --config <path>",
     },
     {
       title: "missing default config",
       path: "/default/config.json",
       isDefault: true,
       message: "Default config file not found at /default/config.json",
+      hintContains: "Run 'sync-rules init'",
     },
   ] as const;
 
@@ -74,7 +76,9 @@ describe("ConfigNotFoundError", () => {
       expect(error.name).toBe("ConfigNotFoundError");
       expect(error.path).toBe(c.path);
       expect(error.isDefault).toBe(c.isDefault);
-      expect(error.message).toBe(c.message);
+      expect(error.message).toContain(c.message);
+      expect(error.message).toContain("Try 'sync-rules --help' for details.");
+      expect(error.message).toContain(c.hintContains);
     });
   }
 });
@@ -103,7 +107,11 @@ describe("ConfigParseError", () => {
       expect(error.name).toBe("ConfigParseError");
       expect(error.path).toBe(c.path);
       expect(error.originalError).toBe(c.original);
-      expect(error.message).toBe(c.expectedMessage);
+      expect(error.message).toContain(c.expectedMessage);
+      expect(error.message).toContain("Fix the JSON and glob patterns");
+      expect(error.message).toContain(
+        "Try 'sync-rules --help' for schema and examples.",
+      );
     });
   }
 });

@@ -1,8 +1,9 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
+import envPaths from "env-paths";
 import { parseConfig } from "./config.js";
 import { normalizePath } from "../utils/paths.js";
-import { DEFAULT_CONFIG_PATH } from "./constants.js";
+import { BUILTIN_DEFAULT_CONFIG_PATH } from "./constants.js";
 import {
   ConfigNotFoundError,
   ConfigParseError,
@@ -10,6 +11,11 @@ import {
   isNodeError,
 } from "../utils/errors.js";
 import type { Config } from "./config.js";
+
+const LEGACY_DEFAULT_CONFIG_PATH = resolve(
+  envPaths("sync-rules").config,
+  "config.json",
+);
 
 /**
  * Sample configuration template for new installations
@@ -79,8 +85,52 @@ export async function loadConfig(configPath: string): Promise<Config> {
     return parseConfig(configContent);
   } catch (error) {
     if (isNodeError(error) && error.code === "ENOENT") {
-      const isDefault = normalizedPath === normalizePath(DEFAULT_CONFIG_PATH);
-      throw new ConfigNotFoundError(normalizedPath, isDefault);
+      const isBuiltinDefault =
+        normalizedPath === normalizePath(BUILTIN_DEFAULT_CONFIG_PATH);
+      if (isBuiltinDefault) {
+        const legacyPath = normalizePath(LEGACY_DEFAULT_CONFIG_PATH);
+        if (legacyPath !== normalizedPath) {
+          try {
+            const legacyContent = await readFile(legacyPath, "utf8");
+            const parsedLegacy = parseConfig(legacyContent);
+            let configToReturn = parsedLegacy;
+
+            // Best-effort automigration: copy legacy config to the new default location.
+            // If migration fails (permissions, race conditions), the legacy config is still
+            // returned and used successfully, so users experience no interruption.
+            try {
+              await mkdir(dirname(normalizedPath), { recursive: true });
+              await writeFile(normalizedPath, legacyContent, {
+                encoding: "utf8",
+                flag: "wx",
+              });
+            } catch (migrationError) {
+              if (
+                isNodeError(migrationError) &&
+                migrationError.code === "EEXIST"
+              ) {
+                try {
+                  const existingContent = await readFile(
+                    normalizedPath,
+                    "utf8",
+                  );
+                  configToReturn = parseConfig(existingContent);
+                } catch {
+                  // Parsing/validation failed on existing file; fall back to legacy config.
+                }
+              }
+            }
+
+            return configToReturn;
+          } catch (legacyError) {
+            if (isNodeError(legacyError) && legacyError.code === "ENOENT") {
+              throw new ConfigNotFoundError(normalizedPath, true);
+            }
+            throw new ConfigParseError(legacyPath, ensureError(legacyError));
+          }
+        }
+      }
+      throw new ConfigNotFoundError(normalizedPath, isBuiltinDefault);
     }
 
     // Handle other errors (permissions, invalid JSON, parsing errors, etc.)
