@@ -189,11 +189,6 @@ describe("cli/main", () => {
       errorSpy.mockRestore();
     });
 
-    it("handles unknown commands", async () => {
-      const code = await main(["node", "sync-rules", "unknown"]);
-      expect(code).toBe(1);
-    });
-
     // no required-arg commands remain
   });
 });

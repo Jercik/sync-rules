@@ -298,18 +298,43 @@ describe("config", () => {
 
     it("should throw ConfigNotFoundError for missing default config", async () => {
       const error = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-      vi.mocked(fs.readFile).mockRejectedValue(error);
+      vi.mocked(fs.readFile)
+        .mockRejectedValueOnce(error)
+        .mockRejectedValueOnce(error);
 
       const { DEFAULT_CONFIG_PATH } = await import("./constants.js");
 
-      await expect(loadConfig(DEFAULT_CONFIG_PATH)).rejects.toThrow(
-        ConfigNotFoundError,
-      );
+      const promise = loadConfig(DEFAULT_CONFIG_PATH);
 
-      await expect(loadConfig(DEFAULT_CONFIG_PATH)).rejects.toMatchObject({
+      await expect(promise).rejects.toThrow(ConfigNotFoundError);
+      await expect(promise).rejects.toMatchObject({
         path: DEFAULT_CONFIG_PATH,
         isDefault: true,
       });
+    });
+
+    it("automigrates legacy default config to new path", async () => {
+      const legacyConfigContent = JSON.stringify({
+        projects: [{ path: "/home/user/project", rules: ["**/*.md"] }],
+      });
+      const error = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+
+      vi.mocked(fs.readFile)
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce(legacyConfigContent);
+
+      const { DEFAULT_CONFIG_PATH } = await import("./constants.js");
+
+      const config = await loadConfig(DEFAULT_CONFIG_PATH);
+
+      expect(config.projects).toHaveLength(1);
+      expect(fs.writeFile).toHaveBeenCalled();
+      expect(vi.mocked(fs.writeFile).mock.calls[0]?.[0]).toBe(
+        DEFAULT_CONFIG_PATH,
+      );
+      expect(vi.mocked(fs.writeFile).mock.calls[0]?.[1]).toBe(
+        legacyConfigContent,
+      );
     });
 
     it("should throw ConfigParseError for invalid JSON", async () => {
