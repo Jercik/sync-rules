@@ -93,6 +93,7 @@ export async function loadConfig(configPath: string): Promise<Config> {
           try {
             const legacyContent = await readFile(legacyPath, "utf8");
             const parsedLegacy = parseConfig(legacyContent);
+            let configToReturn = parsedLegacy;
 
             // Best-effort automigration: copy legacy config to the new default location.
             // If migration fails (permissions, race conditions), the legacy config is still
@@ -103,11 +104,24 @@ export async function loadConfig(configPath: string): Promise<Config> {
                 encoding: "utf8",
                 flag: "wx",
               });
-            } catch {
-              // Ignore migration errors; legacy config is still returned.
+            } catch (migrationError) {
+              if (
+                isNodeError(migrationError) &&
+                migrationError.code === "EEXIST"
+              ) {
+                try {
+                  const existingContent = await readFile(
+                    normalizedPath,
+                    "utf8",
+                  );
+                  configToReturn = parseConfig(existingContent);
+                } catch {
+                  // Ignore failures; legacy config is still returned.
+                }
+              }
             }
 
-            return parsedLegacy;
+            return configToReturn;
           } catch (legacyError) {
             if (isNodeError(legacyError) && legacyError.code === "ENOENT") {
               throw new ConfigNotFoundError(normalizedPath, true);

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
+import { dirname } from "node:path";
 import { parseConfig, findProjectForPath } from "./config.js";
 import { loadConfig } from "./loader.js";
 import { ConfigNotFoundError, ConfigParseError } from "../utils/errors.js";
@@ -328,6 +329,9 @@ describe("config", () => {
       const config = await loadConfig(DEFAULT_CONFIG_PATH);
 
       expect(config.projects).toHaveLength(1);
+      expect(fs.mkdir).toHaveBeenCalledWith(dirname(DEFAULT_CONFIG_PATH), {
+        recursive: true,
+      });
       expect(fs.writeFile).toHaveBeenCalled();
       expect(vi.mocked(fs.writeFile).mock.calls[0]?.[0]).toBe(
         DEFAULT_CONFIG_PATH,
@@ -335,6 +339,30 @@ describe("config", () => {
       expect(vi.mocked(fs.writeFile).mock.calls[0]?.[1]).toBe(
         legacyConfigContent,
       );
+    });
+
+    it("uses existing new default config when migration target already exists", async () => {
+      const legacyConfigContent = JSON.stringify({
+        projects: [{ path: "/legacy-project", rules: ["**/*.md"] }],
+      });
+      const existingConfigContent = JSON.stringify({
+        projects: [{ path: "/existing-project", rules: ["**/*.md"] }],
+      });
+      const error = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+
+      vi.mocked(fs.readFile)
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce(legacyConfigContent)
+        .mockResolvedValueOnce(existingConfigContent);
+      vi.mocked(fs.writeFile).mockRejectedValueOnce(
+        Object.assign(new Error("EEXIST"), { code: "EEXIST" }),
+      );
+
+      const { DEFAULT_CONFIG_PATH } = await import("./constants.js");
+
+      const config = await loadConfig(DEFAULT_CONFIG_PATH);
+
+      expect(config.projects[0]?.path).toBe("/existing-project");
     });
 
     it("throws ConfigParseError with legacy path when legacy config is invalid JSON", async () => {
