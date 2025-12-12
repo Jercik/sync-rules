@@ -11,6 +11,12 @@ vi.mock("env-paths", () => ({
   }),
 }));
 
+vi.mock("conf", () => ({
+  default: class ConfMock {
+    path = "/tmp/internal.json";
+  },
+}));
+
 const originalEnv = process.env;
 
 describe("constants", () => {

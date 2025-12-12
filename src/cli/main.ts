@@ -16,6 +16,7 @@ export async function main(argv: string[]): Promise<number> {
     .name(packageJson.name)
     .description(packageJson.description)
     .version(packageJson.version)
+    .helpCommand(false)
     .enablePositionalOptions()
     .option(
       "-c, --config <path>",
@@ -31,6 +32,14 @@ export async function main(argv: string[]): Promise<number> {
       sortOptions: true,
       showGlobalOptions: true,
     });
+  program.addHelpText(
+    "after",
+    `
+Examples:
+  sync-rules                        # Sync all projects (default)
+  sync-rules init                   # Create a sample config file
+  sync-rules --porcelain | tail -n +2 | wc -l   # Count files that would be written`,
+  );
 
   // Register subcommands
   registerInitCommand(program);
@@ -41,14 +50,14 @@ export async function main(argv: string[]): Promise<number> {
   } catch (error) {
     const err = ensureError(error);
 
-    // Always print an error message to avoid silent failures.
-    // Commander may also print its own message; duplication is acceptable.
-    console.error(err.message);
-
     if (err instanceof CommanderError) {
+      if (typeof err.exitCode === "number" && err.exitCode !== 0) {
+        console.error(err.message);
+      }
       return typeof err.exitCode === "number" ? err.exitCode : 1;
     }
 
+    console.error(err.message);
     return 1;
   }
 

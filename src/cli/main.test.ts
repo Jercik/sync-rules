@@ -3,6 +3,12 @@ import { main } from "./main.js";
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 
 // Mock the entire modules with dynamic imports support
+vi.mock("conf", () => ({
+  default: class ConfMock {
+    path = "/tmp/internal.json";
+  },
+}));
+
 vi.mock("../config/loader.js", () => ({
   loadConfig: vi.fn(),
   createSampleConfig: vi.fn(),

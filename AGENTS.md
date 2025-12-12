@@ -143,7 +143,7 @@ function isWithinDirectory(base: string, target: string): boolean {
   // Absolute means different drive (Windows)
   if (isAbsolute(rel)) return false;
   // Starts with ".." followed by separator means path escapes the base directory
-  // Use sep to avoid false positives on files named "..foo"
+  // Use sep to avoid false positives on paths like "..foo/bar.txt"
   if (rel === ".." || rel.startsWith(`..${sep}`)) return false;
   return true;
 }
@@ -167,7 +167,7 @@ function isWithinDirectory(base: string, target: string): boolean {
 
 1. **Use `relative()` not `startsWith()`** - avoids manual separator handling and different-drive detection
 2. **Check for absolute result** - indicates different drive/root on Windows
-3. **Check for `..` prefix with `sep`** - use `rel === ".." || rel.startsWith(".." + sep)` to avoid false positives on files named `..foo`
+3. **Check for `..` prefix with `sep`** - use `rel === ".." || rel.startsWith(".." + sep)` to avoid false positives on paths like `..foo/bar.txt`
 4. **Empty string is valid** - means the paths are equal
 5. **Symlinks are not resolved** - `resolve()` and `relative()` operate lexically; use `fs.realpathSync()` if symlink traversal is a concern
 

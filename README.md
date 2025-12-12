@@ -132,6 +132,18 @@ sync-rules --porcelain | tail -n +2 | cut -f2 | xargs -n1 dirname | sort -u
 sync-rules && claude --chat
 ```
 
+## Agent Rule
+
+Add to your `CLAUDE.md` or `AGENTS.md`:
+
+```markdown
+# Rule: `sync-rules` Usage
+
+Run `npx -y sync-rules --help` to learn available options.
+
+Use `sync-rules` when you need to keep AI assistant rule files synchronized across many projects from a single central rules repository. It prevents drift and removes manual copying while staying friendly to Unix pipelines.
+```
+
 ## License
 
 MIT License (c) 2025 Łukasz Jerciński
