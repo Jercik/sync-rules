@@ -3,12 +3,6 @@ import { main } from "./main.js";
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 
 // Mock the entire modules with dynamic imports support
-vi.mock("conf", () => ({
-  default: class ConfMock {
-    path = "/tmp/internal.json";
-  },
-}));
-
 vi.mock("../config/loader.js", () => ({
   loadConfig: vi.fn(),
   createSampleConfig: vi.fn(),
@@ -171,6 +165,30 @@ describe("cli/main", () => {
   // launch command removed
 
   describe("error handling", () => {
+    it("does not print errors for --help or --version", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const helpCode = await main(["node", "sync-rules", "--help"]);
+      expect(helpCode).toBe(0);
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      errorSpy.mockClear();
+
+      const versionCode = await main(["node", "sync-rules", "--version"]);
+      expect(versionCode).toBe(0);
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      errorSpy.mockRestore();
+    });
+
+    it("prints an error for invalid commands", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const code = await main(["node", "sync-rules", "unknown"]);
+      expect(code).toBe(1);
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
     it("handles unknown commands", async () => {
       const code = await main(["node", "sync-rules", "unknown"]);
       expect(code).toBe(1);

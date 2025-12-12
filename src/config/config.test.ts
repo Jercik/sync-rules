@@ -7,11 +7,6 @@ import * as fs from "node:fs/promises";
 import type { Config } from "./config.js";
 
 vi.mock("node:fs/promises");
-vi.mock("conf", () => ({
-  default: class ConfMock {
-    path = "/tmp/internal.json";
-  },
-}));
 
 // No need to mock paths - use real normalizePath
 

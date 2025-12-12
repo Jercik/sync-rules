@@ -1,16 +1,10 @@
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import envPaths from "env-paths";
-import Conf from "conf";
 import { normalizePath } from "../utils/paths.js";
 
-const configStore = new Conf({
-  projectName: "sync-rules",
-  projectSuffix: "",
-  configName: "internal",
-});
-
-const defaultConfigDir = dirname(configStore.path);
 const paths = envPaths("sync-rules", { suffix: "" });
+const legacyPaths = envPaths("sync-rules");
+const defaultConfigPath = resolve(paths.config, "config.json");
 
 /**
  * Default configuration file path
@@ -18,7 +12,13 @@ const paths = envPaths("sync-rules", { suffix: "" });
  */
 export const DEFAULT_CONFIG_PATH = process.env.SYNC_RULES_CONFIG
   ? normalizePath(process.env.SYNC_RULES_CONFIG)
-  : resolve(defaultConfigDir, "config.json");
+  : defaultConfigPath;
+
+/**
+ * Legacy configuration file path used before v5.1.1.
+ * Probed for backwards compatibility when default config is missing.
+ */
+export const LEGACY_CONFIG_PATH = resolve(legacyPaths.config, "config.json");
 
 /**
  * Default rules source directory path
