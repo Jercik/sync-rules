@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { parseConfig } from "./config.js";
 import { normalizePath } from "../utils/paths.js";
-import { DEFAULT_CONFIG_PATH, LEGACY_CONFIG_PATH } from "./constants.js";
+import { DEFAULT_CONFIG_PATH } from "./constants.js";
 import {
   ConfigNotFoundError,
   ConfigParseError,
@@ -80,20 +80,6 @@ export async function loadConfig(configPath: string): Promise<Config> {
   } catch (error) {
     if (isNodeError(error) && error.code === "ENOENT") {
       const isDefault = normalizedPath === normalizePath(DEFAULT_CONFIG_PATH);
-      if (isDefault) {
-        const legacyPath = normalizePath(LEGACY_CONFIG_PATH);
-        if (legacyPath !== normalizedPath) {
-          try {
-            const legacyContent = await readFile(legacyPath, "utf8");
-            return parseConfig(legacyContent);
-          } catch (legacyError) {
-            if (isNodeError(legacyError) && legacyError.code === "ENOENT") {
-              throw new ConfigNotFoundError(normalizedPath, true);
-            }
-            throw new ConfigParseError(legacyPath, ensureError(legacyError));
-          }
-        }
-      }
       throw new ConfigNotFoundError(normalizedPath, isDefault);
     }
 
