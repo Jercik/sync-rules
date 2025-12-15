@@ -49,8 +49,8 @@ importers:
         specifier: ^10.1.8
         version: 10.1.8(eslint@9.39.2(jiti@2.6.1))
       fta-check:
-        specifier: ^1.4.1
-        version: 1.4.1(fta-cli@3.0.0)
+        specifier: ^1.5.0
+        version: 1.5.0(fta-cli@3.0.0)
       fta-cli:
         specifier: ^3.0.0
         version: 3.0.0
@@ -1246,8 +1246,8 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
-  fta-check@1.4.1:
-    resolution: {integrity: sha512-CS/vXImF1m6j2mNEc+IhErNPaGBKU/T7CRumw3q/yNJdh4pDsmCULYSROvuEwn/OM7WUulXeiPk8IEsafHHu5Q==}
+  fta-check@1.5.0:
+    resolution: {integrity: sha512-B0QILQf85PMVH3342TwF0BgIFz5NPp+UcpK9fIUC8arVo0yR5p8FBVRIYfMzhgFPhpQ/T059e+rnX9XQ27R6Fg==}
     engines: {node: '>=22.14.0'}
     hasBin: true
     peerDependencies:
@@ -3528,7 +3528,7 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
-  fta-check@1.4.1(fta-cli@3.0.0):
+  fta-check@1.5.0(fta-cli@3.0.0):
     dependencies:
       '@commander-js/extra-typings': 14.0.0(commander@14.0.2)
       commander: 14.0.2
