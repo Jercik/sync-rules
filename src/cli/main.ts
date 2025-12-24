@@ -2,6 +2,7 @@ import { Command, CommanderError } from "@commander-js/extra-typings";
 import packageJson from "../../package.json" with { type: "json" };
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 import { ensureError } from "../utils/errors.js";
+import { registerConfigPathCommand } from "./register-config-path-command.js";
 import { registerInitCommand } from "./register-init-command.js";
 import { registerSyncCommand } from "./register-sync-command.js";
 
@@ -38,10 +39,12 @@ export async function main(argv: string[]): Promise<number> {
 Examples:
   sync-rules                        # Sync all projects (default)
   sync-rules init                   # Create a sample config file
+  sync-rules config-path            # Print the config file path
   sync-rules --porcelain | tail -n +2 | wc -l   # Count files that would be written`,
   );
 
   // Register subcommands
+  registerConfigPathCommand(program);
   registerInitCommand(program);
   registerSyncCommand(program);
 
