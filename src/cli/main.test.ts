@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { main } from "./main.js";
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
@@ -55,6 +57,52 @@ describe("cli/main", () => {
 
       const code = await main(["node", "sync-rules", "init"]);
       expect(code).toBe(1);
+    });
+  });
+
+  describe("config-path command", () => {
+    it("prints the default config path", async () => {
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const code = await main(["node", "sync-rules", "config-path"]);
+
+      expect(code).toBe(0);
+      expect(logSpy).toHaveBeenCalledWith(DEFAULT_CONFIG_PATH);
+      logSpy.mockRestore();
+    });
+
+    it("prints custom config path when --config is provided", async () => {
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const code = await main([
+        "node",
+        "sync-rules",
+        "--config",
+        "./custom.json",
+        "config-path",
+      ]);
+
+      expect(code).toBe(0);
+      expect(logSpy).toHaveBeenCalledWith(resolve("./custom.json"));
+      logSpy.mockRestore();
+    });
+
+    it("expands tilde in config path", async () => {
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      const code = await main([
+        "node",
+        "sync-rules",
+        "--config",
+        "~/.config/sync-rules.json",
+        "config-path",
+      ]);
+
+      expect(code).toBe(0);
+      expect(logSpy).toHaveBeenCalledWith(
+        resolve(homedir(), ".config/sync-rules.json"),
+      );
+      logSpy.mockRestore();
     });
   });
 
