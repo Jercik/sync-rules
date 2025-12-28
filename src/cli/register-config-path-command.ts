@@ -1,4 +1,5 @@
 import type { Command } from "@commander-js/extra-typings";
+import { normalizePath } from "../utils/paths.js";
 
 type ParentCommand = Command<[], { config: string; verbose?: true }>;
 
@@ -19,6 +20,6 @@ Examples:
     )
     .action(() => {
       const parentOpts = program.opts();
-      console.log(parentOpts.config);
+      console.log(normalizePath(parentOpts.config));
     });
 }
