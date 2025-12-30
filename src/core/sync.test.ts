@@ -39,7 +39,10 @@ describe("sync", () => {
     });
 
     it("writes AGENTS.md with concatenated rules", async () => {
-      vi.mocked(filesystemModule.loadRules).mockResolvedValue(mockRules);
+      vi.mocked(filesystemModule.loadRules).mockResolvedValue({
+        rules: mockRules,
+        unmatchedPatterns: [],
+      });
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         written: [
           "/home/user/project/AGENTS.md",
@@ -71,7 +74,10 @@ describe("sync", () => {
     });
 
     it("creates CLAUDE.md file referencing AGENTS.md when not dry-run", async () => {
-      vi.mocked(filesystemModule.loadRules).mockResolvedValue(mockRules);
+      vi.mocked(filesystemModule.loadRules).mockResolvedValue({
+        rules: mockRules,
+        unmatchedPatterns: [],
+      });
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         written: [
           "/home/user/project/AGENTS.md",
@@ -96,7 +102,10 @@ describe("sync", () => {
     });
 
     it("does not attempt extra writes in dry-run mode", async () => {
-      vi.mocked(filesystemModule.loadRules).mockResolvedValue(mockRules);
+      vi.mocked(filesystemModule.loadRules).mockResolvedValue({
+        rules: mockRules,
+        unmatchedPatterns: [],
+      });
       vi.mocked(executionModule.executeActions).mockResolvedValue({
         written: [],
         skipped: [],
@@ -117,7 +126,10 @@ describe("sync", () => {
     });
 
     it("writes CLAUDE.md when AGENTS.md exists but no rules were selected", async () => {
-      vi.mocked(filesystemModule.loadRules).mockResolvedValue([]);
+      vi.mocked(filesystemModule.loadRules).mockResolvedValue({
+        rules: [],
+        unmatchedPatterns: [],
+      });
       vi.mocked(executionModule.executeActions)
         .mockResolvedValueOnce({ written: [], skipped: [] }) // first call (no actions)
         .mockResolvedValueOnce({

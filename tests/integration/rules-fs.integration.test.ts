@@ -45,7 +45,7 @@ describe("filesystem operations", () => {
       const patterns = ["**/*.md"];
       const result = await globRulePaths(tempDir, patterns);
 
-      expect(result).toEqual([
+      expect(result.paths).toEqual([
         "backend/node.md",
         "deep/nested/deep.md",
         "frontend/react.md",
@@ -54,6 +54,7 @@ describe("filesystem operations", () => {
         "python.md",
         "test/test-rule.md",
       ]);
+      expect(result.unmatchedPatterns).toEqual([]);
     });
 
     // Exact name matching covered by wildcard and exclusion tests
@@ -62,13 +63,27 @@ describe("filesystem operations", () => {
       const patterns = ["**/*.md", "!test/**"];
       const result = await globRulePaths(tempDir, patterns);
 
-      expect(result).toEqual([
+      expect(result.paths).toEqual([
         "backend/node.md",
         "deep/nested/deep.md",
         "frontend/react.md",
         "frontend/vue.md",
         "javascript.md",
         "python.md",
+      ]);
+      expect(result.unmatchedPatterns).toEqual([]);
+    });
+
+    it("reports unmatched patterns", async () => {
+      const patterns = ["**/*.md", "nonexistent/*.md", "also-missing/**"];
+      const result = await globRulePaths(tempDir, patterns);
+
+      // Should still return matches from the first pattern
+      expect(result.paths.length).toBeGreaterThan(0);
+      // Should report the patterns that matched nothing
+      expect(result.unmatchedPatterns).toEqual([
+        "also-missing/**",
+        "nonexistent/*.md",
       ]);
     });
 
@@ -82,8 +97,9 @@ describe("filesystem operations", () => {
       await writeFile(join(tempDir, "sub", "b.md"), "# B");
       await writeFile(join(tempDir, "sub", "c.txt"), "nope");
 
-      const rules = await loadRules(tempDir, ["**/*.md", "!sub/**"]);
-      expect(rules).toEqual([{ path: "a.md", content: "# A" }]);
+      const result = await loadRules(tempDir, ["**/*.md", "!sub/**"]);
+      expect(result.rules).toEqual([{ path: "a.md", content: "# A" }]);
+      expect(result.unmatchedPatterns).toEqual([]);
     });
   });
 

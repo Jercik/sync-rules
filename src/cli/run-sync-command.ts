@@ -11,6 +11,11 @@ interface SyncCommandOptions {
   porcelain: boolean;
 }
 
+type PatternWarning = {
+  source: string;
+  patterns: string[];
+};
+
 export async function runSyncCommand(
   options: SyncCommandOptions,
 ): Promise<void> {
@@ -22,7 +27,16 @@ export async function runSyncCommand(
   const { syncProject } = await import("../core/sync.js");
   const { syncGlobal } = await import("../core/sync-global.js");
 
-  const globalReport = await syncGlobal({ dryRun }, config);
+  const globalResult = await syncGlobal({ dryRun }, config);
+
+  // Track warnings for unmatched patterns
+  const patternWarnings: PatternWarning[] = [];
+  if (globalResult.unmatchedPatterns.length > 0) {
+    patternWarnings.push({
+      source: "global",
+      patterns: globalResult.unmatchedPatterns,
+    });
+  }
 
   const settlements = await Promise.allSettled(
     projectsToSync.map(async (project: Project) => {
@@ -74,27 +88,55 @@ export async function runSyncCommand(
   ): s is PromiseFulfilledResult<SyncResult> => s.status === "fulfilled";
   const successes = settlements.filter(isFulfilled);
 
+  // Collect unmatched patterns from successful project syncs
+  for (const success of successes) {
+    if (success.value.unmatchedPatterns.length > 0) {
+      patternWarnings.push({
+        source: success.value.projectPath,
+        patterns: success.value.unmatchedPatterns,
+      });
+    }
+  }
+
   // Collect all written paths for porcelain output
   const allWritten = [
-    ...globalReport.written,
+    ...globalResult.written,
     ...successes.flatMap((s) => s.value.report.written),
   ];
   const allSkipped = [
-    ...globalReport.skipped,
+    ...globalResult.skipped,
     ...successes.flatMap((s) => s.value.report.skipped),
   ];
 
   // Porcelain mode: machine-readable TSV output to stdout
   // Sort paths for deterministic output (concurrent project execution produces non-deterministic order)
   if (porcelain) {
-    console.log("ACTION\tPATH");
+    console.log("ACTION\tSOURCE\tDETAIL");
     for (const path of allWritten.toSorted()) {
-      console.log(`WRITE\t${path}`);
+      console.log(`WRITE\t\t${path}`);
     }
     for (const path of allSkipped.toSorted()) {
-      console.log(`SKIP\t${path}`);
+      console.log(`SKIP\t\t${path}`);
+    }
+    for (const warning of patternWarnings) {
+      for (const pattern of warning.patterns) {
+        console.log(`WARN\t${warning.source}\t${pattern}`);
+      }
     }
     return;
+  }
+
+  // Always output warnings for unmatched patterns (regardless of verbose mode)
+  // These indicate potential config issues that users should be aware of
+  if (patternWarnings.length > 0) {
+    console.error("Warning: The following patterns did not match any rules:");
+    for (const warning of patternWarnings) {
+      const sourceLabel =
+        warning.source === "global" ? "global config" : warning.source;
+      for (const pattern of warning.patterns) {
+        console.error(`  • ${pattern} (in ${sourceLabel})`);
+      }
+    }
   }
 
   // Human-readable mode: status messages to stderr (only if verbose)

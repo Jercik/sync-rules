@@ -8,6 +8,7 @@ import { resolveInside } from "../utils/paths.js";
 export interface SyncResult {
   projectPath: string;
   report: ExecutionReport;
+  unmatchedPatterns: string[];
 }
 
 /**
@@ -31,7 +32,7 @@ export async function syncProject(
 ): Promise<SyncResult> {
   const rulesDir = config.rulesSource;
   // Load rules once
-  const rules = await loadRules(rulesDir, project.rules);
+  const { rules, unmatchedPatterns } = await loadRules(rulesDir, project.rules);
 
   // Plan writes
   const actions: WriteAction[] = [];
@@ -73,5 +74,5 @@ export async function syncProject(
     }
   }
 
-  return { projectPath: project.path, report };
+  return { projectPath: project.path, report, unmatchedPatterns };
 }
