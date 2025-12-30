@@ -79,7 +79,15 @@ describe("filesystem operations", () => {
       const result = await globRulePaths(tempDir, patterns);
 
       // Should still return matches from the first pattern
-      expect(result.paths.length).toBeGreaterThan(0);
+      expect(result.paths).toEqual([
+        "backend/node.md",
+        "deep/nested/deep.md",
+        "frontend/react.md",
+        "frontend/vue.md",
+        "javascript.md",
+        "python.md",
+        "test/test-rule.md",
+      ]);
       // Should report the patterns that matched nothing
       expect(result.unmatchedPatterns).toEqual([
         "also-missing/**",

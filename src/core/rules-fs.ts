@@ -49,10 +49,9 @@ export async function globRulePaths(
 
   // Check each positive pattern individually to find unmatched ones
   const positivePatterns = patterns.filter((p) => !isNegationPattern(p));
-  const unmatchedPatterns: string[] = [];
 
   // Run each positive pattern individually to check if it matches anything
-  await Promise.all(
+  const patternResults = await Promise.all(
     positivePatterns.map(async (pattern) => {
       const matches = await globby([pattern], {
         cwd: normalizedDir,
@@ -60,15 +59,17 @@ export async function globRulePaths(
         onlyFiles: true,
         followSymbolicLinks: true,
       });
-      if (matches.length === 0) {
-        unmatchedPatterns.push(pattern);
-      }
+      return matches.length === 0 ? pattern : null;
     }),
   );
 
+  const unmatchedPatterns = patternResults
+    .filter((p): p is string => p !== null)
+    .sort();
+
   return {
     paths: paths.sort(),
-    unmatchedPatterns: unmatchedPatterns.sort(),
+    unmatchedPatterns,
   };
 }
 

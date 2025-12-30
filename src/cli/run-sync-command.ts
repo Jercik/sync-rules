@@ -118,7 +118,10 @@ export async function runSyncCommand(
     for (const path of allSkipped.toSorted()) {
       console.log(`SKIP\t\t${path}`);
     }
-    for (const warning of patternWarnings) {
+    // Sort warnings for deterministic output
+    for (const warning of patternWarnings.toSorted((a, b) =>
+      a.source.localeCompare(b.source),
+    )) {
       for (const pattern of warning.patterns) {
         console.log(`WARN\t${warning.source}\t${pattern}`);
       }
@@ -130,7 +133,10 @@ export async function runSyncCommand(
   // These indicate potential config issues that users should be aware of
   if (patternWarnings.length > 0) {
     console.error("Warning: The following patterns did not match any rules:");
-    for (const warning of patternWarnings) {
+    // Sort warnings for deterministic output
+    for (const warning of patternWarnings.toSorted((a, b) =>
+      a.source.localeCompare(b.source),
+    )) {
       const sourceLabel =
         warning.source === "global" ? "global config" : warning.source;
       for (const pattern of warning.patterns) {
