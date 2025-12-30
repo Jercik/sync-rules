@@ -15,7 +15,9 @@ vi.mock("../core/sync.js", () => ({
 }));
 
 vi.mock("../core/sync-global.js", () => ({
-  syncGlobal: vi.fn().mockResolvedValue({ written: [], skipped: [] }),
+  syncGlobal: vi
+    .fn()
+    .mockResolvedValue({ written: [], skipped: [], unmatchedPatterns: [] }),
 }));
 
 import * as loader from "../config/loader.js";
@@ -130,6 +132,7 @@ describe("cli/main", () => {
       vi.mocked(syncMod.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
         report: { written: [], skipped: [] },
+        unmatchedPatterns: [],
       });
 
       const code = await main(["node", "sync-rules"]);
@@ -146,6 +149,7 @@ describe("cli/main", () => {
       vi.mocked(syncMod.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
         report: { written: [], skipped: [] },
+        unmatchedPatterns: [],
       });
 
       await main(["node", "sync-rules"]);
@@ -170,6 +174,7 @@ describe("cli/main", () => {
       vi.mocked(syncMod.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
         report: { written: [], skipped: [] },
+        unmatchedPatterns: [],
       });
 
       await main(["node", "sync-rules", "--dry-run"]);
@@ -194,6 +199,7 @@ describe("cli/main", () => {
       vi.mocked(syncMod.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
         report: { written: [], skipped: [] },
+        unmatchedPatterns: [],
       });
 
       await main(["node", "sync-rules", "--porcelain"]);
@@ -207,6 +213,43 @@ describe("cli/main", () => {
         { dryRun: true },
         expect.any(Object),
       );
+    });
+
+    it("outputs warnings for unmatched patterns", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        global: ["global/*.md"],
+        projects: [{ path: "/home/user/project1", rules: ["**/*.md"] }],
+      });
+
+      vi.mocked(syncGlobalMod.syncGlobal).mockResolvedValue({
+        written: [],
+        skipped: [],
+        unmatchedPatterns: ["global/*.md"],
+      });
+
+      vi.mocked(syncMod.syncProject).mockResolvedValue({
+        projectPath: "/home/user/project1",
+        report: { written: [], skipped: [] },
+        unmatchedPatterns: ["missing-pattern/*.md"],
+      });
+
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await main(["node", "sync-rules"]);
+
+      // Check that warnings were printed
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Warning: The following patterns did not match any rules:",
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        "  • global/*.md (in global config)",
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        "  • missing-pattern/*.md (in /home/user/project1)",
+      );
+
+      errorSpy.mockRestore();
     });
   });
 

@@ -18,6 +18,197 @@ Use concise prompts for quick facts and focused questions for deeper topics. If 
 
 ---
 
+# Rule: Design Means Deciding
+
+Design is the art of making choices. When you add a configuration option instead of deciding, you're abdicating your responsibility as a designer and forcing that decision onto users who don't care.
+
+Every option you provide asks users to make a decision. Users care about their task—the document they're writing, the site they're building—not your software's internals. They don't care whether the database is optimized for size or speed, where the toolbar docks, or how the help index is built. Make these decisions for them.
+
+## Options dialogs are archaeological records
+
+An options dialog reveals design arguments that were never resolved. "Should we auto-save? Yes! No!" becomes a checkbox. The #ifdef goes in, the debate ends, and users inherit the cognitive burden forever. If you find yourself reaching for a config option, stop and decide instead.
+
+## Customization is overrated
+
+Power users work across multiple machines, reinstall systems, and upgrade frequently. Customizations don't propagate. Most "power users" do minimal customization because it's not worth re-doing after every reinstall or on every machine they touch.
+
+## When options are appropriate
+
+- **Choices integral to the user's work:** Document formatting, site appearance, output settings—anything directly related to what they're creating. Go deep here.
+- **Visual personalization that doesn't affect behavior:** Themes, skins, wallpapers. Users can ignore these and still get work done.
+
+## When to decide instead
+
+- Technical implementation details (indexing strategy, caching behavior)
+- UI chrome placement (toolbar position, panel arrangement)
+- Anything requiring a "wizard" to explain the choice
+- Anything where you'd recommend a default anyway
+
+If you're tempted to add an option because you can't decide which approach is better, that's a signal to think harder, not to defer. Someone else will ship a simpler product that makes the choice for users, and users will prefer it.
+
+
+---
+
+# Rule: File Naming Matches Contents
+
+Name files for what the module actually does. Use kebab-case and prefer verb–noun or domain–role names. Match the primary export; if you can’t name it crisply, split the file.
+
+## Checklist
+
+- Use kebab-case; describe responsibility (verb–noun or domain–role).
+- Match the main export: `calculateUsageRate` → `calculate-usage-rate.ts`.
+- One responsibility per file; if you need two verbs, split.
+- Align with functional core/imperative shell:
+  - Functional core: `calculate-…`, `validate-…`, `parse-…`, `format-…`, `aggregate-…`
+  - Imperative shell: `…-route.ts`, `…-handler.ts`, `…-job.ts`, `…-cli.ts`, `…-script.ts`
+- Prefer specific domain nouns; avoid buckets like `utils`, `helpers`, `core`, `data`, `math`.
+- Use role suffixes only when they clarify architecture (e.g., `-service`, `-repository`).
+- Preserve history when renaming: `git mv old-name.ts new-name.ts`.
+
+Example: `usage.core.ts` → split into `fetch-service-usage.ts` and `aggregate-usage.ts`.
+
+
+---
+
+# Rule: Functional Core, Imperative Shell
+
+Separate business logic from side effects by organizing code into a functional core and an imperative shell. The functional core contains pure, testable functions that operate only on provided data, free of I/O operations, database calls, or external state mutations. The imperative shell handles all side effects and orchestrates the functional core to perform business logic.
+
+This separation improves testability, maintainability, and reusability. Core logic can be tested in isolation without mocking external dependencies, and the imperative shell can be modified or swapped without changing business logic.
+
+Example of mixed logic and side effects:
+
+```ts
+// Bad: Logic and side effects are mixed
+function sendUserExpiryEmail(): void {
+  for (const user of db.getUsers()) {
+    if (user.subscriptionEndDate > Date.now()) continue;
+    if (user.isFreeTrial) continue;
+    email.send(user.email, "Your account has expired " + user.name + ".");
+  }
+}
+```
+
+Refactored using functional core and imperative shell:
+
+```ts
+// Functional core - pure functions with no side effects
+function getExpiredUsers(users: User[], cutoff: Date): User[] {
+  return users.filter(
+    (user) => user.subscriptionEndDate <= cutoff && !user.isFreeTrial,
+  );
+}
+
+function generateExpiryEmails(users: User[]): Array<[string, string]> {
+  return users.map((user) => [
+    user.email,
+    `Your account has expired ${user.name}.`,
+  ]);
+}
+
+// Imperative shell - handles side effects
+email.bulkSend(
+  generateExpiryEmails(getExpiredUsers(db.getUsers(), Date.now())),
+);
+```
+
+The functional core functions can now be easily tested with sample data and reused for different purposes without modification.
+
+
+---
+
+# Rule: No Logic in Tests
+
+Write test assertions as concrete input/output examples, not computed values. Avoid operators, string concatenation, loops, and conditionals in test bodies—these obscure bugs and make tests harder to verify at a glance.
+
+```ts
+// Bad: this test passes, but both production code and test share the same bug
+const baseUrl = "http://example.com/";
+function getPhotosUrl() {
+  return baseUrl + "/photos"; // Bug: produces "http://example.com//photos"
+}
+expect(getPhotosUrl()).toBe(baseUrl + "/photos"); // ✓ passes — bug hidden
+
+// Good: literal expected value reveals the bug immediately
+expect(getPhotosUrl()).toBe("http://example.com/photos"); // ✗ fails — bug caught
+```
+
+Unlike production code that handles varied inputs, tests verify specific cases. State expectations directly rather than computing them. When a test fails, the expected value should be immediately readable without mental evaluation.
+
+If test setup genuinely requires complex logic (fixtures, builders, shared assertions), extract it into dedicated test utilities with their own tests. Keep test bodies simple: arrange inputs, call the function, assert against literal expected values.
+
+
+---
+
+# Rule: Normalize User Input
+
+Accept flexible input formats and normalize programmatically. Don't reject input because of formatting characters users naturally include—spaces in credit card numbers, parentheses in phone numbers, hyphens in IDs. Computers are good at removing that.
+
+```ts
+import * as z from "zod";
+
+// BAD - forces users to format input a specific way
+const phoneSchema = z.string().regex(/^\d{10}$/, "Only digits allowed");
+
+// GOOD - accept flexible input, normalize it
+const phoneSchema = z
+  .string()
+  .transform((s) => s.replace(/[\s().-]/g, ""))
+  .pipe(z.string().regex(/^\d{10}$/, "Must be 10 digits"));
+```
+
+When accepting user input:
+
+- **Strip formatting characters** (spaces, hyphens, parentheses, dots) before validation
+- **Trim whitespace** from text fields
+- **Normalize case** when case doesn't matter (emails, usernames)
+- **Accept common variations** (with/without country code for phones, with/without protocol for URLs)
+
+The validation error should describe what's actually wrong with the data, not complain about formatting the computer could have handled.
+
+
+---
+
+# Rule: Test Functional Core
+
+Focus testing efforts on the functional core—pure functions with no side effects. These tests are fast, deterministic, and provide high value per line of test code. Do not write tests for the imperative shell (I/O, database calls, external services) unless the user explicitly requests them.
+
+Imperative shell tests require mocks, stubs, or integration infrastructure, making them slower to write, brittle to maintain, and harder to debug. The return on investment diminishes rapidly compared to functional core tests. When the functional core is well-tested, the imperative shell becomes thin orchestration code where bugs are easier to spot through review or manual testing.
+
+## What to test by default
+
+- Pure transformation functions (filtering, mapping, calculations)
+- Validation and parsing logic
+- Business rule implementations
+- Data formatting and serialization helpers
+
+## What to skip unless explicitly requested
+
+- HTTP handlers and route definitions
+- Database queries and repository methods
+- External API clients
+- File system operations
+- Message queue consumers/producers
+
+If testing imperative shell code is explicitly requested, prefer integration tests over unit tests with mocks—they catch real issues and are less likely to break when implementation details change.
+
+
+---
+
+# Rule: Use Git Mv
+
+Use `git mv <old> <new>` for renaming or moving tracked files in Git. It stages both deletion and addition in one command, preserves history for `git log --follow`, and is the only reliable method for case-only renames on case-insensitive filesystems (Windows/macOS).
+
+```bash
+git mv old-file.js new-file.js              # Simple rename
+git mv file.js src/utils/file.js            # Move to directory
+git mv readme.md README.md                  # Case-only change
+for f in *.test.js; do git mv "$f" tests/; done  # Multiple files (use shell loop)
+```
+
+
+---
+
 # Rule: Child Process Selection
 
 Choose the appropriate `node:child_process` function based on synchronicity, shell requirements, output size, and error handling. (Defaults from Node.js 25.x docs.)
@@ -713,6 +904,60 @@ pnpx tsc --noEmit         # ❌ Downloads from registry, ignores local
 
 ---
 
+# Rule: Parse, Don't Validate
+
+When checking input data, return a refined type that preserves the knowledge gained—don't just validate and discard. Validation functions that return `void` or throw errors force callers to re-check conditions or handle "impossible" cases. Parsing functions that return more precise types eliminate redundant checks and let the compiler catch inconsistencies.
+
+Zod embodies this principle: every schema is a parser that transforms `unknown` input into a typed output. Use Zod at system boundaries to parse external data into domain types.
+
+```ts
+import * as z from "zod";
+
+// Schema defines both validation rules AND the resulting type
+const User = z.object({
+  id: z.string(),
+  email: z.email(),
+  roles: z.array(z.string()).min(1),
+});
+
+type User = z.infer<typeof User>; // { id: string; email: string; roles: string[] }
+
+// Parse at the boundary - downstream code receives typed data
+function handleRequest(body: unknown): User {
+  return User.parse(body); // throws ZodError if invalid
+}
+```
+
+With parsing, downstream code receives a fully typed `User` with runtime-guaranteed non-empty roles. If requirements change, update the schema and the compiler surfaces all affected code.
+
+## Practical guidance
+
+- **Parse at system boundaries.** Convert external input (JSON, environment variables, API responses) to precise domain types as early as possible, before any processing occurs. Zod's `.parse()` or `.safeParse()` handles this cleanly.
+- **Strengthen argument types, don't weaken return types.** Instead of returning `T | undefined`, require callers to provide already-parsed data.
+- **Let schemas drive data structures.** If a function needs a guarantee (non-empty array, positive number, valid email), define a schema that encodes that guarantee and accept the inferred type.
+- **Treat `void`-returning checks with suspicion.** A function that validates but returns nothing is easy to forget. Prefer Zod schemas that return refined types.
+- **Use `.refine()` for custom constraints.** When Zod's built-in validators aren't enough, add refinements that preserve type information.
+
+```ts
+import * as z from "zod";
+
+// Custom constraint with .refine() - type is preserved
+const PositiveInt = z
+  .number()
+  .int()
+  .refine((n) => n > 0, "must be positive");
+
+type PositiveInt = z.infer<typeof PositiveInt>; // number (branded at runtime by validation)
+
+// Non-empty array - constraint enforced at parse time
+const ConfigDirs = z.array(z.string()).min(1);
+
+type ConfigDirs = z.infer<typeof ConfigDirs>; // string[] (non-empty enforced at runtime)
+```
+
+
+---
+
 # Rule: Return Types
 
 When declaring functions on the top-level of a module,
@@ -768,11 +1013,13 @@ TypeScript globs are intentionally limited and differ from bash/zsh globs: `*`, 
 Use identical names for Zod schemas and their inferred types. Name both with PascalCase. TypeScript allows this because types and values exist in separate namespaces.
 
 ```ts
+import * as z from "zod";
+
 // CORRECT
 const User = z.object({
   id: z.string(),
   name: z.string(),
-  email: z.string(),
+  email: z.email(),
 });
 
 type User = z.infer<typeof User>;

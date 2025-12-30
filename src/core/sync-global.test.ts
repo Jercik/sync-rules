@@ -35,7 +35,10 @@ describe("sync-global", () => {
   });
 
   it("returns no writes when no rules match", async () => {
-    vi.mocked(filesystemModule.loadRules).mockResolvedValue([]);
+    vi.mocked(filesystemModule.loadRules).mockResolvedValue({
+      rules: [],
+      unmatchedPatterns: ["global-rules/*.md"],
+    });
     const result = await syncGlobal(
       { dryRun: false },
       {
@@ -46,11 +49,15 @@ describe("sync-global", () => {
     );
     expect(filesystemModule.loadRules).toHaveBeenCalled();
     expect(result.written).toEqual([]);
+    expect(result.unmatchedPatterns).toEqual(["global-rules/*.md"]);
   });
 
   it("writes combined content to all global targets", async () => {
     // Mock rules
-    vi.mocked(filesystemModule.loadRules).mockResolvedValue(mockRules);
+    vi.mocked(filesystemModule.loadRules).mockResolvedValue({
+      rules: mockRules,
+      unmatchedPatterns: [],
+    });
 
     // Mock executeActions
     vi.mocked(executionModule.executeActions).mockResolvedValue({

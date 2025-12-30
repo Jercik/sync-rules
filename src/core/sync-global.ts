@@ -4,6 +4,10 @@ import { executeActions } from "./execution.js";
 import type { RunFlags, ExecutionReport, WriteAction } from "./execution.js";
 import { normalizePath } from "../utils/paths.js";
 
+interface GlobalSyncResult extends ExecutionReport {
+  unmatchedPatterns: string[];
+}
+
 // Built-in global target files for supported tools
 const BUILT_IN_GLOBAL_TARGETS = [
   "~/.claude/CLAUDE.md", // Claude Code
@@ -25,20 +29,24 @@ function getGlobalTargetPaths(): string[] {
 export async function syncGlobal(
   flags: RunFlags,
   config: Config,
-): Promise<ExecutionReport> {
+): Promise<GlobalSyncResult> {
   const patterns = config.global;
   if (!patterns || patterns.length === 0) {
-    return { written: [], skipped: [] };
+    return { written: [], skipped: [], unmatchedPatterns: [] };
   }
 
-  const rules = await loadRules(config.rulesSource, patterns);
+  const { rules, unmatchedPatterns } = await loadRules(
+    config.rulesSource,
+    patterns,
+  );
   if (rules.length === 0) {
-    return { written: [], skipped: [] };
+    return { written: [], skipped: [], unmatchedPatterns };
   }
   const content = rules.map((r) => r.content).join("\n\n---\n\n");
 
   const targets = getGlobalTargetPaths();
   const actions: WriteAction[] = targets.map((path) => ({ path, content }));
 
-  return executeActions(actions, flags);
+  const report = await executeActions(actions, flags);
+  return { ...report, unmatchedPatterns };
 }

@@ -5,19 +5,37 @@ import { normalizePath } from "../utils/paths.js";
 import { SyncError, ensureError } from "../utils/errors.js";
 
 /**
+ * Result of glob matching with tracking of unmatched patterns.
+ */
+type GlobResult = {
+  paths: string[];
+  unmatchedPatterns: string[];
+};
+
+/**
+ * Check if a pattern is a negation pattern (starts with `!`).
+ */
+function isNegationPattern(pattern: string): boolean {
+  return pattern.startsWith("!");
+}
+
+/**
  * Find all rule file paths matching the given glob patterns.
  *
  * Uses globby for efficient pattern matching with support for negation patterns.
  * Patterns are validated by Zod before reaching this function.
  *
+ * Also tracks which positive patterns matched no files, useful for detecting
+ * outdated or misspelled patterns.
+ *
  * @param rulesDir - Absolute path to the central rules directory
  * @param patterns - POSIX-style glob patterns (must use forward slashes)
- * @returns Sorted array of relative paths matching the patterns
+ * @returns Object containing sorted paths and list of unmatched positive patterns
  */
 export async function globRulePaths(
   rulesDir: string,
   patterns: string[],
-): Promise<string[]> {
+): Promise<GlobResult> {
   const normalizedDir = normalizePath(rulesDir);
 
   // Trust that patterns have been validated by Zod at ingress
@@ -26,10 +44,33 @@ export async function globRulePaths(
     cwd: normalizedDir,
     unique: true,
     onlyFiles: true,
-    followSymbolicLinks: false,
+    followSymbolicLinks: true,
   });
 
-  return paths.sort();
+  // Check each positive pattern individually to find unmatched ones
+  const positivePatterns = patterns.filter((p) => !isNegationPattern(p));
+
+  // Run each positive pattern individually to check if it matches anything
+  const patternResults = await Promise.all(
+    positivePatterns.map(async (pattern) => {
+      const matches = await globby([pattern], {
+        cwd: normalizedDir,
+        unique: true,
+        onlyFiles: true,
+        followSymbolicLinks: true,
+      });
+      return matches.length === 0 ? pattern : null;
+    }),
+  );
+
+  const unmatchedPatterns = patternResults
+    .filter((p): p is string => p !== null)
+    .sort();
+
+  return {
+    paths: paths.sort(),
+    unmatchedPatterns,
+  };
 }
 
 /**
@@ -75,18 +116,28 @@ export async function readRuleContents(
 }
 
 /**
+ * Result of loading rules with tracking of unmatched patterns.
+ */
+type LoadRulesResult = {
+  rules: Rule[];
+  unmatchedPatterns: string[];
+};
+
+/**
  * Load all rules matching the given patterns.
  *
  * Convenience function combining glob matching and file reading.
+ * Also reports which patterns didn't match any files.
  *
  * @param rulesDir - Absolute path to the central rules directory
  * @param patterns - POSIX-style glob patterns for selecting rules
- * @returns Array of loaded rules with path and content
+ * @returns Object containing loaded rules and list of unmatched patterns
  */
 export async function loadRules(
   rulesDir: string,
   patterns: string[],
-): Promise<Rule[]> {
-  const rulePaths = await globRulePaths(rulesDir, patterns);
-  return readRuleContents(rulesDir, rulePaths);
+): Promise<LoadRulesResult> {
+  const { paths, unmatchedPatterns } = await globRulePaths(rulesDir, patterns);
+  const rules = await readRuleContents(rulesDir, paths);
+  return { rules, unmatchedPatterns };
 }
