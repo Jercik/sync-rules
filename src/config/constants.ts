@@ -1,9 +1,9 @@
-import { resolve } from "node:path";
+import path from "node:path";
 import envPaths from "env-paths";
 import { normalizePath } from "../utils/paths.js";
 
 const paths = envPaths("sync-rules", { suffix: "" });
-const defaultConfigPath = resolve(paths.config, "config.json");
+const defaultConfigPath = path.resolve(paths.config, "config.json");
 
 /**
  * Built-in default configuration file path, ignoring env overrides.
@@ -22,4 +22,4 @@ export const DEFAULT_CONFIG_PATH = process.env.SYNC_RULES_CONFIG
  * Default rules source directory path
  * Uses the system-specific data directory via env-paths without a Node.js suffix.
  */
-export const DEFAULT_RULES_SOURCE = resolve(paths.data, "rules");
+export const DEFAULT_RULES_SOURCE = path.resolve(paths.data, "rules");

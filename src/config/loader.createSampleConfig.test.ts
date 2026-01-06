@@ -13,7 +13,7 @@ describe("createSampleConfig", () => {
   it("createSampleConfig uses atomic 'wx' when force=false", async () => {
     const fs = await import("node:fs/promises");
     const { createSampleConfig } = await import("./loader.js");
-    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+    vi.mocked(fs.writeFile).mockResolvedValue();
 
     await createSampleConfig("/tmp/config.json", false);
 
@@ -28,7 +28,7 @@ describe("createSampleConfig", () => {
   it("createSampleConfig overwrites file when force=true", async () => {
     const fs = await import("node:fs/promises");
     const { createSampleConfig } = await import("./loader.js");
-    vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+    vi.mocked(fs.writeFile).mockResolvedValue();
 
     await createSampleConfig("/tmp/config.json", true);
 
@@ -46,13 +46,13 @@ describe("createSampleConfig", () => {
     vi.mocked(fs.writeFile).mockRejectedValue(eexist);
 
     const error = await createSampleConfig("/tmp/config.json", false).catch(
-      (e: unknown) => e,
+      (error_: unknown) => error_,
     );
 
     expect(error).toBeInstanceOf(Error);
-    const err = error as Error;
-    expect(err.message).toMatch(/already exists.*--force/iu);
-    expect(err.cause).toBe(eexist);
+    const error_ = error as Error;
+    expect(error_.message).toMatch(/already exists.*--force/iu);
+    expect(error_.cause).toBe(eexist);
   });
 
   it("non-EEXIST errors are wrapped with normalized path context", async () => {
@@ -62,14 +62,14 @@ describe("createSampleConfig", () => {
     vi.mocked(fs.writeFile).mockRejectedValue(eacces);
 
     const error = await createSampleConfig("/tmp/config.json", true).catch(
-      (e: unknown) => e,
+      (error_: unknown) => error_,
     );
 
     expect(error).toBeInstanceOf(Error);
-    const err = error as Error;
-    expect(err.message).toMatch(
+    const error_ = error as Error;
+    expect(error_.message).toMatch(
       /Failed to create config file at \/tmp\/config\.json: EACCES/u,
     );
-    expect(err.cause).toBe(eacces);
+    expect(error_.cause).toBe(eacces);
   });
 });

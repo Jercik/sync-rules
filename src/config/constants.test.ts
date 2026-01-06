@@ -11,15 +11,15 @@ vi.mock("env-paths", () => ({
   }),
 }));
 
-const originalEnv = process.env;
+const originalEnvironment = process.env;
 
 describe("constants", () => {
   beforeEach(() => {
-    process.env = { ...originalEnv };
+    process.env = { ...originalEnvironment };
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    process.env = originalEnvironment;
   });
 
   describe("environment variable path normalization", () => {

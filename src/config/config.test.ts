@@ -99,8 +99,8 @@ describe("config", () => {
         }
         expect(zodError).toBeDefined();
         expect(
-          zodError?.issues.some((i) =>
-            i.message.includes("at least one positive glob pattern"),
+          zodError?.issues.some((issue) =>
+            issue.message.includes("at least one positive glob pattern"),
           ),
         ).toBe(true);
       });

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isAbsolute, relative } from "node:path";
+import path from "node:path";
 import { normalizePath } from "../utils/paths.js";
 import { DEFAULT_RULES_SOURCE } from "./constants.js";
 
@@ -117,10 +117,13 @@ export function findProjectForPath(
   const matches = config.projects.filter((project) => {
     // project.path is already normalized by Zod schema
     // Check if target is inside project (or is the project root itself)
-    const rel = relative(project.path, normalizedTarget);
+    const relative_ = path.relative(project.path, normalizedTarget);
     // Empty string means same path, otherwise check that it doesn't escape
     // Use isAbsolute to catch absolute results on Windows (different drive)
-    return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+    return (
+      relative_ === "" ||
+      (!relative_.startsWith("..") && !path.isAbsolute(relative_))
+    );
   });
 
   if (matches.length === 0) {
@@ -128,10 +131,14 @@ export function findProjectForPath(
   }
 
   // This ensures /app/frontend is preferred over /app
-  return matches.reduce((mostSpecific, current) => {
+  let mostSpecific = matches[0];
+  for (const current of matches) {
     // Paths are already normalized by Zod schema
     const currentLength = current.path.length;
-    const mostSpecificLength = mostSpecific.path.length;
-    return currentLength > mostSpecificLength ? current : mostSpecific;
-  });
+    const mostSpecificLength = mostSpecific ? mostSpecific.path.length : 0;
+    if (currentLength > mostSpecificLength) {
+      mostSpecific = current;
+    }
+  }
+  return mostSpecific;
 }

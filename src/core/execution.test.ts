@@ -7,7 +7,7 @@ import * as fsPromises from "node:fs/promises";
 
 vi.mock("node:fs/promises", () => ({
   writeFile: vi.fn(),
-  rename: vi.fn((_, dest: string) => Promise.resolve(dest)),
+  rename: vi.fn((_, destination: string) => Promise.resolve(destination)),
   stat: vi.fn(() => Promise.resolve({ isDirectory: () => true })),
   rm: vi.fn(),
 }));

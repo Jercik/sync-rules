@@ -1,5 +1,5 @@
 import { writeFile, rename, rm, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { normalizePath } from "../utils/paths.js";
 import { SyncError, ensureError, isNodeError } from "../utils/errors.js";
@@ -16,6 +16,8 @@ export interface ExecutionReport {
   skipped: string[];
 }
 
+const DEFAULT_RUN_FLAGS: RunFlags = { dryRun: false };
+
 /**
  * Execute write actions atomically with optional dry-run support.
  *
@@ -28,7 +30,7 @@ export interface ExecutionReport {
  */
 export async function executeActions(
   actions: WriteAction[],
-  flags: RunFlags = { dryRun: false },
+  flags: RunFlags = DEFAULT_RUN_FLAGS,
 ): Promise<ExecutionReport> {
   const { dryRun } = flags;
   const report: ExecutionReport = {
@@ -45,52 +47,52 @@ export async function executeActions(
     path: normalizePath(a.path),
   }));
 
-  for (const { path, content } of normalized) {
+  for (const { path: filePath, content } of normalized) {
     if (dryRun) {
-      report.written.push(path);
+      report.written.push(filePath);
       continue;
     }
 
-    const parentDir = dirname(path);
+    const parentDirectory = path.dirname(filePath);
 
     // Check if parent directory exists
     try {
-      const parentStat = await stat(parentDir);
+      const parentStat = await stat(parentDirectory);
       if (!parentStat.isDirectory()) {
         console.warn(
-          `${parentDir} exists but is not a directory, skipping ${path}`,
+          `${parentDirectory} exists but is not a directory, skipping ${filePath}`,
         );
-        report.skipped.push(path);
+        report.skipped.push(filePath);
         continue;
       }
-    } catch (err) {
-      if (isNodeError(err) && err.code === "ENOENT") {
-        console.warn(`${parentDir} does not exist, skipping ${path}`);
-        report.skipped.push(path);
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        console.warn(`${parentDirectory} does not exist, skipping ${filePath}`);
+        report.skipped.push(filePath);
         continue;
       }
       throw new SyncError(
-        `Failed to check directory ${parentDir}`,
-        { action: "stat", path: parentDir },
-        ensureError(err),
+        `Failed to check directory ${parentDirectory}`,
+        { action: "stat", path: parentDirectory },
+        ensureError(error),
       );
     }
 
-    const tmp = join(parentDir, `.${randomUUID()}.tmp`);
+    const temporary = path.join(parentDirectory, `.${randomUUID()}.tmp`);
     try {
       // Atomic write: write to a temp file in the same directory, then rename
-      await writeFile(tmp, content, "utf8");
-      await rename(tmp, path);
-      report.written.push(path);
-    } catch (err) {
+      await writeFile(temporary, content, "utf8");
+      await rename(temporary, filePath);
+      report.written.push(filePath);
+    } catch (error) {
       // Best-effort cleanup: remove temp file if it exists
-      await rm(tmp, { force: true }).catch(() => {
+      await rm(temporary, { force: true }).catch(() => {
         /* ignore cleanup errors */
       });
       throw new SyncError(
-        `Failed to write ${path}`,
-        { action: "write", path },
-        ensureError(err),
+        `Failed to write ${filePath}`,
+        { action: "write", path: filePath },
+        ensureError(error),
       );
     }
   }

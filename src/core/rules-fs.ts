@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import path from "node:path";
 import { globby } from "globby";
 import { normalizePath } from "../utils/paths.js";
 import { SyncError, ensureError } from "../utils/errors.js";
@@ -33,15 +33,15 @@ function isNegationPattern(pattern: string): boolean {
  * @returns Object containing sorted paths and list of unmatched positive patterns
  */
 export async function globRulePaths(
-  rulesDir: string,
+  rulesDirectory: string,
   patterns: string[],
 ): Promise<GlobResult> {
-  const normalizedDir = normalizePath(rulesDir);
+  const normalizedDirectory = normalizePath(rulesDirectory);
 
   // Trust that patterns have been validated by Zod at ingress
   // globby naturally returns empty array for no matches or only negative patterns
   const paths = await globby(patterns, {
-    cwd: normalizedDir,
+    cwd: normalizedDirectory,
     unique: true,
     onlyFiles: true,
     followSymbolicLinks: true,
@@ -54,21 +54,21 @@ export async function globRulePaths(
   const patternResults = await Promise.all(
     positivePatterns.map(async (pattern) => {
       const matches = await globby([pattern], {
-        cwd: normalizedDir,
+        cwd: normalizedDirectory,
         unique: true,
         onlyFiles: true,
         followSymbolicLinks: true,
       });
-      return matches.length === 0 ? pattern : null;
+      return matches.length === 0 ? pattern : undefined;
     }),
   );
 
   const unmatchedPatterns = patternResults
-    .filter((p): p is string => p !== null)
-    .sort();
+    .filter((p): p is string => p !== undefined)
+    .toSorted();
 
   return {
-    paths: paths.sort(),
+    paths: paths.toSorted(),
     unmatchedPatterns,
   };
 }
@@ -88,25 +88,25 @@ export type Rule = { path: string; content: string };
  */
 
 export async function readRuleContents(
-  rulesDir: string,
-  relPaths: string[],
+  rulesDirectory: string,
+  relativePaths: string[],
 ): Promise<Rule[]> {
-  const normalizedDir = normalizePath(rulesDir);
+  const normalizedDirectory = normalizePath(rulesDirectory);
 
   const results = await Promise.all(
-    relPaths.map(async (relPath) => {
+    relativePaths.map(async (relativePath) => {
       // Use regular join for file system operations (not glob patterns)
-      const fullPath = join(normalizedDir, relPath);
+      const fullPath = path.join(normalizedDirectory, relativePath);
       try {
         const content = await readFile(fullPath, "utf8");
-        return { path: relPath, content };
+        return { path: relativePath, content };
       } catch (error) {
         // Fail explicitly instead of silently skipping
-        const err = ensureError(error);
+        const error_ = ensureError(error);
         throw new SyncError(
-          `Failed to read rule file '${fullPath}': ${err.message}`,
+          `Failed to read rule file '${fullPath}': ${error_.message}`,
           { action: "read", path: fullPath },
-          err,
+          error_,
         );
       }
     }),
@@ -134,10 +134,13 @@ type LoadRulesResult = {
  * @returns Object containing loaded rules and list of unmatched patterns
  */
 export async function loadRules(
-  rulesDir: string,
+  rulesDirectory: string,
   patterns: string[],
 ): Promise<LoadRulesResult> {
-  const { paths, unmatchedPatterns } = await globRulePaths(rulesDir, patterns);
-  const rules = await readRuleContents(rulesDir, paths);
+  const { paths, unmatchedPatterns } = await globRulePaths(
+    rulesDirectory,
+    patterns,
+  );
+  const rules = await readRuleContents(rulesDirectory, paths);
   return { rules, unmatchedPatterns };
 }

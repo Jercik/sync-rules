@@ -18,33 +18,102 @@ Use concise prompts for quick facts and focused questions for deeper topics. If 
 
 ---
 
-# Rule: Design Means Deciding
+# Rule: Avoid Leaky Abstractions
 
-Design is the art of making choices. When you add a configuration option instead of deciding, you're abdicating your responsibility as a designer and forcing that decision onto users who don't care.
+Design abstractions around consumer needs, not implementation details. A leaky abstraction forces callers to understand the underlying system to use it correctly—defeating its purpose. While all non-trivial abstractions leak somewhat (Joel Spolsky's Law), minimize leakage by ensuring your interface doesn't expose internal constraints, infrastructure artifacts, or inconsistent behavior.
 
-Every option you provide asks users to make a decision. Users care about their task—the document they're writing, the site they're building—not your software's internals. They don't care whether the database is optimized for size or speed, where the toolbar docks, or how the help index is built. Make these decisions for them.
+## Warning signs
 
-## Options dialogs are archaeological records
+- **Inconsistent signatures**: Some methods require parameters others don't, revealing backend differences
+- **Infrastructure artifacts**: Connection strings, database IDs, or ORM-specific constructs in the API
+- **Performance surprises**: Logically equivalent operations with vastly different performance
+- **Implementation-dependent error handling**: Callers must catch specific exceptions from underlying layers
+- **Required internal knowledge**: Using the abstraction safely requires understanding what's beneath it
 
-An options dialog reveals design arguments that were never resolved. "Should we auto-save? Yes! No!" becomes a checkbox. The #ifdef goes in, the debate ends, and users inherit the cognitive burden forever. If you find yourself reaching for a config option, stop and decide instead.
+## Before/after example
 
-## Customization is overrated
+```ts
+// Leaky: Exposes database concerns, inconsistent signature
+interface ReservationRepository {
+  create(restaurantId: number, reservation: Reservation): number; // Returns DB ID
+  findById(id: string): Reservation | null; // No restaurantId needed?
+  update(reservation: Reservation): void;
+  connect(connectionString: string): void;
+  disconnect(): void;
+}
+```
 
-Power users work across multiple machines, reinstall systems, and upgrade frequently. Customizations don't propagate. Most "power users" do minimal customization because it's not worth re-doing after every reinstall or on every machine they touch.
+```ts
+// Better: Consistent interface, infrastructure hidden
+interface ReservationRepository {
+  create(restaurantId: number, reservation: Reservation): Promise<void>;
+  findById(restaurantId: number, id: string): Promise<Reservation | null>;
+  update(restaurantId: number, reservation: Reservation): Promise<void>;
+}
 
-## When options are appropriate
+// Connection management injected, not exposed
+class PostgresReservationRepository implements ReservationRepository {
+  constructor(private readonly pool: Pool) {}
+  // ...
+}
+```
 
-- **Choices integral to the user's work:** Document formatting, site appearance, output settings—anything directly related to what they're creating. Go deep here.
-- **Visual personalization that doesn't affect behavior:** Themes, skins, wallpapers. Users can ignore these and still get work done.
+## Practical guidance
 
-## When to decide instead
+- Design interfaces for what callers need to do, not how you implement it
+- Keep signatures consistent—if one method needs context, all similar methods should accept it
+- Return domain types, not infrastructure artifacts (avoid returning raw database IDs)
+- Inject infrastructure dependencies through constructors, not method parameters
+- Normalize error handling so callers don't need to catch implementation-specific exceptions
+- Prefer focused interfaces over "fat" interfaces with unrelated methods
 
-- Technical implementation details (indexing strategy, caching behavior)
-- UI chrome placement (toolbar position, panel arrangement)
-- Anything requiring a "wizard" to explain the choice
-- Anything where you'd recommend a default anyway
 
-If you're tempted to add an option because you can't decide which approach is better, that's a signal to think harder, not to defer. Someone else will ship a simpler product that makes the choice for users, and users will prefer it.
+---
+
+# Rule: Early Returns
+
+Use guard clauses to handle edge cases and invalid states at the top of a function, then return early. This flattens nested conditionals, makes the happy path obvious, and reduces cognitive load.
+
+```ts
+// Nested (hard to follow)
+function getDiscount(user: User | null) {
+  if (user) {
+    if (user.isActive) {
+      if (user.membership === "premium") {
+        return 0.2;
+      } else {
+        return 0.1;
+      }
+    }
+  }
+  return 0;
+}
+
+// Flat (guard clauses)
+function getDiscount(user: User | null) {
+  if (!user) return 0;
+  if (!user.isActive) return 0;
+  if (user.membership === "premium") return 0.2;
+  return 0.1;
+}
+```
+
+Guard clauses invert the condition and exit immediately, leaving the main logic at the top level with minimal indentation. Each guard documents a precondition the function requires.
+
+## When to use
+
+- Null/undefined checks
+- Permission or authorization checks
+- Validation of required preconditions
+- Empty collection checks (`if (items.length === 0) return []`)
+
+## When to reconsider
+
+- **Many guards accumulating**: If you need 5+ guard clauses, the function may have too many responsibilities—consider splitting it
+- **Guards with side effects**: Keep guards as pure condition checks; don't mix in logging, mutations, or complex logic
+- **Resource cleanup required**: In languages without RAII or `defer`, multiple returns can complicate cleanup (less relevant in JS/TS with garbage collection)
+
+The goal is clarity, not dogma. A single well-placed `if-else` is fine when both branches represent equally valid paths rather than a precondition check.
 
 
 ---
@@ -113,6 +182,101 @@ email.bulkSend(
 ```
 
 The functional core functions can now be easily tested with sample data and reused for different purposes without modification.
+
+
+---
+
+# Rule: Inline Obvious Code
+
+Keep simple, self-explanatory code inline rather than extracting it into functions. Every abstraction carries cognitive cost—readers must jump to another location, parse a function signature, and mentally track the context switch. For obvious logic, this overhead exceeds any benefit.
+
+> "Functions should be short and sweet, and do just one thing. They should fit on one or two screenfuls of text... and do one thing and do that well."
+> — Linux kernel coding style
+
+The key insight: extracting code into a function is not inherently virtuous. A function should exist because it encapsulates meaningful complexity, not because code appears twice.
+
+## When to inline
+
+Inline code when:
+
+- The logic is immediately understandable (a few lines, no complex branching)
+- It appears in only one or two places
+- Extracting it would require reading the function definition to understand what happens
+
+```ts
+// GOOD: Inline obvious logic—instantly readable
+if (removedFrom.length === 0) {
+  return { ok: true, message: "No credentials found" };
+}
+return { ok: true, message: `Removed from ${removedFrom.join(" and ")}` };
+
+// BAD: Extraction hides obvious logic behind indirection
+return formatRemovalResult(removedFrom);
+```
+
+Another example—null checks that don't need abstraction:
+
+```ts
+// GOOD: Simple null guard, inline
+function enrich(json: JsonObject, data: string | null): JsonObject {
+  if (data === null) return json;
+  return { ...json, data };
+}
+
+// BAD: Over-abstracted null-safe wrapper
+const enrichSafe = nullSafe((json, data) => ({ ...json, data }));
+```
+
+The second version adds a layer of indirection for a two-line null check. The abstraction costs more to understand than the duplication it eliminates.
+
+## When to extract
+
+Extract into a function when:
+
+- The logic is complex enough that a name genuinely clarifies intent
+- You need to enforce consistent behavior across many call sites (not just two or three)
+- The function encapsulates a coherent concept that stands alone
+- Testing the logic in isolation provides real value
+- The number of local variables exceeds what you can track mentally (the Linux kernel uses ~10 as a threshold)
+
+## The wrong abstraction
+
+Sandi Metz observes that abstractions decay when requirements diverge:
+
+1. Programmer A extracts duplication into a shared function
+2. Programmer B needs slightly different behavior, adds a parameter and conditional
+3. This repeats until the "abstraction" is a mess of parameters and branches
+
+The result is harder to understand than the original duplication. When an abstraction proves wrong, re-introduce duplication and let the code show you what's actually shared.
+
+```ts
+// Started as shared abstraction, became a mess
+function NavButton({ label, url, icon, highlight, testId, onClick, disabled, badge }) {
+  // 50 lines of conditional logic for "shared" button
+}
+
+// Better: Accept that these aren't the same thing
+<HomeButton />
+<AboutButton />
+<BuyButton highlight testId="buy-cta" />
+```
+
+## Warning signs of bad extraction
+
+- **Conditional parameters**: Passing flags that determine which code path executes
+- **Single caller**: A "reusable" function called from exactly one place
+- **Name describes implementation**: `formatRemovalResult` vs. a name that describes _why_
+- **Reading the function is required**: The call site doesn't make sense without jumping to the definition
+- **Future-proofing**: "We might need this elsewhere" without concrete evidence
+
+## The cognitive test
+
+Before extracting, ask: "Will readers understand this faster by reading the inline code or by jumping to a function definition?" If inline is faster, don't extract.
+
+> "Duplication is far cheaper than the wrong abstraction."
+> — Sandi Metz
+
+Three similar lines repeated twice cost less mental effort than a helper function that requires a context switch to understand. A single, direct block of code is cognitively cheaper than one fractured into pointless subroutines.
 
 
 ---
@@ -720,45 +884,6 @@ import { type User } from "./user";
 
 // After transpilation
 import "./user";
-```
-
-
----
-
-# Rule: Interface Extends
-
-ALWAYS prefer interfaces when modelling inheritance.
-
-The `&` operator has terrible performance in TypeScript. Only use it where `interface extends` is not possible.
-
-```ts
-// BAD
-
-type A = {
-  a: string;
-};
-
-type B = {
-  b: string;
-};
-
-type C = A & B;
-```
-
-```ts
-// GOOD
-
-interface A {
-  a: string;
-}
-
-interface B {
-  b: string;
-}
-
-interface C extends A, B {
-  // Additional properties can be added here
-}
 ```
 
 

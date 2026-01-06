@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { normalizePath } from "./paths.js";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import path from "node:path";
 
-describe("utils", () => {
+describe("utilities", () => {
   describe("normalizePath", () => {
     const home = homedir();
 
@@ -12,27 +12,27 @@ describe("utils", () => {
         {
           name: "home directory (~)",
           input: "~/test",
-          expected: resolve(home, "test"),
+          expected: path.resolve(home, "test"),
         },
         {
           name: "home directory nested (~)",
           input: "~/Developer/project",
-          expected: resolve(home, "Developer/project"),
+          expected: path.resolve(home, "Developer/project"),
         },
         {
           name: "absolute path",
-          input: resolve(home, "Projects/my-app"),
-          expected: resolve(home, "Projects/my-app"),
+          input: path.resolve(home, "Projects/my-app"),
+          expected: path.resolve(home, "Projects/my-app"),
         },
         {
           name: "relative path",
           input: "./test",
-          expected: resolve(process.cwd(), "test"),
+          expected: path.resolve(process.cwd(), "test"),
         },
         {
           name: "multiple slashes",
           input: `${home}//Documents///project`,
-          expected: resolve(home, "Documents/project"),
+          expected: path.resolve(home, "Documents/project"),
         },
       ] as const;
 

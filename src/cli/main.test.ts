@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import path from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { main } from "./main.js";
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
@@ -21,8 +21,8 @@ vi.mock("../core/sync-global.js", () => ({
 }));
 
 import * as loader from "../config/loader.js";
-import * as syncMod from "../core/sync.js";
-import * as syncGlobalMod from "../core/sync-global.js";
+import * as syncModule from "../core/sync.js";
+import * as syncGlobalModule from "../core/sync-global.js";
 
 describe("cli/main", () => {
   beforeEach(() => {
@@ -85,7 +85,7 @@ describe("cli/main", () => {
       ]);
 
       expect(code).toBe(0);
-      expect(logSpy).toHaveBeenCalledWith(resolve("./custom.json"));
+      expect(logSpy).toHaveBeenCalledWith(path.resolve("./custom.json"));
       logSpy.mockRestore();
     });
 
@@ -102,7 +102,7 @@ describe("cli/main", () => {
 
       expect(code).toBe(0);
       expect(logSpy).toHaveBeenCalledWith(
-        resolve(homedir(), ".config/sync-rules.json"),
+        path.resolve(homedir(), ".config/sync-rules.json"),
       );
       logSpy.mockRestore();
     });
@@ -117,7 +117,7 @@ describe("cli/main", () => {
 
       const code = await main(["node", "sync-rules"]);
       expect(code).toBe(0);
-      expect(syncMod.syncProject).not.toHaveBeenCalled();
+      expect(syncModule.syncProject).not.toHaveBeenCalled();
     });
 
     it("syncs all configured projects", async () => {
@@ -129,7 +129,7 @@ describe("cli/main", () => {
         ],
       });
 
-      vi.mocked(syncMod.syncProject).mockResolvedValue({
+      vi.mocked(syncModule.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
         report: { written: [], skipped: [] },
         unmatchedPatterns: [],
@@ -137,7 +137,7 @@ describe("cli/main", () => {
 
       const code = await main(["node", "sync-rules"]);
       expect(code).toBe(0);
-      expect(syncMod.syncProject).toHaveBeenCalledTimes(2);
+      expect(syncModule.syncProject).toHaveBeenCalledTimes(2);
     });
 
     it("passes dryRun: false by default", async () => {
@@ -146,7 +146,7 @@ describe("cli/main", () => {
         projects: [{ path: "/home/user/project1", rules: ["**/*.md"] }],
       });
 
-      vi.mocked(syncMod.syncProject).mockResolvedValue({
+      vi.mocked(syncModule.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
         report: { written: [], skipped: [] },
         unmatchedPatterns: [],
@@ -154,11 +154,11 @@ describe("cli/main", () => {
 
       await main(["node", "sync-rules"]);
 
-      expect(syncGlobalMod.syncGlobal).toHaveBeenCalledWith(
+      expect(syncGlobalModule.syncGlobal).toHaveBeenCalledWith(
         { dryRun: false },
         expect.any(Object),
       );
-      expect(syncMod.syncProject).toHaveBeenCalledWith(
+      expect(syncModule.syncProject).toHaveBeenCalledWith(
         expect.any(Object),
         { dryRun: false },
         expect.any(Object),
@@ -171,7 +171,7 @@ describe("cli/main", () => {
         projects: [{ path: "/home/user/project1", rules: ["**/*.md"] }],
       });
 
-      vi.mocked(syncMod.syncProject).mockResolvedValue({
+      vi.mocked(syncModule.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
         report: { written: [], skipped: [] },
         unmatchedPatterns: [],
@@ -179,11 +179,11 @@ describe("cli/main", () => {
 
       await main(["node", "sync-rules", "--dry-run"]);
 
-      expect(syncGlobalMod.syncGlobal).toHaveBeenCalledWith(
+      expect(syncGlobalModule.syncGlobal).toHaveBeenCalledWith(
         { dryRun: true },
         expect.any(Object),
       );
-      expect(syncMod.syncProject).toHaveBeenCalledWith(
+      expect(syncModule.syncProject).toHaveBeenCalledWith(
         expect.any(Object),
         { dryRun: true },
         expect.any(Object),
@@ -196,7 +196,7 @@ describe("cli/main", () => {
         projects: [{ path: "/home/user/project1", rules: ["**/*.md"] }],
       });
 
-      vi.mocked(syncMod.syncProject).mockResolvedValue({
+      vi.mocked(syncModule.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
         report: { written: [], skipped: [] },
         unmatchedPatterns: [],
@@ -204,11 +204,11 @@ describe("cli/main", () => {
 
       await main(["node", "sync-rules", "--porcelain"]);
 
-      expect(syncGlobalMod.syncGlobal).toHaveBeenCalledWith(
+      expect(syncGlobalModule.syncGlobal).toHaveBeenCalledWith(
         { dryRun: true },
         expect.any(Object),
       );
-      expect(syncMod.syncProject).toHaveBeenCalledWith(
+      expect(syncModule.syncProject).toHaveBeenCalledWith(
         expect.any(Object),
         { dryRun: true },
         expect.any(Object),
@@ -222,13 +222,13 @@ describe("cli/main", () => {
         projects: [{ path: "/home/user/project1", rules: ["**/*.md"] }],
       });
 
-      vi.mocked(syncGlobalMod.syncGlobal).mockResolvedValue({
+      vi.mocked(syncGlobalModule.syncGlobal).mockResolvedValue({
         written: [],
         skipped: [],
         unmatchedPatterns: ["global/*.md"],
       });
 
-      vi.mocked(syncMod.syncProject).mockResolvedValue({
+      vi.mocked(syncModule.syncProject).mockResolvedValue({
         projectPath: "/home/user/project1",
         report: { written: [], skipped: [] },
         unmatchedPatterns: ["missing-pattern/*.md"],

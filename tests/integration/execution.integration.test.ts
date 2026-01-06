@@ -2,23 +2,26 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { executeActions } from "../../src/core/execution.js";
 import type { WriteAction } from "../../src/core/execution.js";
 import { promises as fs } from "node:fs";
-import { join } from "node:path";
-import { makeTempDir, cleanupDir } from "../_helpers/test-utils.js";
+import path from "node:path";
+import {
+  makeTemporaryDirectory,
+  cleanupDirectory,
+} from "../_helpers/test-utilities.js";
 
 describe("executeActions - integration tests", () => {
-  let testDir: string;
+  let testDirectory: string;
 
   beforeEach(async () => {
-    testDir = await makeTempDir("sync-rules-exec-");
+    testDirectory = await makeTemporaryDirectory("sync-rules-exec-");
   });
 
   afterEach(async () => {
-    await cleanupDir(testDir);
+    await cleanupDirectory(testDirectory);
   });
 
   describe("native fs integration", () => {
     it("should skip and warn when parent directory does not exist", async () => {
-      const nestedPath = join(testDir, "nonexistent", "file.txt");
+      const nestedPath = path.join(testDirectory, "nonexistent", "file.txt");
       const actions: WriteAction[] = [
         { path: nestedPath, content: "Hello nested!" },
       ];
@@ -30,7 +33,7 @@ describe("executeActions - integration tests", () => {
     });
 
     it("should overwrite existing files", async () => {
-      const filePath = join(testDir, "overwrite.txt");
+      const filePath = path.join(testDirectory, "overwrite.txt");
       await fs.writeFile(filePath, "Old content");
 
       const actions: WriteAction[] = [
