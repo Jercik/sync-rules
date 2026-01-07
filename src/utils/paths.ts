@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { isAbsolute, relative, resolve } from "node:path";
+import path from "node:path";
 
 /**
  * Normalize a path by expanding `~` and resolving to an absolute path.
@@ -10,7 +10,7 @@ export function normalizePath(input: string): string {
   const expanded = input.startsWith("~")
     ? input.replace(/^~/u, homedir())
     : input;
-  return resolve(expanded);
+  return path.resolve(expanded);
 }
 
 /**
@@ -18,11 +18,16 @@ export function normalizePath(input: string): string {
  * - Rejects absolute input paths explicitly (e.g. "/etc/passwd").
  * - Uses path.resolve + path.relative to ensure the final path stays within baseDir.
  */
-export function resolveInside(baseDir: string, relPath: string): string {
-  const full = resolve(baseDir, relPath);
-  const rel = relative(baseDir, full);
-  if (rel.startsWith("..") || isAbsolute(relPath)) {
-    throw new Error(`Refusing to write outside ${baseDir}: ${relPath}`);
+export function resolveInside(
+  baseDirectory: string,
+  relativePath: string,
+): string {
+  const full = path.resolve(baseDirectory, relativePath);
+  const relative_ = path.relative(baseDirectory, full);
+  if (relative_.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error(
+      `Refusing to write outside ${baseDirectory}: ${relativePath}`,
+    );
   }
   return full;
 }

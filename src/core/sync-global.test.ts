@@ -75,9 +75,10 @@ describe("sync-global", () => {
     );
 
     expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
-    const callArgs = vi.mocked(executionModule.executeActions).mock.calls[0];
-    const actionsArg: WriteAction[] = callArgs?.[0] ?? [];
-    const paths = actionsArg.map((action) => action.path);
+    const callArguments = vi.mocked(executionModule.executeActions).mock
+      .calls[0];
+    const actionsArgument: WriteAction[] = callArguments?.[0] ?? [];
+    const paths = actionsArgument.map((action) => action.path);
     expect(paths.some((p) => p.endsWith("/.claude/CLAUDE.md"))).toBe(true);
     expect(paths.some((p) => p.endsWith("/.codex/AGENTS.md"))).toBe(true);
     expect(result.written.length).toBe(2);

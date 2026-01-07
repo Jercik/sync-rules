@@ -51,17 +51,18 @@ Examples:
   try {
     await program.parseAsync(argv);
   } catch (error) {
-    const err = ensureError(error);
+    const error_ = ensureError(error);
 
-    if (err instanceof CommanderError) {
-      const exitCode = typeof err.exitCode === "number" ? err.exitCode : 1;
+    if (error_ instanceof CommanderError) {
+      const exitCode =
+        typeof error_.exitCode === "number" ? error_.exitCode : 1;
       if (exitCode !== 0) {
-        console.error(err.message);
+        console.error(error_.message);
       }
       return exitCode;
     }
 
-    console.error(err.message);
+    console.error(error_.message);
     return 1;
   }
 

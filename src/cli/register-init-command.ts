@@ -20,8 +20,8 @@ Examples:
   sync-rules init --force              # Overwrite existing config`,
     )
     .action(async (options) => {
-      const parentOpts = program.opts();
-      const configPath = parentOpts.config || DEFAULT_CONFIG_PATH;
+      const parentOptions = program.opts();
+      const configPath = parentOptions.config || DEFAULT_CONFIG_PATH;
       await createSampleConfig(configPath, options.force);
     });
 }

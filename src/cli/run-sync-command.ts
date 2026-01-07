@@ -16,6 +16,12 @@ type PatternWarning = {
   patterns: string[];
 };
 
+function isFulfilled(
+  s: PromiseSettledResult<unknown>,
+): s is PromiseFulfilledResult<SyncResult> {
+  return s.status === "fulfilled";
+}
+
 export async function runSyncCommand(
   options: SyncCommandOptions,
 ): Promise<void> {
@@ -46,14 +52,14 @@ export async function runSyncCommand(
 
   const failures: Array<{ project: Project; error: Error }> = [];
 
-  settlements.forEach((settlement, index) => {
+  for (const [index, settlement] of settlements.entries()) {
     if (settlement.status === "rejected") {
       const project = projectsToSync[index];
       if (project) {
         failures.push({ project, error: ensureError(settlement.reason) });
       }
     }
-  });
+  }
 
   if (failures.length > 0) {
     const errorMessages = failures.map(({ project, error }) => {
@@ -83,10 +89,7 @@ export async function runSyncCommand(
     throw new Error(`${summary}\n${errorMessages.join("\n")}`);
   }
 
-  const isFulfilled = (
-    s: PromiseSettledResult<unknown>,
-  ): s is PromiseFulfilledResult<SyncResult> => s.status === "fulfilled";
-  const successes = settlements.filter(isFulfilled);
+  const successes = settlements.filter((x) => isFulfilled(x));
 
   // Collect unmatched patterns from successful project syncs
   for (const success of successes) {

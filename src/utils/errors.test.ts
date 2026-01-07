@@ -191,8 +191,8 @@ describe("SpawnError", () => {
 
 describe("ensureError / isNodeError extras", () => {
   it("ensureError wraps non-Error values", () => {
-    const e = ensureError("boom");
-    expect(e).toBeInstanceOf(Error);
-    expect(e.message).toBe("boom");
+    const error = ensureError("boom");
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toBe("boom");
   });
 });

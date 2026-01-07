@@ -19,7 +19,7 @@ Examples:
   cat "$(sync-rules config-path)"             # View config contents`,
     )
     .action(() => {
-      const parentOpts = program.opts();
-      console.log(normalizePath(parentOpts.config));
+      const parentOptions = program.opts();
+      console.log(normalizePath(parentOptions.config));
     });
 }

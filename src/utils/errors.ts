@@ -119,22 +119,22 @@ export class SpawnError extends Error {
 
 /**
  * Ensures that an unknown caught value is an Error object.
- * @param e - The unknown value to ensure is an Error
+ * @param error - The unknown value to ensure is an Error
  */
-export function ensureError(e: unknown): Error {
-  return e instanceof Error ? e : new Error(String(e));
+export function ensureError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 /**
  * Type guard to safely check if an error is a Node.js ErrnoException
- * @param e - The error to check
+ * @param error - The error to check
  */
-export function isNodeError(e: unknown): e is NodeJS.ErrnoException {
+export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return (
-    !!e &&
-    typeof e === "object" &&
-    "code" in e &&
-    (typeof (e as { code: unknown }).code === "string" ||
-      typeof (e as { code: unknown }).code === "number")
+    !!error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (typeof (error as { code: unknown }).code === "string" ||
+      typeof (error as { code: unknown }).code === "number")
   );
 }

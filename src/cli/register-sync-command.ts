@@ -23,10 +23,10 @@ Examples:
   sync-rules --porcelain | wc -l       # Count files that would be written`,
     )
     .action(async (options) => {
-      const parentOpts = program.opts();
+      const parentOptions = program.opts();
       await runSyncCommand({
-        configPath: parentOpts.config,
-        verbose: parentOpts.verbose ?? false,
+        configPath: parentOptions.config,
+        verbose: parentOptions.verbose ?? false,
         dryRun: options.dryRun ?? options.porcelain ?? false,
         porcelain: options.porcelain ?? false,
       });

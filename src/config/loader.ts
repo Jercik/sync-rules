@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import path from "node:path";
 import { parseConfig } from "./config.js";
 import { normalizePath } from "../utils/paths.js";
 import { BUILTIN_DEFAULT_CONFIG_PATH } from "./constants.js";
@@ -36,10 +36,10 @@ export async function createSampleConfig(
   force = false,
 ): Promise<void> {
   const normalizedPath = normalizePath(configPath);
-  const configDir = dirname(normalizedPath);
+  const configDirectory = path.dirname(normalizedPath);
 
   try {
-    await mkdir(configDir, { recursive: true });
+    await mkdir(configDirectory, { recursive: true });
 
     // Use 'wx' flag for atomic exclusive create when not forcing
     // This prevents TOCTOU race conditions by atomically failing if file exists
@@ -49,16 +49,16 @@ export async function createSampleConfig(
       flag: writeFlags,
     });
   } catch (error) {
-    const err = ensureError(error);
-    if (isNodeError(err) && err.code === "EEXIST" && !force) {
+    const error_ = ensureError(error);
+    if (isNodeError(error_) && error_.code === "EEXIST" && !force) {
       throw new Error(
         `Config file already exists at ${normalizedPath}. Use --force to overwrite`,
-        { cause: err },
+        { cause: error_ },
       );
     }
     throw new Error(
-      `Failed to create config file at ${normalizedPath}: ${err.message}`,
-      { cause: err },
+      `Failed to create config file at ${normalizedPath}: ${error_.message}`,
+      { cause: error_ },
     );
   }
 }
