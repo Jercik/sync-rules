@@ -2,11 +2,7 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Config as ConfigValidator } from "./config.js";
 import { normalizePath } from "../utils/paths.js";
-import {
-  BUILTIN_DEFAULT_CONFIG_PATH,
-  DEFAULT_RULES_SOURCE,
-  createConfigStore,
-} from "./constants.js";
+import { BUILTIN_DEFAULT_CONFIG_PATH, createConfigStore } from "./constants.js";
 import {
   ConfigAccessError,
   ConfigNotFoundError,
@@ -20,7 +16,7 @@ import type { Config as ConfigShape } from "./config.js";
  * Sample configuration template for new installations
  */
 const SAMPLE_CONFIG = {
-  rulesSource: DEFAULT_RULES_SOURCE,
+  rulesSource: "/path/to/rules",
   global: ["global-rules/*.md"],
   projects: [
     {
