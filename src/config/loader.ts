@@ -80,8 +80,12 @@ export async function loadConfig(configPath: string): Promise<ConfigShape> {
     }
   } catch (error) {
     if (isNodeError(error) && error.code === "ENOENT") {
+      // Use path.relative for comparison - it's case-insensitive on Windows
       const isBuiltinDefault =
-        normalizedPath === normalizePath(BUILTIN_DEFAULT_CONFIG_PATH);
+        path.relative(
+          normalizedPath,
+          normalizePath(BUILTIN_DEFAULT_CONFIG_PATH),
+        ) === "";
       throw new ConfigNotFoundError(normalizedPath, isBuiltinDefault);
     }
 
