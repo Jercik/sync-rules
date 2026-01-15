@@ -85,7 +85,7 @@ export async function loadConfig(configPath: string): Promise<ConfigShape> {
 
   let store: ReturnType<typeof createConfigStore>;
   try {
-    store = createConfigStore(configPath);
+    store = createConfigStore(normalizedPath);
   } catch (error) {
     throw new ConfigParseError(normalizedPath, ensureError(error));
   }
