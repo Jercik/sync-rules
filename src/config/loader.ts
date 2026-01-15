@@ -15,6 +15,7 @@ import type { Config as ConfigShape } from "./config.js";
  * Sample configuration template for new installations
  */
 const SAMPLE_CONFIG = {
+  rulesSource: "/path/to/rules",
   global: ["global-rules/*.md"],
   projects: [
     {

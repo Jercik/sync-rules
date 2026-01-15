@@ -25,6 +25,7 @@ describe("createSampleConfig", () => {
       { flag: "wx" },
     );
     const content = vi.mocked(fs.writeFile).mock.calls[0]?.[1] as string;
+    expect(content).toContain('"rulesSource"');
     expect(content).toContain('"global-rules/*.md"');
     expect(content).toContain('"projects"');
   });
