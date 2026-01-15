@@ -90,15 +90,15 @@ export async function loadConfig(configPath: string): Promise<ConfigShape> {
     throw new ConfigAccessError(normalizedPath, ensureError(error));
   }
 
-  let store: ReturnType<typeof createConfigStore>;
+  let configStore: ReturnType<typeof createConfigStore>;
   try {
-    store = createConfigStore(normalizedPath);
+    configStore = createConfigStore(normalizedPath);
   } catch (error) {
     throw new ConfigParseError(normalizedPath, ensureError(error));
   }
 
   try {
-    const result = ConfigValidator.safeParse(store.store);
+    const result = ConfigValidator.safeParse(configStore.store);
     if (!result.success) {
       throw result.error;
     }
