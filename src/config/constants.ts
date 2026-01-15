@@ -3,12 +3,14 @@ import Conf from "conf";
 import envPaths from "env-paths";
 import { normalizePath } from "../utils/paths.js";
 
-const defaultStore = new Conf({ projectName: "sync-rules", projectSuffix: "" });
-
 /**
  * Built-in default configuration file path, ignoring env overrides.
  */
-export const BUILTIN_DEFAULT_CONFIG_PATH = defaultStore.path;
+const configPaths = envPaths("sync-rules", { suffix: "" });
+export const BUILTIN_DEFAULT_CONFIG_PATH = path.resolve(
+  configPaths.config,
+  "config.json",
+);
 
 /**
  * Default configuration file path
@@ -34,6 +36,7 @@ export function createConfigStore(configPath: string): Conf {
     cwd: path.dirname(normalizedPath),
     configName,
     fileExtension,
+    projectName: "sync-rules",
     projectSuffix: "",
   });
 }

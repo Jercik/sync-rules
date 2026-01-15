@@ -6,7 +6,7 @@ import {
   DEFAULT_CONFIG_PATH,
   DEFAULT_RULES_SOURCE,
 } from "../config/constants.js";
-import { ConfigNotFoundError } from "../utils/errors.js";
+import { ConfigNotFoundError, ConfigParseError } from "../utils/errors.js";
 
 // Mock the entire modules with dynamic imports support
 vi.mock("../config/loader.js", () => ({
@@ -142,6 +142,62 @@ describe("cli/main", () => {
         `CONFIG\t${path.resolve(homedir(), ".config/sync-rules.json")}`,
       );
       logSpy.mockRestore();
+    });
+
+    it("prints paths and exits non-zero on config parse errors", async () => {
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(loader.loadConfig).mockRejectedValue(
+        new ConfigParseError(DEFAULT_CONFIG_PATH, new Error("Bad config")),
+      );
+
+      const code = await main(["node", "sync-rules", "--paths"]);
+
+      expect(code).toBe(1);
+      expect(logSpy).toHaveBeenCalledWith("NAME\tPATH");
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to load config"),
+      );
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+  });
+
+  describe("flag validation", () => {
+    it("rejects --force without --init", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const code = await main(["node", "sync-rules", "--force"]);
+
+      expect(code).toBe(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "--force can only be used with --init",
+      );
+      errorSpy.mockRestore();
+    });
+
+    it("rejects --init with --paths", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const code = await main(["node", "sync-rules", "--init", "--paths"]);
+
+      expect(code).toBe(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Use only one of --init or --paths",
+      );
+      errorSpy.mockRestore();
+    });
+
+    it("rejects --dry-run with --init", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const code = await main(["node", "sync-rules", "--init", "--dry-run"]);
+
+      expect(code).toBe(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "--dry-run and --porcelain apply only to sync",
+      );
+      errorSpy.mockRestore();
     });
   });
 

@@ -347,26 +347,14 @@ describe("config", () => {
     });
 
     it("should throw ConfigParseError for invalid JSON", async () => {
-      const store = { path: "/path/to/config.json" } as {
-        path: string;
-        store: Record<string, unknown>;
-      };
-      Object.defineProperty(store, "store", {
-        get() {
-          throw new SyntaxError("Invalid JSON");
-        },
+      const error = new SyntaxError("Invalid JSON");
+      vi.mocked(createConfigStore).mockImplementation(() => {
+        throw error;
       });
 
-      vi.mocked(createConfigStore).mockReturnValue(store as never);
-      vi.mocked(fs.stat).mockResolvedValue({
-        isFile: () => true,
-      } as never);
-
-      await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
-        ConfigParseError,
-      );
-
-      await expect(loadConfig("/path/to/config.json")).rejects.toMatchObject({
+      const promise = loadConfig("/path/to/config.json");
+      await expect(promise).rejects.toThrow(ConfigParseError);
+      await expect(promise).rejects.toMatchObject({
         path: "/path/to/config.json",
       });
     });
@@ -385,6 +373,22 @@ describe("config", () => {
       );
 
       await expect(loadConfig("/path/to/config.json")).rejects.toMatchObject({
+        path: "/path/to/config.json",
+      });
+    });
+
+    it("should throw ConfigParseError when path is a directory", async () => {
+      vi.mocked(createConfigStore).mockReturnValue({
+        path: "/path/to/config.json",
+        store: {},
+      } as never);
+      vi.mocked(fs.stat).mockResolvedValue({
+        isFile: () => false,
+      } as never);
+
+      const promise = loadConfig("/path/to/config.json");
+      await expect(promise).rejects.toThrow(ConfigParseError);
+      await expect(promise).rejects.toMatchObject({
         path: "/path/to/config.json",
       });
     });

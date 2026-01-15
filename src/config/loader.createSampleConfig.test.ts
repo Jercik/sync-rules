@@ -1,79 +1,53 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fs from "node:fs/promises";
-import { createConfigStore } from "./constants.js";
 
 vi.mock("node:fs/promises", () => ({
-  stat: vi.fn(),
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
 }));
-vi.mock("./constants.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("./constants.js")>("./constants.js");
-  return {
-    ...actual,
-    createConfigStore: vi.fn(),
-  };
-});
 
 describe("createSampleConfig", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("createSampleConfig writes a sample config when file is missing", async () => {
+  it("writes a sample config with exclusive create by default", async () => {
     const { createSampleConfig } = await import("./loader.js");
-    const store = {
-      path: "/tmp/config.json",
-      store: {} as Record<string, unknown>,
-    };
-    vi.mocked(createConfigStore).mockReturnValue(store as never);
-    const missing = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-    vi.mocked(fs.stat).mockRejectedValue(missing);
+    vi.mocked(fs.mkdir).mockResolvedValue(void 0);
+    vi.mocked(fs.writeFile).mockResolvedValue(void 0);
 
     await createSampleConfig("/tmp/config.json", false);
 
-    expect(store.store).toEqual({
-      global: ["global-rules/*.md"],
-      projects: [
-        {
-          path: "/path/to/project",
-          rules: ["**/*.md"],
-        },
-      ],
-    });
+    expect(fs.mkdir).toHaveBeenCalledWith("/tmp", { recursive: true });
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      "/tmp/config.json",
+      expect.any(String),
+      { flag: "wx" },
+    );
+    const content = vi.mocked(fs.writeFile).mock.calls[0]?.[1] as string;
+    expect(content).toContain('"global-rules/*.md"');
+    expect(content).toContain('"projects"');
   });
 
-  it("createSampleConfig overwrites file when force=true", async () => {
+  it("overwrites file when force=true", async () => {
     const { createSampleConfig } = await import("./loader.js");
-    const store = {
-      path: "/tmp/config.json",
-      store: {} as Record<string, unknown>,
-    };
-    vi.mocked(createConfigStore).mockReturnValue(store as never);
+    vi.mocked(fs.mkdir).mockResolvedValue(void 0);
+    vi.mocked(fs.writeFile).mockResolvedValue(void 0);
 
     await createSampleConfig("/tmp/config.json", true);
 
-    expect(fs.stat).not.toHaveBeenCalled();
-    expect(store.store).toEqual({
-      global: ["global-rules/*.md"],
-      projects: [
-        {
-          path: "/path/to/project",
-          rules: ["**/*.md"],
-        },
-      ],
-    });
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      "/tmp/config.json",
+      expect.any(String),
+      { flag: "w" },
+    );
   });
 
   it("atomic create: EEXIST yields actionable 'use --force' hint", async () => {
     const { createSampleConfig } = await import("./loader.js");
-    const store = {
-      path: "/tmp/config.json",
-      store: {} as Record<string, unknown>,
-    };
-    vi.mocked(createConfigStore).mockReturnValue(store as never);
-    vi.mocked(fs.stat).mockResolvedValue({
-      isFile: () => true,
-    } as never);
+    vi.mocked(fs.mkdir).mockResolvedValue(void 0);
+    const eexist = Object.assign(new Error("EEXIST"), { code: "EEXIST" });
+    vi.mocked(fs.writeFile).mockRejectedValue(eexist);
 
     const error = await createSampleConfig("/tmp/config.json", false).catch(
       (error_: unknown) => error_,
@@ -86,13 +60,9 @@ describe("createSampleConfig", () => {
 
   it("non-EEXIST errors are wrapped with normalized path context", async () => {
     const { createSampleConfig } = await import("./loader.js");
-    const store = {
-      path: "/tmp/config.json",
-      store: {} as Record<string, unknown>,
-    };
-    vi.mocked(createConfigStore).mockReturnValue(store as never);
+    vi.mocked(fs.mkdir).mockResolvedValue(void 0);
     const eacces = Object.assign(new Error("EACCES"), { code: "EACCES" });
-    vi.mocked(fs.stat).mockRejectedValue(eacces);
+    vi.mocked(fs.writeFile).mockRejectedValue(eacces);
 
     const error = await createSampleConfig("/tmp/config.json", false).catch(
       (error_: unknown) => error_,
