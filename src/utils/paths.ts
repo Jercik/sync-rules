@@ -8,7 +8,7 @@ import path from "node:path";
  */
 export function normalizePath(input: string): string {
   const expanded = input.startsWith("~")
-    ? input.replace(/^~/u, homedir())
+    ? input.replace(/^~(?=$|[\\/])/u, homedir())
     : input;
   return path.resolve(expanded);
 }
@@ -22,27 +22,22 @@ export function resolveInside(
   baseDirectory: string,
   relativePath: string,
 ): string {
+  const base = path.resolve(baseDirectory);
   if (path.isAbsolute(relativePath)) {
-    throw new Error(
-      `Refusing to write outside ${baseDirectory}: ${relativePath}`,
-    );
+    throw new Error(`Refusing to write outside ${base}: ${relativePath}`);
   }
 
-  const full = path.resolve(baseDirectory, relativePath);
-  const relative_ = path.relative(baseDirectory, full);
+  const full = path.resolve(base, relativePath);
+  const relative_ = path.relative(base, full);
   if (relative_ === "") {
     // Empty relative means baseDirectory and full are the same path.
     return full;
   }
   if (path.isAbsolute(relative_)) {
-    throw new Error(
-      `Refusing to write outside ${baseDirectory}: ${relativePath}`,
-    );
+    throw new Error(`Refusing to write outside ${base}: ${relativePath}`);
   }
   if (relative_ === ".." || relative_.startsWith(`..${path.sep}`)) {
-    throw new Error(
-      `Refusing to write outside ${baseDirectory}: ${relativePath}`,
-    );
+    throw new Error(`Refusing to write outside ${base}: ${relativePath}`);
   }
   return full;
 }

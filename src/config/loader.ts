@@ -1,8 +1,12 @@
 import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { Config as ConfigSchema } from "./config.js";
+import { Config as ConfigValidator } from "./config.js";
 import { normalizePath } from "../utils/paths.js";
-import { BUILTIN_DEFAULT_CONFIG_PATH, createConfigStore } from "./constants.js";
+import {
+  BUILTIN_DEFAULT_CONFIG_PATH,
+  DEFAULT_RULES_SOURCE,
+  createConfigStore,
+} from "./constants.js";
 import {
   ConfigNotFoundError,
   ConfigParseError,
@@ -15,7 +19,7 @@ import type { Config as ConfigShape } from "./config.js";
  * Sample configuration template for new installations
  */
 const SAMPLE_CONFIG = {
-  rulesSource: "/path/to/rules",
+  rulesSource: DEFAULT_RULES_SOURCE,
   global: ["global-rules/*.md"],
   projects: [
     {
@@ -92,7 +96,7 @@ export async function loadConfig(configPath: string): Promise<ConfigShape> {
   }
 
   try {
-    const result = ConfigSchema.safeParse(store.store);
+    const result = ConfigValidator.safeParse(store.store);
     if (!result.success) {
       throw result.error;
     }

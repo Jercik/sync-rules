@@ -16,8 +16,9 @@ export const BUILTIN_DEFAULT_CONFIG_PATH = path.resolve(
  * Default configuration file path
  * Can be overridden via SYNC_RULES_CONFIG environment variable
  */
-export const DEFAULT_CONFIG_PATH = process.env.SYNC_RULES_CONFIG
-  ? normalizePath(process.env.SYNC_RULES_CONFIG)
+const environmentConfigPath = process.env.SYNC_RULES_CONFIG?.trim();
+export const DEFAULT_CONFIG_PATH = environmentConfigPath
+  ? normalizePath(environmentConfigPath)
   : BUILTIN_DEFAULT_CONFIG_PATH;
 
 /**
