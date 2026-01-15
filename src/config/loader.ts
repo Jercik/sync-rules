@@ -68,27 +68,26 @@ export async function createSampleConfig(
  */
 export async function loadConfig(configPath: string): Promise<ConfigShape> {
   const normalizedPath = normalizePath(configPath);
+  try {
+    const configStat = await stat(normalizedPath);
+    if (!configStat.isFile()) {
+      throw new Error(`${normalizedPath} is not a file`);
+    }
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      const isBuiltinDefault =
+        normalizedPath === normalizePath(BUILTIN_DEFAULT_CONFIG_PATH);
+      throw new ConfigNotFoundError(normalizedPath, isBuiltinDefault);
+    }
+
+    throw new ConfigParseError(normalizedPath, ensureError(error));
+  }
+
   let store: ReturnType<typeof createConfigStore>;
   try {
     store = createConfigStore(configPath);
   } catch (error) {
     throw new ConfigParseError(normalizedPath, ensureError(error));
-  }
-  const storePath = normalizePath(store.path);
-
-  try {
-    const configStat = await stat(storePath);
-    if (!configStat.isFile()) {
-      throw new Error(`${storePath} is not a file`);
-    }
-  } catch (error) {
-    if (isNodeError(error) && error.code === "ENOENT") {
-      const isBuiltinDefault =
-        storePath === normalizePath(BUILTIN_DEFAULT_CONFIG_PATH);
-      throw new ConfigNotFoundError(storePath, isBuiltinDefault);
-    }
-
-    throw new ConfigParseError(storePath, ensureError(error));
   }
 
   try {
@@ -98,6 +97,6 @@ export async function loadConfig(configPath: string): Promise<ConfigShape> {
     }
     return result.data;
   } catch (error) {
-    throw new ConfigParseError(storePath, ensureError(error));
+    throw new ConfigParseError(normalizedPath, ensureError(error));
   }
 }

@@ -351,6 +351,9 @@ describe("config", () => {
       vi.mocked(createConfigStore).mockImplementation(() => {
         throw error;
       });
+      vi.mocked(fs.stat).mockResolvedValue({
+        isFile: () => true,
+      } as never);
 
       const promise = loadConfig("/path/to/config.json");
       await expect(promise).rejects.toThrow(ConfigParseError);
