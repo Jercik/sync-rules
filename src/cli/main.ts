@@ -28,7 +28,7 @@ type CliOptions = {
 async function resolvePaths(configPath: string): Promise<ResolvedPaths> {
   const normalizedPath = normalizePath(configPath);
   try {
-    const config = await loadConfig(configPath);
+    const config = await loadConfig(normalizedPath);
     return { configPath: normalizedPath, rulesSource: config.rulesSource };
   } catch (error) {
     const error_ = ensureError(error);
