@@ -19,7 +19,7 @@ Managing these rules across numerous projects can be tedious. `sync-rules` lets 
 
 ## Installation
 
-Requires Node.js v22.0.0 or higher.
+Requires Node.js v22.14.0 or higher.
 
 ```bash
 npm install -g sync-rules
