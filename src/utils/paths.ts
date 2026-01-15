@@ -31,6 +31,7 @@ export function resolveInside(
   const full = path.resolve(baseDirectory, relativePath);
   const relative_ = path.relative(baseDirectory, full);
   if (relative_ === "") {
+    // Empty relative means baseDirectory and full are the same path.
     return full;
   }
   if (path.isAbsolute(relative_)) {
