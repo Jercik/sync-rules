@@ -2,7 +2,11 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { main } from "./main.js";
-import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
+import {
+  DEFAULT_CONFIG_PATH,
+  DEFAULT_RULES_SOURCE,
+} from "../config/constants.js";
+import { ConfigNotFoundError } from "../utils/errors.js";
 
 // Mock the entire modules with dynamic imports support
 vi.mock("../config/loader.js", () => ({
@@ -29,11 +33,11 @@ describe("cli/main", () => {
     vi.clearAllMocks();
   });
 
-  describe("init command", () => {
+  describe("--init", () => {
     it("creates sample config at default path", async () => {
       vi.mocked(loader.createSampleConfig).mockResolvedValue();
 
-      const code = await main(["node", "sync-rules", "init"]);
+      const code = await main(["node", "sync-rules", "--init"]);
       expect(code).toBe(0);
       expect(loader.createSampleConfig).toHaveBeenCalledWith(
         DEFAULT_CONFIG_PATH,
@@ -44,7 +48,7 @@ describe("cli/main", () => {
     it("honors --force flag", async () => {
       vi.mocked(loader.createSampleConfig).mockResolvedValue();
 
-      const code = await main(["node", "sync-rules", "init", "--force"]);
+      const code = await main(["node", "sync-rules", "--init", "--force"]);
       expect(code).toBe(0);
       expect(loader.createSampleConfig).toHaveBeenCalledWith(
         DEFAULT_CONFIG_PATH,
@@ -57,52 +61,85 @@ describe("cli/main", () => {
         new Error("Write failed"),
       );
 
-      const code = await main(["node", "sync-rules", "init"]);
+      const code = await main(["node", "sync-rules", "--init"]);
       expect(code).toBe(1);
     });
   });
 
-  describe("config-path command", () => {
-    it("prints the default config path", async () => {
+  describe("--paths", () => {
+    it("prints the resolved config and rules source paths", async () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [],
+      });
 
-      const code = await main(["node", "sync-rules", "config-path"]);
+      const code = await main(["node", "sync-rules", "--paths"]);
 
       expect(code).toBe(0);
-      expect(logSpy).toHaveBeenCalledWith(DEFAULT_CONFIG_PATH);
+      expect(logSpy).toHaveBeenCalledWith("NAME\tPATH");
+      expect(logSpy).toHaveBeenCalledWith(`CONFIG\t${DEFAULT_CONFIG_PATH}`);
+      expect(logSpy).toHaveBeenCalledWith("RULES_SOURCE\t/rules");
+      logSpy.mockRestore();
+    });
+
+    it("prints defaults when config is missing", async () => {
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.mocked(loader.loadConfig).mockRejectedValue(
+        new ConfigNotFoundError(DEFAULT_CONFIG_PATH, true),
+      );
+
+      const code = await main(["node", "sync-rules", "--paths"]);
+
+      expect(code).toBe(0);
+      expect(logSpy).toHaveBeenCalledWith("NAME\tPATH");
+      expect(logSpy).toHaveBeenCalledWith(`CONFIG\t${DEFAULT_CONFIG_PATH}`);
+      expect(logSpy).toHaveBeenCalledWith(
+        `RULES_SOURCE\t${DEFAULT_RULES_SOURCE}`,
+      );
       logSpy.mockRestore();
     });
 
     it("prints custom config path when --config is provided", async () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [],
+      });
 
       const code = await main([
         "node",
         "sync-rules",
         "--config",
         "./custom.json",
-        "config-path",
+        "--paths",
       ]);
 
       expect(code).toBe(0);
-      expect(logSpy).toHaveBeenCalledWith(path.resolve("./custom.json"));
+      expect(logSpy).toHaveBeenCalledWith(
+        `CONFIG\t${path.resolve("./custom.json")}`,
+      );
       logSpy.mockRestore();
     });
 
     it("expands tilde in config path", async () => {
       const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [],
+      });
 
       const code = await main([
         "node",
         "sync-rules",
         "--config",
         "~/.config/sync-rules.json",
-        "config-path",
+        "--paths",
       ]);
 
       expect(code).toBe(0);
       expect(logSpy).toHaveBeenCalledWith(
-        path.resolve(homedir(), ".config/sync-rules.json"),
+        `CONFIG\t${path.resolve(homedir(), ".config/sync-rules.json")}`,
       );
       logSpy.mockRestore();
     });

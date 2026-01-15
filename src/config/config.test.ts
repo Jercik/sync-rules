@@ -4,9 +4,18 @@ import { parseConfig, findProjectForPath } from "./config.js";
 import { loadConfig } from "./loader.js";
 import { ConfigNotFoundError, ConfigParseError } from "../utils/errors.js";
 import * as fs from "node:fs/promises";
+import { createConfigStore } from "./constants.js";
 import type { Config } from "./config.js";
 
 vi.mock("node:fs/promises");
+vi.mock("./constants.js", async () => {
+  const actual =
+    await vi.importActual<typeof import("./constants.js")>("./constants.js");
+  return {
+    ...actual,
+    createConfigStore: vi.fn(),
+  };
+});
 
 // No need to mock paths - use real normalizePath
 
@@ -278,29 +287,40 @@ describe("config", () => {
     });
 
     it("should load and parse valid config successfully", async () => {
-      const configContent = JSON.stringify({
-        rulesSource: "/path/to/rules",
-        projects: [
-          {
-            path: "/home/user/project",
-            rules: ["**/*.md"],
-          },
-        ],
-      });
+      const store = {
+        path: "/path/to/config.json",
+        store: {
+          rulesSource: "/path/to/rules",
+          projects: [
+            {
+              path: "/home/user/project",
+              rules: ["**/*.md"],
+            },
+          ],
+        },
+      };
 
-      vi.mocked(fs.readFile).mockResolvedValue(configContent);
+      vi.mocked(createConfigStore).mockReturnValue(store as never);
+      vi.mocked(fs.stat).mockResolvedValue({
+        isFile: () => true,
+      } as never);
 
       const config = await loadConfig("/path/to/config.json");
 
-      expect(fs.readFile).toHaveBeenCalledWith("/path/to/config.json", "utf8");
+      expect(fs.stat).toHaveBeenCalledWith("/path/to/config.json");
       expect(config.projects).toHaveLength(1);
     });
 
     it("should throw ConfigNotFoundError for missing default config", async () => {
       const error = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-      vi.mocked(fs.readFile).mockRejectedValueOnce(error);
+      vi.mocked(fs.stat).mockRejectedValueOnce(error);
 
       const { DEFAULT_CONFIG_PATH } = await import("./constants.js");
+
+      vi.mocked(createConfigStore).mockReturnValue({
+        path: DEFAULT_CONFIG_PATH,
+        store: {},
+      } as never);
 
       const promise = loadConfig(DEFAULT_CONFIG_PATH);
 
@@ -313,16 +333,34 @@ describe("config", () => {
 
     it("should throw ConfigNotFoundError for custom config path", async () => {
       const error = Object.assign(new Error("ENOENT"), { code: "ENOENT" });
-      vi.mocked(fs.readFile).mockRejectedValueOnce(error);
+      vi.mocked(fs.stat).mockRejectedValueOnce(error);
+
+      vi.mocked(createConfigStore).mockReturnValue({
+        path: "/custom/config.json",
+        store: {},
+      } as never);
 
       await expect(loadConfig("/custom/config.json")).rejects.toThrow(
         ConfigNotFoundError,
       );
-      expect(fs.readFile).toHaveBeenCalledTimes(1);
+      expect(fs.stat).toHaveBeenCalledTimes(1);
     });
 
     it("should throw ConfigParseError for invalid JSON", async () => {
-      vi.mocked(fs.readFile).mockResolvedValue("{invalid json}");
+      const store = { path: "/path/to/config.json" } as {
+        path: string;
+        store: Record<string, unknown>;
+      };
+      Object.defineProperty(store, "store", {
+        get() {
+          throw new SyntaxError("Invalid JSON");
+        },
+      });
+
+      vi.mocked(createConfigStore).mockReturnValue(store as never);
+      vi.mocked(fs.stat).mockResolvedValue({
+        isFile: () => true,
+      } as never);
 
       await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
         ConfigParseError,
@@ -335,7 +373,12 @@ describe("config", () => {
 
     it("should throw ConfigParseError for permission errors", async () => {
       const error = Object.assign(new Error("EACCES"), { code: "EACCES" });
-      vi.mocked(fs.readFile).mockRejectedValue(error);
+      vi.mocked(fs.stat).mockRejectedValue(error);
+
+      vi.mocked(createConfigStore).mockReturnValue({
+        path: "/path/to/config.json",
+        store: {},
+      } as never);
 
       await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
         ConfigParseError,
@@ -347,12 +390,18 @@ describe("config", () => {
     });
 
     it("should throw ConfigParseError for Zod validation errors", async () => {
-      const invalidConfig = JSON.stringify({
-        rulesSource: "/path/to/rules",
-        projects: [], // Empty projects array
-      });
+      const store = {
+        path: "/path/to/config.json",
+        store: {
+          rulesSource: "/path/to/rules",
+          projects: [],
+        },
+      };
 
-      vi.mocked(fs.readFile).mockResolvedValue(invalidConfig);
+      vi.mocked(createConfigStore).mockReturnValue(store as never);
+      vi.mocked(fs.stat).mockResolvedValue({
+        isFile: () => true,
+      } as never);
 
       await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
         ConfigParseError,
@@ -360,17 +409,23 @@ describe("config", () => {
     });
 
     it("should normalize config paths", async () => {
-      const configContent = JSON.stringify({
-        rulesSource: "/path/to/rules",
-        projects: [
-          {
-            path: "~/project",
-            rules: ["**/*.md"],
-          },
-        ],
-      });
+      const store = {
+        path: "/path/to/config.json",
+        store: {
+          rulesSource: "/path/to/rules",
+          projects: [
+            {
+              path: "~/project",
+              rules: ["**/*.md"],
+            },
+          ],
+        },
+      };
 
-      vi.mocked(fs.readFile).mockResolvedValue(configContent);
+      vi.mocked(createConfigStore).mockReturnValue(store as never);
+      vi.mocked(fs.stat).mockResolvedValue({
+        isFile: () => true,
+      } as never);
 
       const config = await loadConfig("/path/to/config.json");
 

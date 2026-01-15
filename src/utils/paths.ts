@@ -16,15 +16,29 @@ export function normalizePath(input: string): string {
 /**
  * Resolve a relative path inside a base directory, rejecting escapes.
  * - Rejects absolute input paths explicitly (e.g. "/etc/passwd").
- * - Uses path.resolve + path.relative to ensure the final path stays within baseDir.
+ * - Uses path.relative to ensure the final path stays within baseDir.
  */
 export function resolveInside(
   baseDirectory: string,
   relativePath: string,
 ): string {
+  if (path.isAbsolute(relativePath)) {
+    throw new Error(
+      `Refusing to write outside ${baseDirectory}: ${relativePath}`,
+    );
+  }
+
   const full = path.resolve(baseDirectory, relativePath);
   const relative_ = path.relative(baseDirectory, full);
-  if (relative_.startsWith("..") || path.isAbsolute(relativePath)) {
+  if (relative_ === "") {
+    return full;
+  }
+  if (path.isAbsolute(relative_)) {
+    throw new Error(
+      `Refusing to write outside ${baseDirectory}: ${relativePath}`,
+    );
+  }
+  if (relative_ === ".." || relative_.startsWith(`..${path.sep}`)) {
     throw new Error(
       `Refusing to write outside ${baseDirectory}: ${relativePath}`,
     );

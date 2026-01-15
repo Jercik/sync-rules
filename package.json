@@ -48,6 +48,7 @@
   "dependencies": {
     "@commander-js/extra-typings": "^14.0.0",
     "commander": "^14.0.2",
+    "conf": "^15.0.2",
     "env-paths": "^3.0.0",
     "globby": "^16.1.0",
     "zod": "^4.3.5"

@@ -1,8 +1,7 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import path from "node:path";
+import { stat } from "node:fs/promises";
 import { parseConfig } from "./config.js";
 import { normalizePath } from "../utils/paths.js";
-import { BUILTIN_DEFAULT_CONFIG_PATH } from "./constants.js";
+import { BUILTIN_DEFAULT_CONFIG_PATH, createConfigStore } from "./constants.js";
 import {
   ConfigNotFoundError,
   ConfigParseError,
@@ -14,15 +13,15 @@ import type { Config } from "./config.js";
 /**
  * Sample configuration template for new installations
  */
-const SAMPLE_CONFIG = `{
-  "global": ["global-rules/*.md"],
-  "projects": [
+const SAMPLE_CONFIG = {
+  global: ["global-rules/*.md"],
+  projects: [
     {
-      "path": "/path/to/project",
-      "rules": ["**/*.md"]
-    }
-  ]
-}`;
+      path: "/path/to/project",
+      rules: ["**/*.md"],
+    },
+  ],
+};
 
 /**
  * Creates a new configuration file with sample content
@@ -35,26 +34,28 @@ export async function createSampleConfig(
   configPath: string,
   force = false,
 ): Promise<void> {
-  const normalizedPath = normalizePath(configPath);
-  const configDirectory = path.dirname(normalizedPath);
+  const store = createConfigStore(configPath);
+  const normalizedPath = normalizePath(store.path);
 
   try {
-    await mkdir(configDirectory, { recursive: true });
+    if (!force) {
+      try {
+        await stat(normalizedPath);
+        throw new Error(
+          `Config file already exists at ${normalizedPath}. Use --force to overwrite`,
+        );
+      } catch (error) {
+        if (!(isNodeError(error) && error.code === "ENOENT")) {
+          throw error;
+        }
+      }
+    }
 
-    // Use 'wx' flag for atomic exclusive create when not forcing
-    // This prevents TOCTOU race conditions by atomically failing if file exists
-    const writeFlags = force ? "w" : "wx";
-    await writeFile(normalizedPath, SAMPLE_CONFIG, {
-      encoding: "utf8",
-      flag: writeFlags,
-    });
+    store.store = SAMPLE_CONFIG;
   } catch (error) {
     const error_ = ensureError(error);
-    if (isNodeError(error_) && error_.code === "EEXIST" && !force) {
-      throw new Error(
-        `Config file already exists at ${normalizedPath}. Use --force to overwrite`,
-        { cause: error_ },
-      );
+    if (error_.message.includes("Config file already exists") && !force) {
+      throw new Error(error_.message, { cause: error_ });
     }
     throw new Error(
       `Failed to create config file at ${normalizedPath}: ${error_.message}`,
@@ -72,11 +73,14 @@ export async function createSampleConfig(
  * @throws {ConfigParseError} When the config file cannot be parsed or is invalid
  */
 export async function loadConfig(configPath: string): Promise<Config> {
-  const normalizedPath = normalizePath(configPath);
+  const store = createConfigStore(configPath);
+  const normalizedPath = normalizePath(store.path);
 
   try {
-    const configContent = await readFile(normalizedPath, "utf8");
-    return parseConfig(configContent);
+    const configStat = await stat(normalizedPath);
+    if (!configStat.isFile()) {
+      throw new Error(`${normalizedPath} is not a file`);
+    }
   } catch (error) {
     if (isNodeError(error) && error.code === "ENOENT") {
       const isBuiltinDefault =
@@ -84,7 +88,12 @@ export async function loadConfig(configPath: string): Promise<Config> {
       throw new ConfigNotFoundError(normalizedPath, isBuiltinDefault);
     }
 
-    // Handle other errors (permissions, invalid JSON, parsing errors, etc.)
+    throw new ConfigParseError(normalizedPath, ensureError(error));
+  }
+
+  try {
+    return parseConfig(JSON.stringify(store.store));
+  } catch (error) {
     throw new ConfigParseError(normalizedPath, ensureError(error));
   }
 }

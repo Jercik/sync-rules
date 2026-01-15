@@ -30,8 +30,8 @@ export class ConfigNotFoundError extends Error {
   constructor(path: string, isDefault = false) {
     const location = isDefault ? "Default config file" : "Config file";
     const hint = isDefault
-      ? "Run 'sync-rules init' to create one, or pass --config <path>."
-      : "Check the path, or create one with 'sync-rules init --config <path>'.";
+      ? "Run 'sync-rules --init' to create one, or pass --config <path>."
+      : "Check the path, or create one with 'sync-rules --init --config <path>'.";
     super(
       `${location} not found at ${path}.\n${hint}\nTry 'sync-rules --help' for details.`,
     );
