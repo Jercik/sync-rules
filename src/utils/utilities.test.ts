@@ -40,5 +40,11 @@ describe("utilities", () => {
         expect(normalizePath(c.input)).toBe(c.expected);
       }
     });
+
+    it("does not expand ~user paths", () => {
+      expect(normalizePath("~someone/config.json")).toBe(
+        path.resolve("~someone/config.json"),
+      );
+    });
   });
 });

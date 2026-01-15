@@ -30,7 +30,7 @@ Or run without installing globally using npx:
 ```bash
 npx sync-rules --help
 # e.g.
-npx sync-rules init
+npx sync-rules --init
 ```
 
 ## Usage
@@ -42,10 +42,16 @@ The workflow involves initializing a configuration file, defining your projects 
 First, initialize the configuration file:
 
 ```bash
-sync-rules init
+sync-rules --init
 ```
 
-This creates a sample `config.json`. By default, it is stored in your system's application data directory. You can specify a custom path using the `--config <path>` flag or the `SYNC_RULES_CONFIG` environment variable.
+This creates a sample `config.json`. By default, it is stored in your system's application data directory. You can specify a custom path using the `--config <path>` flag or the `SYNC_RULES_CONFIG` environment variable. Use `--force` to overwrite an existing config file.
+
+To show the resolved config and rules source paths:
+
+```bash
+sync-rules --paths
+```
 
 ### 2\. Configure Projects and Rules
 
@@ -80,14 +86,15 @@ To synchronize the rules for all configured projects, run the default command:
 
 ```bash
 sync-rules
-# or
-sync-rules sync
 ```
 
 This reads the rules and writes `AGENTS.md` in each project. It also writes `CLAUDE.md` containing `@AGENTS.md` for Claude Code.
 
 #### Options
 
+- `--init`: Create a sample config file
+- `--force` / `-f`: Overwrite existing config file (with `--init`)
+- `--paths`: Print resolved config and rules source paths
 - `--verbose` / `-v`: Show status messages (silent by default)
 - `--dry-run` / `-n`: Preview changes without writing files
 - `--porcelain`: Machine-readable TSV output (implies `--dry-run`)

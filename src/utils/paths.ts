@@ -8,7 +8,7 @@ import path from "node:path";
  */
 export function normalizePath(input: string): string {
   const expanded = input.startsWith("~")
-    ? input.replace(/^~/u, homedir())
+    ? input.replace(/^~(?=$|[\\/])/u, homedir())
     : input;
   return path.resolve(expanded);
 }
@@ -16,18 +16,28 @@ export function normalizePath(input: string): string {
 /**
  * Resolve a relative path inside a base directory, rejecting escapes.
  * - Rejects absolute input paths explicitly (e.g. "/etc/passwd").
- * - Uses path.resolve + path.relative to ensure the final path stays within baseDir.
+ * - Uses path.relative to ensure the final path stays within baseDir.
  */
 export function resolveInside(
   baseDirectory: string,
   relativePath: string,
 ): string {
-  const full = path.resolve(baseDirectory, relativePath);
-  const relative_ = path.relative(baseDirectory, full);
-  if (relative_.startsWith("..") || path.isAbsolute(relativePath)) {
-    throw new Error(
-      `Refusing to write outside ${baseDirectory}: ${relativePath}`,
-    );
+  const base = path.resolve(baseDirectory);
+  if (path.isAbsolute(relativePath)) {
+    throw new Error(`Refusing to write outside ${base}: ${relativePath}`);
+  }
+
+  const full = path.resolve(base, relativePath);
+  const relative_ = path.relative(base, full);
+  if (relative_ === "") {
+    // Empty relative means baseDirectory and full are the same path.
+    return full;
+  }
+  if (path.isAbsolute(relative_)) {
+    throw new Error(`Refusing to write outside ${base}: ${relativePath}`);
+  }
+  if (relative_ === ".." || relative_.startsWith(`..${path.sep}`)) {
+    throw new Error(`Refusing to write outside ${base}: ${relativePath}`);
   }
   return full;
 }

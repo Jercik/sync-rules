@@ -59,14 +59,14 @@ describe("ConfigNotFoundError", () => {
       path: "/path/to/config.json",
       isDefault: false,
       message: "Config file not found at /path/to/config.json",
-      hintContains: "init --config <path>",
+      hintContains: "--init --config <path>",
     },
     {
       title: "missing default config",
       path: "/default/config.json",
       isDefault: true,
       message: "Default config file not found at /default/config.json",
-      hintContains: "Run 'sync-rules init'",
+      hintContains: "Run 'sync-rules --init'",
     },
   ] as const;
 

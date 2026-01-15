@@ -1,28 +1,30 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { parseConfig } from "./config.js";
+import { Config as ConfigValidator } from "./config.js";
 import { normalizePath } from "../utils/paths.js";
-import { BUILTIN_DEFAULT_CONFIG_PATH } from "./constants.js";
+import { BUILTIN_DEFAULT_CONFIG_PATH, createConfigStore } from "./constants.js";
 import {
+  ConfigAccessError,
   ConfigNotFoundError,
   ConfigParseError,
   ensureError,
   isNodeError,
 } from "../utils/errors.js";
-import type { Config } from "./config.js";
+import type { Config as ConfigShape } from "./config.js";
 
 /**
  * Sample configuration template for new installations
  */
-const SAMPLE_CONFIG = `{
-  "global": ["global-rules/*.md"],
-  "projects": [
+const SAMPLE_CONFIG = {
+  rulesSource: "/path/to/rules",
+  global: ["global-rules/*.md"],
+  projects: [
     {
-      "path": "/path/to/project",
-      "rules": ["**/*.md"]
-    }
-  ]
-}`;
+      path: "/path/to/project",
+      rules: ["**/*.md"],
+    },
+  ],
+};
 
 /**
  * Creates a new configuration file with sample content
@@ -40,14 +42,9 @@ export async function createSampleConfig(
 
   try {
     await mkdir(configDirectory, { recursive: true });
-
-    // Use 'wx' flag for atomic exclusive create when not forcing
-    // This prevents TOCTOU race conditions by atomically failing if file exists
-    const writeFlags = force ? "w" : "wx";
-    await writeFile(normalizedPath, SAMPLE_CONFIG, {
-      encoding: "utf8",
-      flag: writeFlags,
-    });
+    const content = JSON.stringify(SAMPLE_CONFIG, undefined, "\t");
+    const flag = force ? "w" : "wx";
+    await writeFile(normalizedPath, content, { flag });
   } catch (error) {
     const error_ = ensureError(error);
     if (isNodeError(error_) && error_.code === "EEXIST" && !force) {
@@ -69,22 +66,44 @@ export async function createSampleConfig(
  *
  * @param configPath - Path to the JSON config file. `~` is supported.
  * @throws {ConfigNotFoundError} When the config file doesn't exist
+ * @throws {ConfigAccessError} When the config file cannot be accessed (permissions, not a file)
  * @throws {ConfigParseError} When the config file cannot be parsed or is invalid
  */
-export async function loadConfig(configPath: string): Promise<Config> {
+export async function loadConfig(configPath: string): Promise<ConfigShape> {
   const normalizedPath = normalizePath(configPath);
-
   try {
-    const configContent = await readFile(normalizedPath, "utf8");
-    return parseConfig(configContent);
+    const configStat = await stat(normalizedPath);
+    if (!configStat.isFile()) {
+      throw new Error(`${normalizedPath} is not a file`);
+    }
   } catch (error) {
     if (isNodeError(error) && error.code === "ENOENT") {
+      // Use path.relative for comparison - it's case-insensitive on Windows
       const isBuiltinDefault =
-        normalizedPath === normalizePath(BUILTIN_DEFAULT_CONFIG_PATH);
+        path.relative(
+          normalizedPath,
+          normalizePath(BUILTIN_DEFAULT_CONFIG_PATH),
+        ) === "";
       throw new ConfigNotFoundError(normalizedPath, isBuiltinDefault);
     }
 
-    // Handle other errors (permissions, invalid JSON, parsing errors, etc.)
+    throw new ConfigAccessError(normalizedPath, ensureError(error));
+  }
+
+  let configStore: ReturnType<typeof createConfigStore>;
+  try {
+    configStore = createConfigStore(normalizedPath);
+  } catch (error) {
+    throw new ConfigParseError(normalizedPath, ensureError(error));
+  }
+
+  try {
+    const result = ConfigValidator.safeParse(configStore.store);
+    if (!result.success) {
+      throw result.error;
+    }
+    return result.data;
+  } catch (error) {
     throw new ConfigParseError(normalizedPath, ensureError(error));
   }
 }

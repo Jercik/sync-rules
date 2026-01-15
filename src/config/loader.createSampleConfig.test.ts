@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as fs from "node:fs/promises";
 
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn(),
@@ -10,39 +11,43 @@ describe("createSampleConfig", () => {
     vi.clearAllMocks();
   });
 
-  it("createSampleConfig uses atomic 'wx' when force=false", async () => {
-    const fs = await import("node:fs/promises");
+  it("writes a sample config with exclusive create by default", async () => {
     const { createSampleConfig } = await import("./loader.js");
-    vi.mocked(fs.writeFile).mockResolvedValue();
+    vi.mocked(fs.mkdir).mockResolvedValue(void 0);
+    vi.mocked(fs.writeFile).mockResolvedValue(void 0);
 
     await createSampleConfig("/tmp/config.json", false);
 
     expect(fs.mkdir).toHaveBeenCalledWith("/tmp", { recursive: true });
     expect(fs.writeFile).toHaveBeenCalledWith(
       "/tmp/config.json",
-      expect.stringContaining('"projects"'),
-      { encoding: "utf8", flag: "wx" },
+      expect.any(String),
+      { flag: "wx" },
     );
+    const content = vi.mocked(fs.writeFile).mock.calls[0]?.[1] as string;
+    expect(content).toContain('"rulesSource"');
+    expect(content).toContain('"global-rules/*.md"');
+    expect(content).toContain('"projects"');
   });
 
-  it("createSampleConfig overwrites file when force=true", async () => {
-    const fs = await import("node:fs/promises");
+  it("overwrites file when force=true", async () => {
     const { createSampleConfig } = await import("./loader.js");
-    vi.mocked(fs.writeFile).mockResolvedValue();
+    vi.mocked(fs.mkdir).mockResolvedValue(void 0);
+    vi.mocked(fs.writeFile).mockResolvedValue(void 0);
 
     await createSampleConfig("/tmp/config.json", true);
 
     expect(fs.writeFile).toHaveBeenCalledWith(
       "/tmp/config.json",
       expect.any(String),
-      { encoding: "utf8", flag: "w" },
+      { flag: "w" },
     );
   });
 
   it("atomic create: EEXIST yields actionable 'use --force' hint", async () => {
-    const fs = await import("node:fs/promises");
     const { createSampleConfig } = await import("./loader.js");
-    const eexist = Object.assign(new Error("exists"), { code: "EEXIST" });
+    vi.mocked(fs.mkdir).mockResolvedValue(void 0);
+    const eexist = Object.assign(new Error("EEXIST"), { code: "EEXIST" });
     vi.mocked(fs.writeFile).mockRejectedValue(eexist);
 
     const error = await createSampleConfig("/tmp/config.json", false).catch(
@@ -56,12 +61,12 @@ describe("createSampleConfig", () => {
   });
 
   it("non-EEXIST errors are wrapped with normalized path context", async () => {
-    const fs = await import("node:fs/promises");
     const { createSampleConfig } = await import("./loader.js");
+    vi.mocked(fs.mkdir).mockResolvedValue(void 0);
     const eacces = Object.assign(new Error("EACCES"), { code: "EACCES" });
     vi.mocked(fs.writeFile).mockRejectedValue(eacces);
 
-    const error = await createSampleConfig("/tmp/config.json", true).catch(
+    const error = await createSampleConfig("/tmp/config.json", false).catch(
       (error_: unknown) => error_,
     );
 
