@@ -56,6 +56,7 @@ describe("createSampleConfig", () => {
     expect(error).toBeInstanceOf(Error);
     const error_ = error as Error;
     expect(error_.message).toMatch(/already exists.*--force/iu);
+    expect(error_.cause).toBe(eexist);
   });
 
   it("non-EEXIST errors are wrapped with normalized path context", async () => {
