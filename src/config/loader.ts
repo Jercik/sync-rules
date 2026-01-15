@@ -8,6 +8,7 @@ import {
   createConfigStore,
 } from "./constants.js";
 import {
+  ConfigAccessError,
   ConfigNotFoundError,
   ConfigParseError,
   ensureError,
@@ -69,6 +70,7 @@ export async function createSampleConfig(
  *
  * @param configPath - Path to the JSON config file. `~` is supported.
  * @throws {ConfigNotFoundError} When the config file doesn't exist
+ * @throws {ConfigAccessError} When the config file cannot be accessed (permissions, not a file)
  * @throws {ConfigParseError} When the config file cannot be parsed or is invalid
  */
 export async function loadConfig(configPath: string): Promise<ConfigShape> {
@@ -89,7 +91,7 @@ export async function loadConfig(configPath: string): Promise<ConfigShape> {
       throw new ConfigNotFoundError(normalizedPath, isBuiltinDefault);
     }
 
-    throw new ConfigParseError(normalizedPath, ensureError(error));
+    throw new ConfigAccessError(normalizedPath, ensureError(error));
   }
 
   let store: ReturnType<typeof createConfigStore>;

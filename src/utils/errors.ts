@@ -42,6 +42,26 @@ export class ConfigNotFoundError extends Error {
 }
 
 /**
+ * Error thrown when config file cannot be accessed (permissions, not a file, etc.)
+ */
+export class ConfigAccessError extends Error {
+  readonly path: string;
+  readonly originalError?: Error;
+
+  constructor(path: string, originalError?: Error) {
+    const base = originalError
+      ? `Cannot access config at ${path}: ${originalError.message}`
+      : `Cannot access config at ${path}`;
+    const hint = "Check the file path and permissions.";
+    const baseWithPeriod = /[.!?]$/u.test(base) ? base : `${base}.`;
+    super(`${baseWithPeriod}\n${hint}`, { cause: originalError });
+    this.name = this.constructor.name;
+    this.path = path;
+    this.originalError = originalError;
+  }
+}
+
+/**
  * Error thrown when config file cannot be parsed or is invalid.
  */
 export class ConfigParseError extends Error {

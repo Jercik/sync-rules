@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
 import { parseConfig, findProjectForPath } from "./config.js";
 import { loadConfig } from "./loader.js";
-import { ConfigNotFoundError, ConfigParseError } from "../utils/errors.js";
+import {
+  ConfigAccessError,
+  ConfigNotFoundError,
+  ConfigParseError,
+} from "../utils/errors.js";
 import * as fs from "node:fs/promises";
 import { createConfigStore } from "./constants.js";
 import type { Config } from "./config.js";
@@ -362,7 +366,7 @@ describe("config", () => {
       });
     });
 
-    it("should throw ConfigParseError for permission errors", async () => {
+    it("should throw ConfigAccessError for permission errors", async () => {
       const error = Object.assign(new Error("EACCES"), { code: "EACCES" });
       vi.mocked(fs.stat).mockRejectedValue(error);
 
@@ -372,7 +376,7 @@ describe("config", () => {
       } as never);
 
       await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
-        ConfigParseError,
+        ConfigAccessError,
       );
 
       await expect(loadConfig("/path/to/config.json")).rejects.toMatchObject({
@@ -380,7 +384,7 @@ describe("config", () => {
       });
     });
 
-    it("should throw ConfigParseError when path is a directory", async () => {
+    it("should throw ConfigAccessError when path is a directory", async () => {
       vi.mocked(createConfigStore).mockReturnValue({
         path: "/path/to/config.json",
         store: {},
@@ -390,7 +394,7 @@ describe("config", () => {
       } as never);
 
       const promise = loadConfig("/path/to/config.json");
-      await expect(promise).rejects.toThrow(ConfigParseError);
+      await expect(promise).rejects.toThrow(ConfigAccessError);
       await expect(promise).rejects.toMatchObject({
         path: "/path/to/config.json",
       });
