@@ -194,7 +194,7 @@ describe("filesystem operations", () => {
 
       await expect(
         readRuleContents(rulesDirectory, relativePaths),
-      ).rejects.toThrow(/Failed to read rule file.*nonexistent\.md/u);
+      ).rejects.toThrowError(/Failed to read rule file.*nonexistent\.md/u);
     });
   });
 });

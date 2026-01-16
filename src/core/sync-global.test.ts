@@ -81,6 +81,6 @@ describe("sync-global", () => {
     const paths = actionsArgument.map((action) => action.path);
     expect(paths.some((p) => p.endsWith("/.claude/CLAUDE.md"))).toBe(true);
     expect(paths.some((p) => p.endsWith("/.codex/AGENTS.md"))).toBe(true);
-    expect(result.written.length).toBe(2);
+    expect(result.written).toHaveLength(2);
   });
 });
