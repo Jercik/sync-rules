@@ -58,7 +58,7 @@
     "@types/node": "^25.0.8",
     "@vitest/coverage-v8": "^4.0.17",
     "eslint": "^9.39.2",
-    "eslint-config-axkit": "^1.0.0",
+    "eslint-config-axkit": "^1.1.0",
     "fta-check": "^1.5.1",
     "fta-cli": "^3.0.0",
     "knip": "^5.81.0",

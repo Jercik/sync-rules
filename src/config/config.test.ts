@@ -13,8 +13,7 @@ import type { Config } from "./config.js";
 
 vi.mock("node:fs/promises");
 vi.mock("./constants.js", async () => {
-  const actual =
-    await vi.importActual<typeof import("./constants.js")>("./constants.js");
+  const actual = await vi.importActual("./constants.js");
   return {
     ...actual,
     createConfigStore: vi.fn(),
@@ -88,7 +87,7 @@ describe("config", () => {
           projects: [{ path: "~/Developer/project", rules: ["test.md"] }],
         });
         const config = parseConfig(json);
-        expect(typeof config.rulesSource).toBe("string");
+        expectTypeOf(config.rulesSource).toBeString();
         expect(config.rulesSource).toMatch(/sync-rules[/\\]rules$/u);
         expect(config.projects).toHaveLength(1);
         expect(config.projects[0]?.path).toMatch(/\//u);
@@ -102,7 +101,7 @@ describe("config", () => {
           projects: [{ path: "./test", rules: ["!test/**", "!**/*.md"] }],
         });
 
-        expect(() => parseConfig(json)).toThrow(z.ZodError);
+        expect(() => parseConfig(json)).toThrowError(z.ZodError);
 
         let zodError: z.ZodError | undefined;
         try {
@@ -118,7 +117,7 @@ describe("config", () => {
         ).toBe(true);
       });
       it("throws SyntaxError for invalid JSON syntax", () => {
-        expect(() => parseConfig("{invalid}")).toThrow(SyntaxError);
+        expect(() => parseConfig("{invalid}")).toThrowError(SyntaxError);
       });
 
       // Missing projects and non-array projects are covered by table-driven tests below
@@ -143,7 +142,9 @@ describe("config", () => {
           },
         },
       ])("should reject invalid project shapes: $name", ({ payload }) => {
-        expect(() => parseConfig(JSON.stringify(payload))).toThrow(z.ZodError);
+        expect(() => parseConfig(JSON.stringify(payload))).toThrowError(
+          z.ZodError,
+        );
       });
 
       // Nested errors are covered by the table-driven test and multi-error tests below
@@ -157,7 +158,7 @@ describe("config", () => {
           ],
         });
 
-        expect(() => parseConfig(json)).toThrow(z.ZodError);
+        expect(() => parseConfig(json)).toThrowError(z.ZodError);
 
         let zodError: z.ZodError | undefined;
         try {
@@ -328,7 +329,7 @@ describe("config", () => {
 
       const promise = loadConfig(DEFAULT_CONFIG_PATH);
 
-      await expect(promise).rejects.toThrow(ConfigNotFoundError);
+      await expect(promise).rejects.toThrowError(ConfigNotFoundError);
       await expect(promise).rejects.toMatchObject({
         path: DEFAULT_CONFIG_PATH,
         isDefault: true,
@@ -344,7 +345,7 @@ describe("config", () => {
         store: {},
       } as never);
 
-      await expect(loadConfig("/custom/config.json")).rejects.toThrow(
+      await expect(loadConfig("/custom/config.json")).rejects.toThrowError(
         ConfigNotFoundError,
       );
       expect(fs.stat).toHaveBeenCalledTimes(1);
@@ -360,7 +361,7 @@ describe("config", () => {
       } as never);
 
       const promise = loadConfig("/path/to/config.json");
-      await expect(promise).rejects.toThrow(ConfigParseError);
+      await expect(promise).rejects.toThrowError(ConfigParseError);
       await expect(promise).rejects.toMatchObject({
         path: "/path/to/config.json",
       });
@@ -375,7 +376,7 @@ describe("config", () => {
         store: {},
       } as never);
 
-      await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
+      await expect(loadConfig("/path/to/config.json")).rejects.toThrowError(
         ConfigAccessError,
       );
 
@@ -394,7 +395,7 @@ describe("config", () => {
       } as never);
 
       const promise = loadConfig("/path/to/config.json");
-      await expect(promise).rejects.toThrow(ConfigAccessError);
+      await expect(promise).rejects.toThrowError(ConfigAccessError);
       await expect(promise).rejects.toMatchObject({
         path: "/path/to/config.json",
       });
@@ -414,7 +415,7 @@ describe("config", () => {
         isFile: () => true,
       } as never);
 
-      await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
+      await expect(loadConfig("/path/to/config.json")).rejects.toThrowError(
         ConfigParseError,
       );
     });

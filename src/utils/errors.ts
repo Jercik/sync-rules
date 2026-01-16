@@ -15,7 +15,7 @@ export class SyncError extends Error {
 
   constructor(message: string, details: SyncErrorDetails = {}, cause?: Error) {
     super(message, { cause });
-    this.name = this.constructor.name;
+    this.name = "SyncError";
     this.details = details;
   }
 }
@@ -35,7 +35,7 @@ export class ConfigNotFoundError extends Error {
     super(
       `${location} not found at ${path}.\n${hint}\nTry 'sync-rules --help' for details.`,
     );
-    this.name = this.constructor.name;
+    this.name = "ConfigNotFoundError";
     this.path = path;
     this.isDefault = isDefault;
   }
@@ -55,7 +55,7 @@ export class ConfigAccessError extends Error {
     const hint = "Check the file path and permissions.";
     const baseWithPeriod = /[.!?]$/u.test(base) ? base : `${base}.`;
     super(`${baseWithPeriod}\n${hint}`, { cause: originalError });
-    this.name = this.constructor.name;
+    this.name = "ConfigAccessError";
     this.path = path;
     this.originalError = originalError;
   }
@@ -76,7 +76,7 @@ export class ConfigParseError extends Error {
       "Fix the JSON and glob patterns, then retry.\nTry 'sync-rules --help' for schema and examples.";
     const baseWithPeriod = /[.!?]$/u.test(base) ? base : `${base}.`;
     super(`${baseWithPeriod}\n${hint}`, { cause: originalError });
-    this.name = this.constructor.name;
+    this.name = "ConfigParseError";
     this.path = path;
     this.originalError = originalError;
   }
@@ -100,7 +100,7 @@ export class SpawnError extends Error {
   ) {
     const message = SpawnError.buildMessage(command, code, exitCode, signal);
     super(message, { cause });
-    this.name = this.constructor.name;
+    this.name = "SpawnError";
     this.command = command;
     this.code = code;
     this.exitCode = exitCode;
