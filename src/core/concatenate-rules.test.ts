@@ -9,7 +9,15 @@ describe("concatenate-rules", () => {
     expect(result).toBe("");
   });
 
-  it("inserts a single newline when boundary has no newline", () => {
+  it("preserves content exactly when only one rule is present", () => {
+    const rules: Rule[] = [{ path: "a.md", content: "# A\n\n" }];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n\n");
+  });
+
+  it("inserts one blank line when boundary has no newline", () => {
     const rules: Rule[] = [
       { path: "a.md", content: "# A" },
       { path: "b.md", content: "# B" },
@@ -17,10 +25,10 @@ describe("concatenate-rules", () => {
 
     const result = concatenateRules(rules);
 
-    expect(result).toBe("# A\n# B");
+    expect(result).toBe("# A\n\n# B");
   });
 
-  it("does not insert newline when previous rule already ends with newline", () => {
+  it("normalizes previous trailing newline to one blank line", () => {
     const rules: Rule[] = [
       { path: "a.md", content: "# A\n" },
       { path: "b.md", content: "# B" },
@@ -28,10 +36,10 @@ describe("concatenate-rules", () => {
 
     const result = concatenateRules(rules);
 
-    expect(result).toBe("# A\n# B");
+    expect(result).toBe("# A\n\n# B");
   });
 
-  it("does not insert newline when next rule already starts with newline", () => {
+  it("normalizes next leading newline to one blank line", () => {
     const rules: Rule[] = [
       { path: "a.md", content: "# A" },
       { path: "b.md", content: "\n# B" },
@@ -39,10 +47,10 @@ describe("concatenate-rules", () => {
 
     const result = concatenateRules(rules);
 
-    expect(result).toBe("# A\n# B");
+    expect(result).toBe("# A\n\n# B");
   });
 
-  it("keeps existing blank-line boundaries unchanged", () => {
+  it("normalizes existing multi-newline boundaries to one blank line", () => {
     const rules: Rule[] = [
       { path: "a.md", content: "# A\n\n" },
       { path: "b.md", content: "# B" },
@@ -51,6 +59,52 @@ describe("concatenate-rules", () => {
 
     const result = concatenateRules(rules);
 
-    expect(result).toBe("# A\n\n# B\n# C");
+    expect(result).toBe("# A\n\n# B\n\n# C");
+  });
+
+  it("normalizes trailing newlines from middle rules at the next boundary", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "# A" },
+      { path: "b.md", content: "# B\n\n\n" },
+      { path: "c.md", content: "# C" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n\n# B\n\n# C");
+  });
+
+  it("normalizes CRLF boundaries to one LF blank line", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "# A\r\n" },
+      { path: "b.md", content: "\r\n# B" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n\n# B");
+  });
+
+  it("ignores empty rules between non-empty rules", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "# A" },
+      { path: "b.md", content: "\n\n" },
+      { path: "c.md", content: "# C" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n\n# C");
+  });
+
+  it("ignores leading empty rules when later rules have content", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "\n\n" },
+      { path: "b.md", content: "# B" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# B");
   });
 });

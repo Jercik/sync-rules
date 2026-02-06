@@ -5,19 +5,11 @@ Before taking any action—answering questions, editing files, or running comman
 - **@README.md** — Project overview and context
 
 If a file does not exist, skip it silently and continue.
-
-
----
-
 # Rule: `askpplx` CLI Usage
 
 **At session start:** Run `npx -y askpplx --help` to confirm the tool works and learn available options.
 
 Use `askpplx` to query Perplexity search engine for real-time web search. Use it to verify facts before acting. A lookup is far cheaper than debugging hallucinated code or explaining why an approach failed. Verification is fast and cheap—prefer looking up information over making assumptions. When in doubt, verify.
-
-
----
-
 # Rule: Avoid Leaky Abstractions
 
 Design abstractions around consumer needs, not implementation details. A leaky abstraction forces callers to understand the underlying system to use it correctly—defeating its purpose. While all non-trivial abstractions leak somewhat (Joel Spolsky's Law of Leaky Abstractions), minimize leakage by ensuring your interface doesn't expose internal constraints, infrastructure artifacts, or inconsistent behavior.
@@ -63,10 +55,6 @@ class PostgresReservationRepository implements ReservationRepository {
 - Return domain types, not infrastructure artifacts (avoid raw database IDs)
 - Inject infrastructure dependencies through constructors, not method parameters
 - Normalize error handling so callers don't catch implementation-specific exceptions
-
-
----
-
 # Rule: Early Returns
 
 Handle edge cases and invalid states at the top of a function with guard clauses that return early. This flattens nested conditionals and keeps the happy path obvious.
@@ -81,10 +69,6 @@ function getDiscount(user: User | null) {
 ```
 
 Invert conditions and exit immediately—null checks, permission checks, validation, empty collections. Main logic stays at the top level with minimal indentation.
-
-
----
-
 # Rule: File Naming Matches Contents
 
 Name files for what the module actually does. Use kebab-case and prefer verb-noun or domain-role names. Match the primary export; if you cannot name it crisply, split the file.
@@ -100,10 +84,6 @@ Name files for what the module actually does. Use kebab-case and prefer verb-nou
 - Use role suffixes (`-service`, `-repository`) only when they clarify architecture.
 
 Example: A file named `usage.core.ts` containing both fetching and aggregation logic should be split into `fetch-service-usage.ts` and `aggregate-usage.ts`.
-
-
----
-
 # Rule: Functional Core, Imperative Shell
 
 Separate business logic from side effects by organizing code into a functional core and an imperative shell. The functional core contains pure functions that operate only on provided data, free of I/O, database calls, or state mutations. The imperative shell handles all side effects and orchestrates the core to perform work.
@@ -145,10 +125,6 @@ email.bulkSend(
 ```
 
 Core functions can now be tested with sample data and reused without modification.
-
-
----
-
 # Rule: Inline Obvious Code
 
 Keep simple, self-explanatory code inline rather than extracting it into functions. Every abstraction carries cognitive cost—readers must jump to another location, parse a signature, and track context. For obvious logic, this overhead exceeds any benefit.
@@ -173,10 +149,6 @@ Extract when a name clarifies complex intent, you need consistent behavior acros
 ## The wrong abstraction
 
 Abstractions decay when requirements diverge: programmer A extracts duplication into a shared function, programmer B adds a parameter for different behavior, and this repeats until the "abstraction" is a mess of conditionals. When an abstraction proves wrong, re-introduce duplication and let the code show you what's actually shared. Duplication is far cheaper than the wrong abstraction.
-
-
----
-
 # Rule: No Logic in Tests
 
 Write test assertions as concrete input/output examples, not computed values. Avoid operators, string concatenation, loops, and conditionals in test bodies—these obscure bugs and make tests harder to verify at a glance.
@@ -194,10 +166,6 @@ expect(getPhotosUrl()).toBe("http://example.com/photos"); // fails, reveals the 
 Unlike production code that handles varied inputs, tests verify specific cases. State expectations directly rather than computing them. When a test fails, the expected value should be immediately readable without mental evaluation.
 
 Test utilities are acceptable for setup and data preparation—fixtures, builders, factories, mock configuration—but not for computing expected values. Keep assertion logic in the test body with literal expectations.
-
-
----
-
 # Rule: Normalize User Input
 
 Accept flexible input formats and normalize programmatically. Don't reject input because of formatting characters users naturally include—spaces in credit card numbers, parentheses in phone numbers, hyphens in IDs. Computers are good at removing that.
@@ -225,10 +193,6 @@ When accepting user input:
 **Never normalize passwords.** Users should be able to use any characters exactly as entered—normalizing passwords reduces entropy and can break legitimate credentials. The only acceptable transformation is Unicode normalization (NFC/NFKC) for cross-platform compatibility before hashing.
 
 The validation error should describe what's actually wrong with the data, not complain about formatting the computer could have handled.
-
-
----
-
 # Rule: Parse, Don't Validate
 
 When checking input data, return a refined type that preserves the knowledge gained—don't just validate and discard. Validation functions that return `void` or throw errors force callers to re-check conditions or handle "impossible" cases. Parsing functions that return more precise types eliminate redundant checks and let the compiler catch inconsistencies.
@@ -269,10 +233,6 @@ const PositiveInt = z
   .refine((n) => n > 0, "must be positive");
 type PositiveInt = z.infer<typeof PositiveInt>;
 ```
-
-
----
-
 # Rule: Test Functional Core
 
 Focus testing efforts on the functional core—pure functions with no side effects that operate only on provided data. These tests are fast, deterministic, and provide high value per line of test code. Do not write tests for the imperative shell (I/O, database calls, external services) unless the user explicitly requests them.
@@ -295,10 +255,6 @@ Imperative shell tests require mocks, stubs, or integration infrastructure, maki
 - Message queue consumers/producers
 
 If testing imperative shell code is explicitly requested, prefer integration tests over unit tests with mocks—they catch real issues and are less likely to break when implementation details change.
-
-
----
-
 # Rule: Child Process Selection
 
 Choose the appropriate `node:child_process` function based on synchronicity, shell requirements, output size, and error handling. (Defaults from Node.js 25.x docs.)
@@ -380,10 +336,6 @@ if (result.error) console.error(result.error);
 if (result.status !== 0) console.error(`Exit code: ${result.status}`);
 console.log(result.stdout.toString());
 ```
-
-
----
-
 # Rule: Cross-Platform Path Validation
 
 When validating that a file path stays within an expected directory (path traversal prevention), use `path.relative` instead of `startsWith` checks. This handles Windows case-insensitivity correctly.
@@ -467,10 +419,6 @@ Use this pattern when:
 - Preventing path traversal attacks (e.g., `../../../etc/passwd`)
 - Ensuring files stay within a designated base directory
 - Any path containment check that must work on Windows
-
-
----
-
 # Rule: Import Metadata from package.json
 
 Import name, version, and description directly from package.json to maintain a single source of truth for your package metadata. In Node.js 20.10+ use `with { type: "json" }` syntax (the older `assert` keyword is deprecated); ensure TypeScript's `resolveJsonModule` is enabled in tsconfig.json. This approach eliminates manual version synchronization and reduces maintenance errors when updating package information. Always import from the nearest package.json using relative paths to ensure correct metadata for monorepo packages.
@@ -483,10 +431,6 @@ const program = new Command()
   .description(packageJson.description)
   .version(packageJson.version);
 ```
-
-
----
-
 # Rule: Package.json Imports
 
 Use `package.json` "imports" field with `#` prefixes to create stable internal module paths that replace brittle relative imports like `../../../utils`. The imports field accepts exact paths (`"#db": "./src/db.js"`) and wildcards (`"#utils/*": "./src/utils/*.js"`), and these private subpath imports are only accessible within your package, not from external consumers. Modern Node.js versions support this natively, while recent TypeScript versions provide full editor support including auto-imports and IntelliSense. For TypeScript projects, map to `.js` extensions in package.json since Node.js expects JavaScript at runtime, or use `.ts` with `allowImportingTsExtensions: true` for native TypeScript execution tools like tsx, Bun or latest Node.
@@ -499,10 +443,6 @@ Use `package.json` "imports" field with `#` prefixes to create stable internal m
   }
 }
 ```
-
-
----
-
 # Rule: Run TypeScript Natively
 
 Run TypeScript files directly with `node`. Do not use `tsx`, `ts-node`, or other external runners.
@@ -514,10 +454,6 @@ pnpm exec tsx script.ts  # ❌ Unnecessary
 ```
 
 Node.js 22.18+ and 24+ run `.ts` files natively without flags. External TypeScript runners add unnecessary dependencies and complexity.
-
-
----
-
 # Rule: Discriminated Unions
 
 Use discriminated unions to model data that can be in one of several distinct shapes. Each variant shares a literal discriminant property (commonly `type`, `kind`, or `status`) that TypeScript uses to narrow the union.
@@ -598,10 +534,6 @@ const MyResult = z.discriminatedUnion("status", [
   MyErrors,
 ]);
 ```
-
-
----
-
 # Rule: Enums Alternatives
 
 Do not introduce new enums into the codebase. Retain existing enums.
@@ -637,10 +569,6 @@ Object.keys(Direction).length; // 8 (not 4)
 ```
 
 String enums do not have this behavior.
-
-
----
-
 # Rule: Error Result Types
 
 Throwing errors is fine when framework infrastructure handles them (e.g., a backend request handler returning HTTP 500). For operations where callers must handle failure explicitly, use a result type instead of `try`/`catch`:
@@ -667,10 +595,6 @@ if (result.ok) {
 ```
 
 Result types make error handling explicit at call sites and let the compiler enforce that failures are addressed.
-
-
----
-
 # Rule: ESLint Print Config
 
 Use `eslint --print-config` to check if a rule is enabled in the resolved configuration. This queries ESLint's actual computed config rather than searching config files for text strings.
@@ -684,10 +608,6 @@ pnpm exec eslint --print-config src/index.ts | jq -e '.rules["@typescript-eslint
 ```
 
 Returns `2` (error), `1` (warn), or `0` (off). The `-e` flag makes jq exit with code 1 when the result is null, useful for scripting.
-
-
----
-
 # Rule: Import Type
 
 Use `import type` for type-only imports. Prefer top-level `import type` over inline `import { type ... }`.
@@ -701,10 +621,6 @@ import type { User } from "./user";
 ```
 
 Inline type qualifiers can leave empty `import {}` statements in the emitted JavaScript, causing unnecessary side-effect imports. Top-level `import type` guarantees complete erasure.
-
-
----
-
 # Rule: JSDoc Comments
 
 Add JSDoc comments only when a function's behavior is not self-evident from its name and signature. Keep comments concise—describe intent or non-obvious behavior, not implementation details.
@@ -719,10 +635,6 @@ const truncateToInt = (n: number): number => Math.trunc(n);
 const decodePathSegment = (segment: string): string =>
   decodeURIComponent(segment);
 ```
-
-
----
-
 # Rule: Module Exports
 
 Don't use default exports. Don't use barrel files (`index.ts` that re-exports siblings). Both add indirection that breaks the link between an import and its source—default exports let importers pick arbitrary names, barrels route imports through an intermediary. This harms refactoring, IDE navigation, and build performance.
@@ -734,10 +646,6 @@ import calc from "#components";
 // Prefer
 import { calculateTotal } from "#utils/calculate-total";
 ```
-
-
----
-
 # Rule: No Unchecked Indexed Access
 
 When `noUncheckedIndexedAccess` is enabled in `tsconfig.json`, indexing into arrays and objects returns `T | undefined` rather than `T`. Handle the potential `undefined` value instead of assuming the index exists.
@@ -754,10 +662,6 @@ const value = obj.key; // string | undefined
 const first = arr[0]; // string
 const value = obj.key; // string
 ```
-
-
----
-
 # Rule: Optional Properties
 
 Prefer `T | undefined` over optional properties (`?`) when callers must always explicitly provide a value. Optional properties allow omission at call sites, which can mask bugs when a property is required but forgotten.
@@ -786,10 +690,6 @@ function Button({ variant = 'solid', size = 'md' }: ButtonProps) {
 ```
 
 This is safe because the default parameter guarantees a value inside the component, and omitting the prop at the call site (`<Button />`) is intentional. Avoid this pattern for props without sensible defaults or where omission would cause bugs.
-
-
----
-
 # Rule: Package Manager Execution
 
 How different package manager commands resolve binaries:
@@ -802,10 +702,6 @@ How different package manager commands resolve binaries:
 | `npx foo@version` | Resolves version, uses local if exact match exists, otherwise downloads |
 
 `pnpx` is an alias for `pnpm dlx`.
-
-
----
-
 # Rule: Return Types
 
 Annotate return types on top-level module functions. Explicit return types document intent, catch incomplete implementations at the definition site, and help AI assistants understand function purpose.
@@ -820,10 +716,6 @@ const myFunc = (): string => {
 
 - React components returning JSX need no annotation—the return type is always `JSX.Element` or similar.
 - React hooks returning objects should still annotate: `(): { state: string; }`.
-
-
----
-
 # Rule: TypeScript Config File Patterns
 
 Use explicit `include`/`exclude` patterns in environment-specific configs. Exclude test files from production; include them in test configs.
@@ -843,10 +735,6 @@ TypeScript globs are intentionally limited and differ from bash/zsh globs: `*`, 
 ## Resolution Priority
 
 `files` > `include` > `exclude`. If a file matches both `include` and `exclude`, it is excluded. Exception: imported files bypass `exclude`.
-
-
----
-
 # Rule: Zod Schema Naming
 
 Use identical names for Zod schemas and their inferred types. Name both with PascalCase. TypeScript allows this because types and values exist in separate namespaces.
