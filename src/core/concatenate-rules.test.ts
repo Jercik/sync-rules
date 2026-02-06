@@ -9,15 +9,7 @@ describe("concatenate-rules", () => {
     expect(result).toBe("");
   });
 
-  it("returns content as-is for a single rule", () => {
-    const rules: Rule[] = [{ path: "a.md", content: "# A" }];
-
-    const result = concatenateRules(rules);
-
-    expect(result).toBe("# A");
-  });
-
-  it("separates multiple rules with a Markdown horizontal rule", () => {
+  it("inserts a single newline when boundary has no newline", () => {
     const rules: Rule[] = [
       { path: "a.md", content: "# A" },
       { path: "b.md", content: "# B" },
@@ -25,18 +17,40 @@ describe("concatenate-rules", () => {
 
     const result = concatenateRules(rules);
 
-    expect(result).toBe("# A\n\n---\n\n# B");
+    expect(result).toBe("# A\n# B");
   });
 
-  it("preserves trailing newlines in rule content", () => {
+  it("does not insert newline when previous rule already ends with newline", () => {
     const rules: Rule[] = [
       { path: "a.md", content: "# A\n" },
-      { path: "b.md", content: "# B\n" },
-      { path: "c.md", content: "# C" },
+      { path: "b.md", content: "# B" },
     ];
 
     const result = concatenateRules(rules);
 
-    expect(result).toBe("# A\n\n\n---\n\n# B\n\n\n---\n\n# C");
+    expect(result).toBe("# A\n# B");
+  });
+
+  it("does not insert newline when next rule already starts with newline", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "# A" },
+      { path: "b.md", content: "\n# B" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n# B");
+  });
+
+  it("keeps existing blank-line boundaries unchanged", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "# A\n\n" },
+      { path: "b.md", content: "# B" },
+      { path: "c.md", content: "\n# C" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n\n# B\n# C");
   });
 });
