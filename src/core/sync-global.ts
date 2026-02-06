@@ -1,5 +1,6 @@
 import type { Config } from "../config/config.js";
 import { loadRules } from "./rules-fs.js";
+import { concatenateRules } from "./concatenate-rules.js";
 import { executeActions } from "./execution.js";
 import type { RunFlags, ExecutionReport, WriteAction } from "./execution.js";
 import { normalizePath } from "../utils/paths.js";
@@ -42,7 +43,7 @@ export async function syncGlobal(
   if (rules.length === 0) {
     return { written: [], skipped: [], unmatchedPatterns };
   }
-  const content = rules.map((r) => r.content).join("\n\n---\n\n");
+  const content = concatenateRules(rules);
 
   const targets = getGlobalTargetPaths();
   const actions: WriteAction[] = targets.map((path) => ({ path, content }));

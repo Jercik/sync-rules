@@ -90,8 +90,7 @@ describe("executeActions - algorithm tests", () => {
   });
 
   describe("directory existence check", () => {
-    it("skips write and warns when parent directory does not exist", async () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    it("skips write when parent directory does not exist", async () => {
       const enoentError = Object.assign(new Error("ENOENT"), {
         code: "ENOENT",
       });
@@ -104,17 +103,13 @@ describe("executeActions - algorithm tests", () => {
       const result = await executeActions(actions, { dryRun: false });
 
       expect(result.written).toEqual([]);
-      expect(result.skipped).toEqual(["/nonexistent/file.txt"]);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("does not exist, skipping"),
-      );
+      expect(result.skipped).toEqual([
+        { path: "/nonexistent/file.txt", reason: "parent_missing" },
+      ]);
       expect(fsPromises.writeFile).not.toHaveBeenCalled();
-
-      warnSpy.mockRestore();
     });
 
-    it("skips write and warns when path is not a directory", async () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    it("skips write when path is not a directory", async () => {
       vi.mocked(fsPromises.stat).mockResolvedValueOnce({
         isDirectory: () => false,
       } as Awaited<ReturnType<typeof fsPromises.stat>>);
@@ -126,13 +121,10 @@ describe("executeActions - algorithm tests", () => {
       const result = await executeActions(actions, { dryRun: false });
 
       expect(result.written).toEqual([]);
-      expect(result.skipped).toEqual(["/not-a-dir/file.txt"]);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("is not a directory"),
-      );
+      expect(result.skipped).toEqual([
+        { path: "/not-a-dir/file.txt", reason: "parent_not_directory" },
+      ]);
       expect(fsPromises.writeFile).not.toHaveBeenCalled();
-
-      warnSpy.mockRestore();
     });
 
     it("writes file when parent directory exists", async () => {
