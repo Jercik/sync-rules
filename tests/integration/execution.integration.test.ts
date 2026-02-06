@@ -20,7 +20,7 @@ describe("executeActions - integration tests", () => {
   });
 
   describe("native fs integration", () => {
-    it("should skip and warn when parent directory does not exist", async () => {
+    it("should skip when parent directory does not exist", async () => {
       const nestedPath = path.join(testDirectory, "nonexistent", "file.txt");
       const actions: WriteAction[] = [
         { path: nestedPath, content: "Hello nested!" },
@@ -28,7 +28,9 @@ describe("executeActions - integration tests", () => {
 
       const result = await executeActions(actions, { dryRun: false });
 
-      expect(result.skipped).toContain(nestedPath);
+      expect(result.skipped).toEqual([
+        { path: nestedPath, reason: "parent_missing" },
+      ]);
       expect(result.written).toEqual([]);
     });
 

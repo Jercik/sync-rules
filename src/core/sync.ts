@@ -1,6 +1,7 @@
 import { executeActions } from "./execution.js";
 import type { ExecutionReport, WriteAction, RunFlags } from "./execution.js";
 import { loadRules } from "./rules-fs.js";
+import { concatenateRules } from "./concatenate-rules.js";
 import type { Project, Config } from "../config/config.js";
 import { lstat } from "node:fs/promises";
 import { resolveInside } from "../utils/paths.js";
@@ -45,7 +46,7 @@ export async function syncProject(
 
   if (rules.length > 0) {
     // Write AGENTS.md with concatenated content
-    const content = rules.map((r) => r.content).join("\n\n---\n\n");
+    const content = concatenateRules(rules);
     actions.push({ path: agentsPath, content });
 
     // Also write CLAUDE.md include file (Claude Code supported syntax)

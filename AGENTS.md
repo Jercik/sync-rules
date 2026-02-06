@@ -1,3 +1,14 @@
+# Rule: Mandatory Startup Reads
+
+Before taking any action—answering questions, editing files, or running commands—read these files in order:
+
+- **@README.md** — Project overview and context
+
+If a file does not exist, skip it silently and continue.
+
+
+---
+
 # Rule: `askpplx` CLI Usage
 
 **At session start:** Run `npx -y askpplx --help` to confirm the tool works and learn available options.
@@ -144,10 +155,6 @@ Keep simple, self-explanatory code inline rather than extracting it into functio
 
 Extracting code into a function is not inherently virtuous. A function should exist because it encapsulates meaningful complexity, not because code appears twice.
 
-## When to inline
-
-Inline when the logic is immediately understandable, appears in only one or two places, or when extracting would require reading the function definition to understand what happens.
-
 ```ts
 // GOOD: Inline obvious logic
 if (removedFrom.length === 0) {
@@ -161,39 +168,11 @@ return formatRemovalResult(removedFrom);
 
 ## When to extract
 
-Extract when the logic is complex enough that a name clarifies intent, you need consistent behavior across many call sites, the function encapsulates a coherent standalone concept, testing it in isolation provides value, or local variables exceed what you can track mentally.
+Extract when a name clarifies complex intent, you need consistent behavior across many call sites, the function encapsulates a coherent standalone concept, or testing it in isolation provides value. Don't extract for single callers, because "we might need this elsewhere," or when the name describes implementation rather than purpose.
 
 ## The wrong abstraction
 
-Abstractions decay when requirements diverge: programmer A extracts duplication into a shared function, programmer B adds a parameter for different behavior, and this repeats until the "abstraction" is a mess of conditionals. The result is harder to understand than the original duplication.
-
-When an abstraction proves wrong, re-introduce duplication and let the code show you what's actually shared.
-
-```ts
-// Started as shared abstraction, became a mess
-function NavButton({ label, url, icon, highlight, testId, onClick, disabled, badge }) {
-  // 50 lines of conditional logic for "shared" button
-}
-
-// Better: Accept that these aren't the same thing
-<HomeButton />
-<AboutButton />
-<BuyButton highlight testId="buy-cta" />
-```
-
-## Warning signs
-
-- **Conditional parameters**: Flags that determine which code path executes
-- **Single caller**: A "reusable" function called from exactly one place
-- **Name describes implementation**: `formatRemovalResult` vs. a name describing _why_
-- **Reading the function is required**: The call site doesn't make sense without the definition
-- **Future-proofing**: "We might need this elsewhere" without concrete evidence
-
-## The cognitive test
-
-Before extracting, ask: "Will readers understand this faster by reading the inline code or by jumping to a function definition?" If inline is faster, don't extract.
-
-> "Duplication is far cheaper than the wrong abstraction." — Sandi Metz
+Abstractions decay when requirements diverge: programmer A extracts duplication into a shared function, programmer B adds a parameter for different behavior, and this repeats until the "abstraction" is a mess of conditionals. When an abstraction proves wrong, re-introduce duplication and let the code show you what's actually shared. Duplication is far cheaper than the wrong abstraction.
 
 
 ---
@@ -604,18 +583,7 @@ function Button(props: ButtonProps) {
 
 ## Representing discriminated unions with Zod
 
-Use `z.discriminatedUnion()` instead of `z.union()` for discriminated unions. Regular unions check each option in order until one passes, which is slow for large unions. Discriminated unions use the discriminator key for efficient parsing.
-
-```ts
-const MyResult = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("success"), data: z.string() }),
-  z.object({ status: z.literal("failed"), error: z.string() }),
-]);
-```
-
-Each option must be an object schema whose discriminator property is a literal value—typically `z.literal()`, `z.enum()`, `z.null()`, or `z.undefined()`.
-
-For complex cases, discriminated unions can be nested. Zod determines the optimal parsing strategy using discriminators at each level:
+Use `z.discriminatedUnion()` instead of `z.union()` for discriminated unions. Regular unions check each option in order until one passes, which is slow for large unions. Discriminated unions use the discriminator key for efficient parsing. They can also be nested—Zod determines the optimal parsing strategy using discriminators at each level:
 
 ```ts
 const BaseError = { status: z.literal("failed"), message: z.string() };
@@ -744,15 +712,12 @@ Add JSDoc comments only when a function's behavior is not self-evident from its 
 Use `{@link SymbolName}` to create clickable references to other functions, types, or classes. This works across files and updates automatically when symbols are renamed.
 
 ```ts
-/**
- * Subtracts two numbers
- */
-const subtract = (a: number, b: number) => a - b;
+/** Rounds toward zero, unlike `Math.round` which rounds half-up. */
+const truncateToInt = (n: number): number => Math.trunc(n);
 
-/**
- * Does the opposite of {@link subtract}
- */
-const add = (a: number, b: number) => a + b;
+/** Inverse of {@link encodePathSegment}—decodes a single URI path segment. */
+const decodePathSegment = (segment: string): string =>
+  decodeURIComponent(segment);
 ```
 
 

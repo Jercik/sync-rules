@@ -195,7 +195,35 @@ describe("cli/main", () => {
 
       expect(code).toBe(1);
       expect(errorSpy).toHaveBeenCalledWith(
-        "--dry-run and --porcelain apply only to sync",
+        "--dry-run, --porcelain, and --json apply only to sync",
+      );
+      errorSpy.mockRestore();
+    });
+
+    it("rejects --json with --init", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const code = await main(["node", "sync-rules", "--init", "--json"]);
+
+      expect(code).toBe(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "--dry-run, --porcelain, and --json apply only to sync",
+      );
+      errorSpy.mockRestore();
+    });
+
+    it("rejects --json with --porcelain", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [],
+      });
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const code = await main(["node", "sync-rules", "--json", "--porcelain"]);
+
+      expect(code).toBe(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "--porcelain and --json are mutually exclusive",
       );
       errorSpy.mockRestore();
     });
@@ -306,6 +334,35 @@ describe("cli/main", () => {
         { dryRun: true },
         expect.any(Object),
       );
+    });
+
+    it("implies dryRun: true with --json flag", async () => {
+      vi.mocked(loader.loadConfig).mockResolvedValue({
+        rulesSource: "/rules",
+        projects: [{ path: "/home/user/project1", rules: ["**/*.md"] }],
+      });
+
+      vi.mocked(syncModule.syncProject).mockResolvedValue({
+        projectPath: "/home/user/project1",
+        report: { written: [], skipped: [] },
+        unmatchedPatterns: [],
+      });
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+      await main(["node", "sync-rules", "--json"]);
+
+      expect(syncGlobalModule.syncGlobal).toHaveBeenCalledWith(
+        { dryRun: true },
+        expect.any(Object),
+      );
+      expect(syncModule.syncProject).toHaveBeenCalledWith(
+        expect.any(Object),
+        { dryRun: true },
+        expect.any(Object),
+      );
+
+      logSpy.mockRestore();
     });
 
     it("outputs warnings for unmatched patterns", async () => {

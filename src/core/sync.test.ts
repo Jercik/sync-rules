@@ -68,6 +68,10 @@ describe("sync", () => {
       const paths = actionsArgument.map((action) => action.path);
       expect(paths).toContain("/home/user/project/AGENTS.md");
       expect(paths).toContain("/home/user/project/CLAUDE.md");
+      const agents = actionsArgument.find((action) =>
+        action.path.endsWith("AGENTS.md"),
+      );
+      expect(agents?.content).toBe("# Rule 1\nContent\n# Rule 2\nContent");
       const claude = actionsArgument.find((action) =>
         action.path.endsWith("CLAUDE.md"),
       );

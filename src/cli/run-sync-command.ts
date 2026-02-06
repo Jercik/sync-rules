@@ -1,14 +1,17 @@
 import { DEFAULT_CONFIG_PATH } from "../config/constants.js";
 import { loadConfig } from "../config/loader.js";
 import type { Project } from "../config/config.js";
-import { SyncError, ensureError } from "../utils/errors.js";
+import { ensureError } from "../utils/errors.js";
 import type { SyncResult } from "../core/sync.js";
+import type { SkippedEntry } from "../core/execution.js";
+import { formatSyncFailureMessage } from "./format-sync-failures.js";
 
 interface SyncCommandOptions {
   configPath: string;
   verbose: boolean;
   dryRun: boolean;
   porcelain: boolean;
+  json: boolean;
 }
 
 type PatternWarning = {
@@ -25,7 +28,7 @@ function isFulfilled(
 export async function runSyncCommand(
   options: SyncCommandOptions,
 ): Promise<void> {
-  const { configPath, verbose, dryRun, porcelain } = options;
+  const { configPath, verbose, dryRun, porcelain, json } = options;
   const config = await loadConfig(configPath || DEFAULT_CONFIG_PATH);
 
   const projectsToSync: Project[] = config.projects;
@@ -62,31 +65,7 @@ export async function runSyncCommand(
   }
 
   if (failures.length > 0) {
-    const errorMessages = failures.map(({ project, error }) => {
-      let message = `  • Project: ${project.path}`;
-
-      if (error instanceof SyncError) {
-        message += `\n    Error: ${error.message}`;
-        if (error.cause) {
-          const causeMessage =
-            error.cause instanceof Error
-              ? error.cause.message
-              : JSON.stringify(error.cause);
-          message += `\n    Cause: ${causeMessage}`;
-        }
-      } else {
-        message += `\n    Error: ${error.message}`;
-      }
-
-      return message;
-    });
-
-    const summary =
-      failures.length === 1
-        ? "Synchronization failed for 1 project:"
-        : `Synchronization failed for ${String(failures.length)} projects:`;
-
-    throw new Error(`${summary}\n${errorMessages.join("\n")}`);
+    throw new Error(formatSyncFailureMessage(failures));
   }
 
   const successes = settlements.filter((x) => isFulfilled(x));
@@ -101,15 +80,30 @@ export async function runSyncCommand(
     }
   }
 
-  // Collect all written paths for porcelain output
+  // Collect all written and skipped paths
   const allWritten = [
     ...globalResult.written,
     ...successes.flatMap((s) => s.value.report.written),
   ];
-  const allSkipped = [
+  const allSkipped: SkippedEntry[] = [
     ...globalResult.skipped,
     ...successes.flatMap((s) => s.value.report.skipped),
   ];
+
+  // JSON mode: structured output to stdout
+  if (json) {
+    const output = {
+      written: allWritten.toSorted(),
+      skipped: allSkipped.toSorted((a, b) => a.path.localeCompare(b.path)),
+      warnings: patternWarnings
+        .toSorted((a, b) => a.source.localeCompare(b.source))
+        .flatMap((w) =>
+          w.patterns.map((pattern) => ({ source: w.source, pattern })),
+        ),
+    };
+    console.log(JSON.stringify(output, undefined, 2));
+    return;
+  }
 
   // Porcelain mode: machine-readable TSV output to stdout
   // Sort paths for deterministic output (concurrent project execution produces non-deterministic order)
@@ -118,8 +112,10 @@ export async function runSyncCommand(
     for (const path of allWritten.toSorted()) {
       console.log(`WRITE\t\t${path}`);
     }
-    for (const path of allSkipped.toSorted()) {
-      console.log(`SKIP\t\t${path}`);
+    for (const entry of allSkipped.toSorted((a, b) =>
+      a.path.localeCompare(b.path),
+    )) {
+      console.log(`SKIP\t${entry.reason}\t${entry.path}`);
     }
     // Sort warnings for deterministic output
     for (const warning of patternWarnings.toSorted((a, b) =>
@@ -145,6 +141,20 @@ export async function runSyncCommand(
       for (const pattern of warning.patterns) {
         console.error(`  • ${pattern} (in ${sourceLabel})`);
       }
+    }
+  }
+
+  // Always output skip warnings (regardless of verbose mode)
+  if (allSkipped.length > 0) {
+    console.error("Warning: The following paths were skipped:");
+    for (const entry of allSkipped.toSorted((a, b) =>
+      a.path.localeCompare(b.path),
+    )) {
+      const reasonLabel =
+        entry.reason === "parent_missing"
+          ? "parent directory does not exist"
+          : "parent path is not a directory";
+      console.error(`  • ${entry.path} (${reasonLabel})`);
     }
   }
 

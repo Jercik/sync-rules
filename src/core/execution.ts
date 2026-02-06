@@ -11,9 +11,16 @@ export type WriteAction = {
   readonly content: string;
 };
 
+export type SkipReason = "parent_missing" | "parent_not_directory";
+
+export type SkippedEntry = {
+  path: string;
+  reason: SkipReason;
+};
+
 export interface ExecutionReport {
   written: string[];
-  skipped: string[];
+  skipped: SkippedEntry[];
 }
 
 const DEFAULT_RUN_FLAGS: RunFlags = { dryRun: false };
@@ -59,16 +66,12 @@ export async function executeActions(
     try {
       const parentStat = await stat(parentDirectory);
       if (!parentStat.isDirectory()) {
-        console.warn(
-          `${parentDirectory} exists but is not a directory, skipping ${filePath}`,
-        );
-        report.skipped.push(filePath);
+        report.skipped.push({ path: filePath, reason: "parent_not_directory" });
         continue;
       }
     } catch (error) {
       if (isNodeError(error) && error.code === "ENOENT") {
-        console.warn(`${parentDirectory} does not exist, skipping ${filePath}`);
-        report.skipped.push(filePath);
+        report.skipped.push({ path: filePath, reason: "parent_missing" });
         continue;
       }
       throw new SyncError(

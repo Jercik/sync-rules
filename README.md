@@ -98,6 +98,7 @@ This reads the rules and writes `AGENTS.md` in each project. It also writes `CLA
 - `--verbose` / `-v`: Show status messages (silent by default)
 - `--dry-run` / `-n`: Preview changes without writing files
 - `--porcelain`: Machine-readable TSV output (implies `--dry-run`)
+- `--json`: Structured JSON output (implies `--dry-run`)
 
 ### 4\. Run With Your Tool
 
@@ -122,6 +123,8 @@ Tip: define a small shell function to forward args cleanly:
 
 The CLI follows Unix philosophy—silent success, machine-readable output modes, and composability with standard tools.
 
+> **Tip:** Output is TSV, so always parse with tab delimiters (`awk -F'\t'`, `cut -f`). Plain `awk` splits on all whitespace and will break on paths like `~/Library/Application Support/…`.
+
 ```bash
 # Preview what would be written
 sync-rules --dry-run --verbose
@@ -130,10 +133,13 @@ sync-rules --dry-run --verbose
 sync-rules --porcelain | tail -n +2 | wc -l
 
 # List only project files (exclude global targets)
-sync-rules --porcelain | tail -n +2 | grep -v '^\w*\t.*/.claude/' | cut -f2
+sync-rules --porcelain | tail -n +2 | grep -v '^\w*\t.*/.claude/' | cut -f3
 
 # Extract unique project directories
-sync-rules --porcelain | tail -n +2 | cut -f2 | xargs -n1 dirname | sort -u
+sync-rules --porcelain | tail -n +2 | cut -f3 | xargs -n1 dirname | sort -u
+
+# Extract RULES_SOURCE path (-F'\t' is essential; plain awk splits on spaces)
+sync-rules --paths | awk -F'\t' '/^RULES_SOURCE/ {print $2}'
 
 # Chain with AI tool (sync only on success)
 sync-rules && claude --chat
