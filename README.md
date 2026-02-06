@@ -131,10 +131,10 @@ sync-rules --dry-run --verbose
 sync-rules --porcelain | tail -n +2 | wc -l
 
 # List only project files (exclude global targets)
-sync-rules --porcelain | tail -n +2 | grep -v '^\w*\t.*/.claude/' | cut -f2
+sync-rules --porcelain | tail -n +2 | grep -v '^\w*\t.*/.claude/' | cut -f3
 
 # Extract unique project directories
-sync-rules --porcelain | tail -n +2 | cut -f2 | xargs -n1 dirname | sort -u
+sync-rules --porcelain | tail -n +2 | cut -f3 | xargs -n1 dirname | sort -u
 
 # Chain with AI tool (sync only on success)
 sync-rules && claude --chat
