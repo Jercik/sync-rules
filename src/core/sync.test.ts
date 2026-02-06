@@ -71,7 +71,7 @@ describe("sync", () => {
       const agents = actionsArgument.find((action) =>
         action.path.endsWith("AGENTS.md"),
       );
-      expect(agents?.content).toBe("# Rule 1\nContent\n# Rule 2\nContent");
+      expect(agents?.content).toBe("# Rule 1\nContent\n\n# Rule 2\nContent");
       const claude = actionsArgument.find((action) =>
         action.path.endsWith("CLAUDE.md"),
       );
