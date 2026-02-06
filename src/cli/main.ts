@@ -70,7 +70,10 @@ export async function main(argv: string[]): Promise<number> {
     )
     .option("--init", "create a sample configuration file")
     .option("-f, --force", "overwrite existing config file (with --init)")
-    .option("--paths", "print resolved config and rules source paths")
+    .option(
+      "--paths",
+      String.raw`print resolved config and rules source paths (TSV; parse with -F'\t')`,
+    )
     .option("-n, --dry-run", "preview changes without writing files")
     .option("--porcelain", "machine-readable output (implies --dry-run)")
     .option("--json", "structured JSON output (implies --dry-run)")
@@ -83,7 +86,7 @@ export async function main(argv: string[]): Promise<number> {
     });
   program.addHelpText(
     "after",
-    `
+    String.raw`
 Resolved defaults:
   CONFIG: ${DEFAULT_CONFIG_PATH}
   RULES_SOURCE: ${DEFAULT_RULES_SOURCE}
@@ -92,6 +95,7 @@ Examples:
   sync-rules                        # Sync all projects (default)
   sync-rules --init                 # Create a sample config file
   sync-rules --paths                # Print resolved config and rules paths
+  sync-rules --paths | awk -F'\t' '/^RULES_SOURCE/ {print $2}'  # Extract rules path
   sync-rules --json | jq '.written[]'            # List files that would be written (JSON)
   sync-rules --porcelain | tail -n +2 | wc -l   # Count files that would be written`,
   );

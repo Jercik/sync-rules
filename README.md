@@ -123,6 +123,8 @@ Tip: define a small shell function to forward args cleanly:
 
 The CLI follows Unix philosophy—silent success, machine-readable output modes, and composability with standard tools.
 
+> **Tip:** Output is TSV, so always parse with tab delimiters (`awk -F'\t'`, `cut -f`). Plain `awk` splits on all whitespace and will break on paths like `~/Library/Application Support/…`.
+
 ```bash
 # Preview what would be written
 sync-rules --dry-run --verbose
@@ -135,6 +137,9 @@ sync-rules --porcelain | tail -n +2 | grep -v '^\w*\t.*/.claude/' | cut -f3
 
 # Extract unique project directories
 sync-rules --porcelain | tail -n +2 | cut -f3 | xargs -n1 dirname | sort -u
+
+# Extract RULES_SOURCE path (-F'\t' is essential; plain awk splits on spaces)
+sync-rules --paths | awk -F'\t' '/^RULES_SOURCE/ {print $2}'
 
 # Chain with AI tool (sync only on success)
 sync-rules && claude --chat
