@@ -9,6 +9,14 @@ describe("concatenate-rules", () => {
     expect(result).toBe("");
   });
 
+  it("preserves content exactly when only one rule is present", () => {
+    const rules: Rule[] = [{ path: "a.md", content: "# A\n\n" }];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n\n");
+  });
+
   it("inserts one blank line when boundary has no newline", () => {
     const rules: Rule[] = [
       { path: "a.md", content: "# A" },

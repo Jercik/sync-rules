@@ -11,9 +11,10 @@ export function concatenateRules(rules: Rule[]): string {
     return "";
   }
 
-  let combinedContent = firstRule.content.replace(/\n+$/u, "");
+  let combinedContent = firstRule.content;
 
   for (const rule of remainingRules) {
+    combinedContent = combinedContent.replace(/\n+$/u, "");
     const normalizedRuleContent = rule.content.replace(/^\n+/u, "");
     combinedContent = `${combinedContent}\n\n${normalizedRuleContent}`;
   }
