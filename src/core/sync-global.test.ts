@@ -82,7 +82,9 @@ describe("sync-global", () => {
     expect(paths.some((p) => p.endsWith("/.claude/CLAUDE.md"))).toBe(true);
     expect(paths.some((p) => p.endsWith("/.codex/AGENTS.md"))).toBe(true);
     expect(
-      actionsArgument.every((action) => action.content === "# G1\nA\n# G2\nB"),
+      actionsArgument.every(
+        (action) => action.content === "# G1\nA\n\n---\n\n# G2\nB",
+      ),
     ).toBe(true);
     expect(result.written).toHaveLength(2);
   });

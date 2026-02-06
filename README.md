@@ -98,6 +98,7 @@ This reads the rules and writes `AGENTS.md` in each project. It also writes `CLA
 - `--verbose` / `-v`: Show status messages (silent by default)
 - `--dry-run` / `-n`: Preview changes without writing files
 - `--porcelain`: Machine-readable TSV output (implies `--dry-run`)
+- `--json`: Structured JSON output (implies `--dry-run`)
 
 ### 4\. Run With Your Tool
 
