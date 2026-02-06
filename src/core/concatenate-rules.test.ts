@@ -73,4 +73,38 @@ describe("concatenate-rules", () => {
 
     expect(result).toBe("# A\n\n# B\n\n# C");
   });
+
+  it("normalizes CRLF boundaries to one LF blank line", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "# A\r\n" },
+      { path: "b.md", content: "\r\n# B" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n\n# B");
+  });
+
+  it("ignores empty rules between non-empty rules", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "# A" },
+      { path: "b.md", content: "\n\n" },
+      { path: "c.md", content: "# C" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n\n# C");
+  });
+
+  it("ignores leading empty rules when later rules have content", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "\n\n" },
+      { path: "b.md", content: "# B" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# B");
+  });
 });
