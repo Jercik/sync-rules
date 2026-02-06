@@ -61,4 +61,16 @@ describe("concatenate-rules", () => {
 
     expect(result).toBe("# A\n\n# B\n\n# C");
   });
+
+  it("normalizes trailing newlines from middle rules at the next boundary", () => {
+    const rules: Rule[] = [
+      { path: "a.md", content: "# A" },
+      { path: "b.md", content: "# B\n\n\n" },
+      { path: "c.md", content: "# C" },
+    ];
+
+    const result = concatenateRules(rules);
+
+    expect(result).toBe("# A\n\n# B\n\n# C");
+  });
 });
