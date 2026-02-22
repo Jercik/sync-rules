@@ -46,16 +46,20 @@ export async function createSampleConfig(
     const flag = force ? "w" : "wx";
     await writeFile(normalizedPath, content, { flag });
   } catch (error) {
-    const error_ = ensureError(error);
-    if (isNodeError(error_) && error_.code === "EEXIST" && !force) {
+    const normalizedError = ensureError(error);
+    if (
+      isNodeError(normalizedError) &&
+      normalizedError.code === "EEXIST" &&
+      !force
+    ) {
       throw new Error(
         `Config file already exists at ${normalizedPath}. Use --force to overwrite`,
-        { cause: error_ },
+        { cause: error },
       );
     }
     throw new Error(
-      `Failed to create config file at ${normalizedPath}: ${error_.message}`,
-      { cause: error_ },
+      `Failed to create config file at ${normalizedPath}: ${normalizedError.message}`,
+      { cause: error },
     );
   }
 }
