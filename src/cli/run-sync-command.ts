@@ -31,7 +31,7 @@ export async function runSyncCommand(
   const { configPath, verbose, dryRun, porcelain, json } = options;
   const config = await loadConfig(configPath || DEFAULT_CONFIG_PATH);
 
-  const projectsToSync: Project[] = config.projects;
+  const projectsToSync: Project[] = config.projects ?? [];
 
   const { syncProject } = await import("../core/sync.js");
   const { syncGlobal } = await import("../core/sync-global.js");

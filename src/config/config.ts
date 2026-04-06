@@ -2,6 +2,8 @@ import { z } from "zod";
 import path from "node:path";
 import { normalizePath } from "../utils/paths.js";
 import { DEFAULT_RULES_SOURCE } from "./constants.js";
+import { HARNESS_NAMES } from "../core/harness-registry.js";
+import type { HarnessName } from "../core/harness-registry.js";
 
 /**
  * Project configuration schema.
@@ -34,6 +36,56 @@ export const Project = z
   .strip();
 
 /**
+ * Validates that a glob pattern array (when provided) contains at least one
+ * non-empty, non-negation pattern.
+ */
+function hasPositiveGlob(patterns: string[] | undefined): boolean {
+  return (
+    patterns === undefined ||
+    patterns.some((p) => {
+      const t = p.trim();
+      return t !== "" && !t.startsWith("!");
+    })
+  );
+}
+
+const GlobalOverrides = z
+  .record(z.string(), z.array(z.string()))
+  .optional()
+  .superRefine((overrides, context) => {
+    if (overrides === undefined) return;
+    for (const key of Object.keys(overrides)) {
+      if (!HARNESS_NAMES.includes(key as HarnessName)) {
+        context.addIssue({
+          code: "custom",
+          message: `Unknown harness "${key}". Valid harness names: ${HARNESS_NAMES.join(", ")}`,
+          path: [key],
+        });
+        continue;
+      }
+      const patterns = overrides[key];
+      if (!patterns || patterns.length === 0) {
+        context.addIssue({
+          code: "custom",
+          message: `globalOverrides.${key} cannot be empty when provided`,
+          path: [key],
+        });
+        continue;
+      }
+      if (!hasPositiveGlob(patterns)) {
+        context.addIssue({
+          code: "custom",
+          message: `globalOverrides.${key} must include at least one positive glob pattern`,
+          path: [key],
+        });
+      }
+    }
+  })
+  .describe(
+    "Optional per-harness override globs. Keys must be valid harness names.",
+  );
+
+/**
  * Main configuration schema.
  * Defines the central rules directory and all projects to sync.
  */
@@ -52,26 +104,36 @@ export const Config = z
       .refine((patterns) => patterns === undefined || patterns.length > 0, {
         message: "global cannot be empty when provided",
       })
-      .refine(
-        (patterns) =>
-          patterns === undefined ||
-          patterns.some((p) => {
-            const t = p.trim();
-            return t !== "" && !t.startsWith("!");
-          }),
-        {
-          message:
-            'global must include at least one positive glob pattern (e.g., "global-rules/*.md") when provided',
-        },
-      )
+      .refine((patterns) => hasPositiveGlob(patterns), {
+        message:
+          'global must include at least one positive glob pattern (e.g., "global-rules/*.md") when provided',
+      })
       .describe(
         "Optional POSIX-style globs for global rules to sync to tool-specific global files.",
       ),
+    globalOverrides: GlobalOverrides,
     projects: z
       .array(Project)
-      .nonempty("At least one project must be specified"),
+      .optional()
+      .refine((projects) => projects === undefined || projects.length > 0, {
+        message:
+          "projects cannot be empty when provided; omit the field instead",
+      }),
   })
-  .strip();
+  .strip()
+  .refine(
+    (config) => {
+      const hasGlobal = config.global !== undefined;
+      const hasOverrides = config.globalOverrides !== undefined;
+      const hasProjects =
+        config.projects !== undefined && config.projects.length > 0;
+      return hasGlobal || hasOverrides || hasProjects;
+    },
+    {
+      message:
+        "Config must specify at least one of: global, globalOverrides, or projects",
+    },
+  );
 
 /**
  * Inferred types from Zod schemas
@@ -112,9 +174,10 @@ export function findProjectForPath(
   config: Config,
 ): Project | undefined {
   const normalizedTarget = normalizePath(currentPath);
+  const projects = config.projects ?? [];
 
   // Find all matching projects with proper boundary checking
-  const matches = config.projects.filter((project) => {
+  const matches = projects.filter((project) => {
     // project.path is already normalized by Zod schema
     // Check if target is inside project (or is the project root itself)
     const relative_ = path.relative(project.path, normalizedTarget);
