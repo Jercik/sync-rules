@@ -30,6 +30,7 @@ describe("createSampleConfig", () => {
     expect(content).toContain('"globalOverrides"');
     expect(content).toContain('"claude"');
     expect(content).toContain('"codex"');
+    expect(content).toContain('"copilot"');
     expect(content).toContain('"projects"');
   });
 

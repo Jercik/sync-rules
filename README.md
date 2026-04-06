@@ -6,7 +6,7 @@ A CLI tool to synchronize AI coding assistant rule files between a central repos
 
 ## What is this tool for?
 
-Many AI coding assistants (Claude Code, Gemini CLI, OpenCode, Codex CLI) read a local rules file to understand context, coding standards, and specific instructions.
+Many AI coding assistants (Claude Code, Gemini CLI, OpenCode, Codex CLI, GitHub Copilot) read local instruction files to understand context, coding standards, and specific instructions.
 
 Managing these rules across numerous projects can be tedious. `sync-rules` lets you maintain a **single, centralized directory** of rules and automatically synchronize the relevant subsets into your projects using a single standard file.
 
@@ -14,7 +14,7 @@ Managing these rules across numerous projects can be tedious. `sync-rules` lets 
 
 - **Centralized Rule Management:** Keep all your AI guidelines in one place.
 - **Project-Specific Configuration:** Use flexible glob patterns to define exactly which rules apply to which projects.
-- **Single Standard File:** Always generates `AGENTS.md` with all selected rules and writes a `CLAUDE.md` file containing `@AGENTS.md` for Claude Code.
+- **Single Standard File:** Always generates `AGENTS.md` with all selected rules and writes a `CLAUDE.md` file containing `@AGENTS.md` for Claude Code. Copilot CLI reads the synced `AGENTS.md` directly.
   // Seamless integration via shell: chain with your tool, e.g. `sync-rules && claude --chat`.
 
 ## Installation
@@ -63,7 +63,8 @@ Edit the `config.json` file to define your setup.
   "global": ["global-rules/*.md"],
   "globalOverrides": {
     "claude": ["claude-specific/*.md"],
-    "codex": ["codex-specific/*.md"]
+    "codex": ["codex-specific/*.md"],
+    "copilot": ["copilot-specific/*.md"]
   },
   "projects": [
     {
@@ -79,8 +80,8 @@ Edit the `config.json` file to define your setup.
 ```
 
 - `rulesSource`: The central directory where you store your rule files (e.g., Markdown files). If omitted, it defaults to the system's data directory.
-- `global`: Optional POSIX globs for rules that are combined and written to built-in global target files for supported tools (e.g., `~/.claude/CLAUDE.md`, `~/.gemini/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.codex/AGENTS.md`).
-- `globalOverrides`: Optional per-harness override globs. Each key is a harness name (`claude`, `gemini`, `opencode`, `codex`) with its own glob patterns. Override rules are appended after the shared `global` rules for that harness only. A rule file must not appear in both `global` and an override for the same harness.
+- `global`: Optional POSIX globs for rules that are combined and written to built-in global target files for supported tools (e.g., `~/.claude/CLAUDE.md`, `~/.gemini/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.codex/AGENTS.md`, `~/.copilot/copilot-instructions.md`).
+- `globalOverrides`: Optional per-harness override globs. Each key is a harness name (`claude`, `gemini`, `opencode`, `codex`, `copilot`) with its own glob patterns. Override rules are appended after the shared `global` rules for that harness only. A rule file must not appear in both `global` and an override for the same harness.
 - `projects`: Optional array defining each project. Can be omitted for a globals-only config.
   - `path`: The root directory of the project (supports `~` for home directory).
   - `rules`: POSIX-style glob patterns to select files from `rulesSource`. Supports negation (`!`).
@@ -125,8 +126,10 @@ Tip: define a small shell function to forward args cleanly:
 
 ## Output Files
 
-- `AGENTS.md`: Canonical rules file read by Codex CLI, Gemini CLI, and OpenCode.
+- `AGENTS.md`: Canonical rules file read by Codex CLI, Gemini CLI, OpenCode, and GitHub Copilot CLI.
 - `CLAUDE.md`: A tiny include file with `@AGENTS.md` (Claude Code supported syntax).
+
+> **Note:** The built-in global `copilot` target writes Copilot CLI's user-level instructions file at `~/.copilot/copilot-instructions.md`.
 
 ## Pipeline Examples
 

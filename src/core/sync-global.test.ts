@@ -78,6 +78,9 @@ describe("sync-global", () => {
     expect(paths.some((p) => p.endsWith("/.claude/CLAUDE.md"))).toBe(true);
     expect(paths.some((p) => p.endsWith("/.codex/AGENTS.md"))).toBe(true);
     expect(
+      paths.some((p) => p.endsWith("/.copilot/copilot-instructions.md")),
+    ).toBe(true);
+    expect(
       actionsArgument.every(
         (action) => action.content === "# G1\nA\n\n# G2\nB",
       ),
