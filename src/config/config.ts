@@ -54,6 +54,14 @@ const GlobalOverrides = z
   .optional()
   .superRefine((overrides, context) => {
     if (overrides === undefined) return;
+    if (Object.keys(overrides).length === 0) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "globalOverrides cannot be empty when provided; omit the field instead",
+      });
+      return;
+    }
     for (const key of Object.keys(overrides)) {
       if (!HARNESS_NAMES.includes(key as HarnessName)) {
         context.addIssue({

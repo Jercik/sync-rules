@@ -165,8 +165,11 @@ export async function runSyncCommand(
 
   const totalWrites = allWritten.length;
 
-  if (projectsToSync.length === 0) {
+  if (projectsToSync.length === 0 && totalWrites === 0) {
     console.error("No projects configured; nothing to do.");
+  } else if (projectsToSync.length === 0) {
+    const action = dryRun ? "Would write" : "Wrote";
+    console.error(`${action} ${String(totalWrites)} global file(s).`);
   } else if (totalWrites === 0) {
     console.error("No changes. Rules matched no files or files up to date.");
   } else {
