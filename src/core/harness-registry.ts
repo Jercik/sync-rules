@@ -16,6 +16,6 @@ export const HARNESS_REGISTRY: Record<HarnessName, HarnessEntry> = {
   gemini: { target: "~/.gemini/AGENTS.md" },
   opencode: { target: "~/.config/opencode/AGENTS.md" },
   codex: { target: "~/.codex/AGENTS.md" },
-} as const;
+};
 
 export const HARNESS_NAMES = Object.keys(HARNESS_REGISTRY) as HarnessName[];
