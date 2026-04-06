@@ -27,6 +27,9 @@ describe("createSampleConfig", () => {
     const content = vi.mocked(fs.writeFile).mock.calls[0]?.[1] as string;
     expect(content).toContain('"rulesSource"');
     expect(content).toContain('"global-rules/*.md"');
+    expect(content).toContain('"globalOverrides"');
+    expect(content).toContain('"claude"');
+    expect(content).toContain('"codex"');
     expect(content).toContain('"projects"');
   });
 

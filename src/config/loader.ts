@@ -18,6 +18,10 @@ import type { Config as ConfigShape } from "./config.js";
 const SAMPLE_CONFIG = {
   rulesSource: "/path/to/rules",
   global: ["global-rules/*.md"],
+  globalOverrides: {
+    claude: ["claude-specific/*.md"],
+    codex: ["codex-specific/*.md"],
+  },
   projects: [
     {
       path: "/path/to/project",

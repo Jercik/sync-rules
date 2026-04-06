@@ -87,6 +87,8 @@ Edit the `config.json` file to define your setup.
 
 Config must specify at least one of `global`, `globalOverrides`, or `projects`.
 
+> **Note:** OpenCode reads `~/.config/opencode/AGENTS.md` but also loads Claude-format instructions from `~/.claude/CLAUDE.md` by default. If you use both `claude` and `opencode` globals, disable Claude prompt loading in OpenCode to avoid duplicated instructions.
+
 ### 3\. Synchronize Rules
 
 To synchronize the rules for all configured projects, run the default command:
