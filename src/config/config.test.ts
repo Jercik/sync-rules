@@ -38,9 +38,10 @@ describe("config", () => {
 
         const config = parseConfig(json);
         expect(config.projects).toHaveLength(1);
+        const projects = config.projects ?? [];
         // normalizePath will expand ~ to full home directory
-        expect(config.projects[0]?.path).toMatch(/\/Developer\/project$/u);
-        expect(config.projects[0]?.rules).toEqual(["python.md"]);
+        expect(projects[0]?.path).toMatch(/\/Developer\/project$/u);
+        expect(projects[0]?.rules).toEqual(["python.md"]);
       });
 
       it("parses multiple projects", () => {
@@ -60,7 +61,8 @@ describe("config", () => {
 
         const config = parseConfig(json);
         expect(config.projects).toHaveLength(2);
-        expect(config.projects[1]?.rules).toEqual(["frontend/**/*.md"]);
+        const projects = config.projects ?? [];
+        expect(projects[1]?.rules).toEqual(["frontend/**/*.md"]);
       });
 
       it("accepts positive and negative POSIX globs in 'rules'", () => {
@@ -75,7 +77,8 @@ describe("config", () => {
         });
 
         const config = parseConfig(json);
-        expect(config.projects[0]?.rules).toEqual([
+        const projects = config.projects ?? [];
+        expect(projects[0]?.rules).toEqual([
           "**/*.md",
           "frontend/**",
           "!test/**",
@@ -90,8 +93,72 @@ describe("config", () => {
         expectTypeOf(config.rulesSource).toBeString();
         expect(config.rulesSource).toMatch(/sync-rules[/\\]rules$/u);
         expect(config.projects).toHaveLength(1);
-        expect(config.projects[0]?.path).toMatch(/\//u);
-        expect(config.projects[0]?.rules).toEqual(["test.md"]);
+        const projects = config.projects ?? [];
+        expect(projects[0]?.path).toMatch(/\//u);
+        expect(projects[0]?.rules).toEqual(["test.md"]);
+      });
+
+      it("accepts config with only global (no projects)", () => {
+        const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
+          global: ["global-rules/*.md"],
+        });
+        const config = parseConfig(json);
+        expect(config.global).toEqual(["global-rules/*.md"]);
+        expect(config.projects).toBeUndefined();
+      });
+
+      it("accepts config with only globalOverrides (no projects, no global)", () => {
+        const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
+          globalOverrides: {
+            claude: ["claude-specific/*.md"],
+          },
+        });
+        const config = parseConfig(json);
+        expect(config.globalOverrides).toEqual({
+          claude: ["claude-specific/*.md"],
+        });
+        expect(config.projects).toBeUndefined();
+        expect(config.global).toBeUndefined();
+      });
+
+      it("accepts config with global, globalOverrides, and projects", () => {
+        const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
+          global: ["shared/*.md"],
+          globalOverrides: {
+            gemini: ["gemini/*.md"],
+            codex: ["codex/*.md"],
+          },
+          projects: [{ path: "./app", rules: ["**/*.md"] }],
+        });
+        const config = parseConfig(json);
+        expect(config.global).toEqual(["shared/*.md"]);
+        expect(config.globalOverrides).toEqual({
+          gemini: ["gemini/*.md"],
+          codex: ["codex/*.md"],
+        });
+        expect(config.projects).toHaveLength(1);
+      });
+
+      it("accepts all valid harness names in globalOverrides", () => {
+        const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
+          globalOverrides: {
+            claude: ["claude/*.md"],
+            gemini: ["gemini/*.md"],
+            opencode: ["opencode/*.md"],
+            codex: ["codex/*.md"],
+          },
+        });
+        const config = parseConfig(json);
+        expect(Object.keys(config.globalOverrides ?? {})).toEqual([
+          "claude",
+          "gemini",
+          "opencode",
+          "codex",
+        ]);
       });
     });
 
@@ -171,6 +238,56 @@ describe("config", () => {
       });
 
       // Root-level validation errors are covered by the table-driven tests
+
+      it("rejects unknown harness names in globalOverrides", () => {
+        const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
+          globalOverrides: {
+            unknown_harness: ["some/*.md"],
+          },
+        });
+        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+
+        let zodError: z.ZodError | undefined;
+        try {
+          parseConfig(json);
+        } catch (error) {
+          zodError = error as z.ZodError;
+        }
+        expect(zodError).toBeDefined();
+        expect(
+          zodError?.issues.some((issue) =>
+            issue.message.includes('Unknown harness "unknown_harness"'),
+          ),
+        ).toBe(true);
+      });
+
+      it("rejects empty glob array in globalOverrides", () => {
+        const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
+          globalOverrides: {
+            claude: [],
+          },
+        });
+        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+      });
+
+      it("rejects globalOverrides with only negative globs", () => {
+        const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
+          globalOverrides: {
+            gemini: ["!exclude/*.md"],
+          },
+        });
+        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+      });
+
+      it("rejects config with no global, no globalOverrides, and no projects", () => {
+        const json = JSON.stringify({
+          rulesSource: "/path/to/rules",
+        });
+        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+      });
     });
 
     // Edge case with many projects removed - adds time with little signal
@@ -442,8 +559,9 @@ describe("config", () => {
       const config = await loadConfig("/path/to/config.json");
 
       // Path should be normalized (~ expanded)
-      expect(config.projects[0]?.path).toMatch(/\/project$/u);
-      expect(config.projects[0]?.path).not.toContain("~");
+      const projects = config.projects ?? [];
+      expect(projects[0]?.path).toMatch(/\/project$/u);
+      expect(projects[0]?.path).not.toContain("~");
     });
   });
 });

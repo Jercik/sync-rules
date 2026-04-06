@@ -1,53 +1,142 @@
 import type { Config } from "../config/config.js";
-import { loadRules } from "./rules-fs.js";
+import { loadRules, globRulePaths } from "./rules-fs.js";
 import { concatenateRules } from "./concatenate-rules.js";
 import { executeActions } from "./execution.js";
 import type { RunFlags, ExecutionReport, WriteAction } from "./execution.js";
 import { normalizePath } from "../utils/paths.js";
+import { HARNESS_REGISTRY, HARNESS_NAMES } from "./harness-registry.js";
+import type { HarnessName } from "./harness-registry.js";
+import type { Rule, GlobResult } from "./rules-fs.js";
 
 interface GlobalSyncResult extends ExecutionReport {
   unmatchedPatterns: string[];
 }
 
-// Built-in global target files for supported tools
-const BUILT_IN_GLOBAL_TARGETS = [
-  "~/.claude/CLAUDE.md", // Claude Code
-  "~/.gemini/AGENTS.md", // Gemini CLI
-  "~/.config/opencode/AGENTS.md", // OpenCode
-  "~/.codex/AGENTS.md", // Codex CLI
-] as const;
+/**
+ * Detect rule file overlap between global patterns and per-harness override patterns.
+ * Throws if the same rule file would be included twice for a single harness.
+ * Returns the override glob result so callers can reuse it (avoids double-globbing).
+ */
+async function detectOverlap(
+  rulesSource: string,
+  globalPaths: string[],
+  overridePatterns: string[],
+  harnessName: HarnessName,
+): Promise<GlobResult> {
+  const overrideResult = await globRulePaths(rulesSource, overridePatterns);
+  const globalPathSet = new Set(globalPaths);
+  const overlapping = overrideResult.paths.filter((p) => globalPathSet.has(p));
 
-function getGlobalTargetPaths(): string[] {
-  // Normalize so paths stay consistent across platforms
-  const targets = BUILT_IN_GLOBAL_TARGETS.map((p) => normalizePath(p));
-  return targets;
+  if (overlapping.length > 0) {
+    const fileList = overlapping.join(", ");
+    throw new Error(
+      `Rule overlap for harness "${harnessName}": the following files appear in both "global" and "globalOverrides.${harnessName}": ${fileList}. Remove duplicates from one or the other.`,
+    );
+  }
+
+  return overrideResult;
 }
 
 /**
- * Synchronize global rules to the built-in absolute target paths.
- * Combines all selected global rule files into one content and writes it to each target path.
+ * Synchronize global rules to harness-specific target paths.
+ *
+ * For each harness in the registry:
+ * 1. Start with shared `global` rules content (if any)
+ * 2. Append per-harness override content (if any)
+ * 3. Write the combined content to the harness target path
+ * 4. Skip harnesses with no content (no writes, no errors)
  */
 export async function syncGlobal(
   flags: RunFlags,
   config: Config,
 ): Promise<GlobalSyncResult> {
-  const patterns = config.global;
-  if (!patterns || patterns.length === 0) {
+  const globalPatterns = config.global;
+  const overrides = config.globalOverrides;
+  const hasGlobal = globalPatterns !== undefined && globalPatterns.length > 0;
+  const hasOverrides =
+    overrides !== undefined && Object.keys(overrides).length > 0;
+
+  if (!hasGlobal && !hasOverrides) {
     return { written: [], skipped: [], unmatchedPatterns: [] };
   }
 
-  const { rules, unmatchedPatterns } = await loadRules(
-    config.rulesSource,
-    patterns,
-  );
-  if (rules.length === 0) {
-    return { written: [], skipped: [], unmatchedPatterns };
+  // Load shared global rules once
+  let sharedRules: Rule[] = [];
+  let sharedUnmatched: string[] = [];
+  let sharedResult: GlobResult | undefined;
+  if (hasGlobal) {
+    if (hasOverrides) {
+      sharedResult = await globRulePaths(config.rulesSource, globalPatterns);
+    }
+    const result = await loadRules(
+      config.rulesSource,
+      globalPatterns,
+      sharedResult,
+    );
+    sharedRules = result.rules;
+    sharedUnmatched = result.unmatchedPatterns;
   }
-  const content = concatenateRules(rules);
 
-  const targets = getGlobalTargetPaths();
-  const actions: WriteAction[] = targets.map((path) => ({ path, content }));
+  // Detect overlaps and pre-glob overrides for each harness
+  const overrideGlobResults = new Map<HarnessName, GlobResult>();
+  if (hasOverrides) {
+    const sharedPaths = sharedResult?.paths ?? [];
+    const overrideEntries = HARNESS_NAMES.flatMap((name) => {
+      const patterns = overrides[name];
+      return patterns === undefined ? [] : [{ name, patterns }];
+    });
+    const results = await Promise.all(
+      overrideEntries.map(({ name, patterns }) => {
+        if (hasGlobal) {
+          return detectOverlap(config.rulesSource, sharedPaths, patterns, name);
+        }
+        return globRulePaths(config.rulesSource, patterns);
+      }),
+    );
+    for (const [index, { name }] of overrideEntries.entries()) {
+      const result = results[index];
+      if (result) {
+        overrideGlobResults.set(name, result);
+      }
+    }
+  }
+
+  const actions: WriteAction[] = [];
+  const allUnmatched = [...sharedUnmatched];
+
+  for (const harnessName of HARNESS_NAMES) {
+    const entry = HARNESS_REGISTRY[harnessName];
+    const targetPath = normalizePath(entry.target);
+    const overridePatterns = overrides?.[harnessName];
+
+    let overrideRules: Rule[] = [];
+    if (overridePatterns !== undefined && overridePatterns.length > 0) {
+      const result = await loadRules(
+        config.rulesSource,
+        overridePatterns,
+        overrideGlobResults.get(harnessName),
+      );
+      overrideRules = result.rules;
+      if (result.unmatchedPatterns.length > 0) {
+        allUnmatched.push(
+          ...result.unmatchedPatterns.map(
+            (p) => `globalOverrides.${harnessName}: ${p}`,
+          ),
+        );
+      }
+    }
+
+    const combinedRules = [...sharedRules, ...overrideRules];
+    if (combinedRules.length === 0) continue;
+
+    const content = concatenateRules(combinedRules);
+    actions.push({ path: targetPath, content });
+  }
+
+  if (actions.length === 0) {
+    return { written: [], skipped: [], unmatchedPatterns: allUnmatched };
+  }
 
   const report = await executeActions(actions, flags);
-  return { ...report, unmatchedPatterns };
+  return { ...report, unmatchedPatterns: allUnmatched };
 }

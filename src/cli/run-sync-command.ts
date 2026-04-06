@@ -6,6 +6,9 @@ import type { SyncResult } from "../core/sync.js";
 import type { SkippedEntry } from "../core/execution.js";
 import { formatSyncFailureMessage } from "./format-sync-failures.js";
 
+import { collectGlobalPatternWarnings } from "./collect-pattern-warnings.js";
+import type { PatternWarning } from "./collect-pattern-warnings.js";
+
 interface SyncCommandOptions {
   configPath: string;
   verbose: boolean;
@@ -13,11 +16,6 @@ interface SyncCommandOptions {
   porcelain: boolean;
   json: boolean;
 }
-
-type PatternWarning = {
-  source: string;
-  patterns: string[];
-};
 
 function isFulfilled(
   s: PromiseSettledResult<unknown>,
@@ -31,7 +29,7 @@ export async function runSyncCommand(
   const { configPath, verbose, dryRun, porcelain, json } = options;
   const config = await loadConfig(configPath || DEFAULT_CONFIG_PATH);
 
-  const projectsToSync: Project[] = config.projects;
+  const projectsToSync: Project[] = config.projects ?? [];
 
   const { syncProject } = await import("../core/sync.js");
   const { syncGlobal } = await import("../core/sync-global.js");
@@ -39,13 +37,10 @@ export async function runSyncCommand(
   const globalResult = await syncGlobal({ dryRun }, config);
 
   // Track warnings for unmatched patterns
-  const patternWarnings: PatternWarning[] = [];
-  if (globalResult.unmatchedPatterns.length > 0) {
-    patternWarnings.push({
-      source: "global",
-      patterns: globalResult.unmatchedPatterns,
-    });
-  }
+  const patternWarnings: PatternWarning[] =
+    globalResult.unmatchedPatterns.length > 0
+      ? collectGlobalPatternWarnings(globalResult.unmatchedPatterns)
+      : [];
 
   const settlements = await Promise.allSettled(
     projectsToSync.map(async (project: Project) => {
@@ -165,8 +160,11 @@ export async function runSyncCommand(
 
   const totalWrites = allWritten.length;
 
-  if (projectsToSync.length === 0) {
+  if (projectsToSync.length === 0 && totalWrites === 0) {
     console.error("No projects configured; nothing to do.");
+  } else if (projectsToSync.length === 0) {
+    const action = dryRun ? "Would write" : "Wrote";
+    console.error(`${action} ${String(totalWrites)} global file(s).`);
   } else if (totalWrites === 0) {
     console.error("No changes. Rules matched no files or files up to date.");
   } else {
