@@ -63,11 +63,11 @@ export async function syncGlobal(
   // Load shared global rules once
   let sharedRules: Rule[] = [];
   let sharedUnmatched: string[] = [];
-  let sharedPaths: string[] = [];
+  let sharedResult: GlobResult | undefined;
   if (hasGlobal) {
-    const sharedResult = hasOverrides
-      ? await globRulePaths(config.rulesSource, globalPatterns)
-      : undefined;
+    if (hasOverrides) {
+      sharedResult = await globRulePaths(config.rulesSource, globalPatterns);
+    }
     const result = await loadRules(
       config.rulesSource,
       globalPatterns,
@@ -75,12 +75,12 @@ export async function syncGlobal(
     );
     sharedRules = result.rules;
     sharedUnmatched = result.unmatchedPatterns;
-    sharedPaths = sharedResult?.paths ?? [];
   }
 
   // Detect overlaps and pre-glob overrides for each harness
   const overrideGlobResults = new Map<HarnessName, GlobResult>();
   if (hasOverrides) {
+    const sharedPaths = sharedResult?.paths ?? [];
     const overrideEntries = HARNESS_NAMES.flatMap((name) => {
       const patterns = overrides[name];
       return patterns === undefined ? [] : [{ name, patterns }];
