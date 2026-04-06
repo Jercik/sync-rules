@@ -61,6 +61,10 @@ Edit the `config.json` file to define your setup.
 {
   "rulesSource": "/path/to/my/central/rules/repository",
   "global": ["global-rules/*.md"],
+  "globalOverrides": {
+    "claude": ["claude-specific/*.md"],
+    "codex": ["codex-specific/*.md"]
+  },
   "projects": [
     {
       "path": "~/Developer/my-backend-api",
@@ -76,9 +80,12 @@ Edit the `config.json` file to define your setup.
 
 - `rulesSource`: The central directory where you store your rule files (e.g., Markdown files). If omitted, it defaults to the system's data directory.
 - `global`: Optional POSIX globs for rules that are combined and written to built-in global target files for supported tools (e.g., `~/.claude/CLAUDE.md`, `~/.gemini/AGENTS.md`, `~/.config/opencode/AGENTS.md`, `~/.codex/AGENTS.md`).
-- `projects`: An array defining each project.
+- `globalOverrides`: Optional per-harness override globs. Each key is a harness name (`claude`, `gemini`, `opencode`, `codex`) with its own glob patterns. Override rules are appended after the shared `global` rules for that harness only. A rule file must not appear in both `global` and an override for the same harness.
+- `projects`: Optional array defining each project. Can be omitted for a globals-only config.
   - `path`: The root directory of the project (supports `~` for home directory).
   - `rules`: POSIX-style glob patterns to select files from `rulesSource`. Supports negation (`!`).
+
+Config must specify at least one of `global`, `globalOverrides`, or `projects`.
 
 ### 3\. Synchronize Rules
 

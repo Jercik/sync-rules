@@ -6,7 +6,7 @@ import type { RunFlags, ExecutionReport, WriteAction } from "./execution.js";
 import { normalizePath } from "../utils/paths.js";
 import { HARNESS_REGISTRY, HARNESS_NAMES } from "./harness-registry.js";
 import type { HarnessName } from "./harness-registry.js";
-import type { Rule } from "./rules-fs.js";
+import type { Rule, GlobResult } from "./rules-fs.js";
 
 interface GlobalSyncResult extends ExecutionReport {
   unmatchedPatterns: string[];
@@ -15,20 +15,17 @@ interface GlobalSyncResult extends ExecutionReport {
 /**
  * Detect rule file overlap between global patterns and per-harness override patterns.
  * Throws if the same rule file would be included twice for a single harness.
+ * Returns the override glob result so callers can reuse it (avoids double-globbing).
  */
 async function detectOverlap(
   rulesSource: string,
-  globalPatterns: string[],
+  globalPaths: string[],
   overridePatterns: string[],
   harnessName: HarnessName,
-): Promise<void> {
-  const [globalResult, overrideResult] = await Promise.all([
-    globRulePaths(rulesSource, globalPatterns),
-    globRulePaths(rulesSource, overridePatterns),
-  ]);
-
-  const globalPaths = new Set(globalResult.paths);
-  const overlapping = overrideResult.paths.filter((p) => globalPaths.has(p));
+): Promise<GlobResult> {
+  const overrideResult = await globRulePaths(rulesSource, overridePatterns);
+  const globalPathSet = new Set(globalPaths);
+  const overlapping = overrideResult.paths.filter((p) => globalPathSet.has(p));
 
   if (overlapping.length > 0) {
     const fileList = overlapping.join(", ");
@@ -36,6 +33,8 @@ async function detectOverlap(
       `Rule overlap for harness "${harnessName}": the following files appear in both "global" and "globalOverrides.${harnessName}": ${fileList}. Remove duplicates from one or the other.`,
     );
   }
+
+  return overrideResult;
 }
 
 /**
@@ -64,28 +63,42 @@ export async function syncGlobal(
   // Load shared global rules once
   let sharedRules: Rule[] = [];
   let sharedUnmatched: string[] = [];
+  let sharedPaths: string[] = [];
   if (hasGlobal) {
-    const result = await loadRules(config.rulesSource, globalPatterns);
+    const sharedResult = hasOverrides
+      ? await globRulePaths(config.rulesSource, globalPatterns)
+      : undefined;
+    const result = await loadRules(
+      config.rulesSource,
+      globalPatterns,
+      sharedResult,
+    );
     sharedRules = result.rules;
     sharedUnmatched = result.unmatchedPatterns;
+    sharedPaths = sharedResult?.paths ?? [];
   }
 
-  // Detect overlaps for each harness that has overrides
-  if (hasGlobal && hasOverrides) {
-    await Promise.all(
-      HARNESS_NAMES.filter((name) => overrides[name] !== undefined).map(
-        (name) => {
-          const patterns = overrides[name];
-          if (!patterns) return Promise.resolve();
-          return detectOverlap(
-            config.rulesSource,
-            globalPatterns,
-            patterns,
-            name,
-          );
-        },
-      ),
+  // Detect overlaps and pre-glob overrides for each harness
+  const overrideGlobResults = new Map<HarnessName, GlobResult>();
+  if (hasOverrides) {
+    const overrideEntries = HARNESS_NAMES.flatMap((name) => {
+      const patterns = overrides[name];
+      return patterns === undefined ? [] : [{ name, patterns }];
+    });
+    const results = await Promise.all(
+      overrideEntries.map(({ name, patterns }) => {
+        if (hasGlobal) {
+          return detectOverlap(config.rulesSource, sharedPaths, patterns, name);
+        }
+        return globRulePaths(config.rulesSource, patterns);
+      }),
     );
+    for (const [index, { name }] of overrideEntries.entries()) {
+      const result = results[index];
+      if (result) {
+        overrideGlobResults.set(name, result);
+      }
+    }
   }
 
   const actions: WriteAction[] = [];
@@ -98,7 +111,11 @@ export async function syncGlobal(
 
     let overrideRules: Rule[] = [];
     if (overridePatterns !== undefined && overridePatterns.length > 0) {
-      const result = await loadRules(config.rulesSource, overridePatterns);
+      const result = await loadRules(
+        config.rulesSource,
+        overridePatterns,
+        overrideGlobResults.get(harnessName),
+      );
       overrideRules = result.rules;
       if (result.unmatchedPatterns.length > 0) {
         allUnmatched.push(

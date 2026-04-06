@@ -21,7 +21,7 @@ describe("sync-global", () => {
   ];
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it("returns no writes when no global patterns configured", async () => {
@@ -222,11 +222,10 @@ describe("sync-global", () => {
         .mockResolvedValueOnce({ rules: overrideRules, unmatchedPatterns: [] })
         .mockResolvedValue({ rules: [], unmatchedPatterns: [] });
 
-      // No overlap within any single harness
+      // Pre-glob shared paths once, then one overlap check per harness
       vi.mocked(filesystemModule.globRulePaths)
         .mockResolvedValueOnce({ paths: ["shared.md"], unmatchedPatterns: [] })
         .mockResolvedValueOnce({ paths: ["extra.md"], unmatchedPatterns: [] })
-        .mockResolvedValueOnce({ paths: ["shared.md"], unmatchedPatterns: [] })
         .mockResolvedValueOnce({ paths: ["extra.md"], unmatchedPatterns: [] });
 
       vi.mocked(executionModule.executeActions).mockResolvedValue({

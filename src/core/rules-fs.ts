@@ -7,7 +7,7 @@ import { SyncError, ensureError } from "../utils/errors.js";
 /**
  * Result of glob matching with tracking of unmatched patterns.
  */
-type GlobResult = {
+export type GlobResult = {
   paths: string[];
   unmatchedPatterns: string[];
 };
@@ -136,11 +136,9 @@ type LoadRulesResult = {
 export async function loadRules(
   rulesDirectory: string,
   patterns: string[],
+  globResult?: GlobResult,
 ): Promise<LoadRulesResult> {
-  const { paths, unmatchedPatterns } = await globRulePaths(
-    rulesDirectory,
-    patterns,
-  );
-  const rules = await readRuleContents(rulesDirectory, paths);
-  return { rules, unmatchedPatterns };
+  const result = globResult ?? (await globRulePaths(rulesDirectory, patterns));
+  const rules = await readRuleContents(rulesDirectory, result.paths);
+  return { rules, unmatchedPatterns: result.unmatchedPatterns };
 }

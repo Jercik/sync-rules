@@ -6,6 +6,9 @@ import type { SyncResult } from "../core/sync.js";
 import type { SkippedEntry } from "../core/execution.js";
 import { formatSyncFailureMessage } from "./format-sync-failures.js";
 
+import { collectGlobalPatternWarnings } from "./collect-pattern-warnings.js";
+import type { PatternWarning } from "./collect-pattern-warnings.js";
+
 interface SyncCommandOptions {
   configPath: string;
   verbose: boolean;
@@ -13,11 +16,6 @@ interface SyncCommandOptions {
   porcelain: boolean;
   json: boolean;
 }
-
-type PatternWarning = {
-  source: string;
-  patterns: string[];
-};
 
 function isFulfilled(
   s: PromiseSettledResult<unknown>,
@@ -39,13 +37,10 @@ export async function runSyncCommand(
   const globalResult = await syncGlobal({ dryRun }, config);
 
   // Track warnings for unmatched patterns
-  const patternWarnings: PatternWarning[] = [];
-  if (globalResult.unmatchedPatterns.length > 0) {
-    patternWarnings.push({
-      source: "global",
-      patterns: globalResult.unmatchedPatterns,
-    });
-  }
+  const patternWarnings: PatternWarning[] =
+    globalResult.unmatchedPatterns.length > 0
+      ? collectGlobalPatternWarnings(globalResult.unmatchedPatterns)
+      : [];
 
   const settlements = await Promise.allSettled(
     projectsToSync.map(async (project: Project) => {
