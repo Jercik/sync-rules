@@ -36,6 +36,9 @@ describe("sync", () => {
 
     beforeEach(() => {
       vi.clearAllMocks();
+      vi.mocked(fsPromises.lstat).mockRejectedValue(
+        Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
+      );
     });
 
     it("writes AGENTS.md with concatenated rules", async () => {

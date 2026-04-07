@@ -150,6 +150,7 @@ describe("config", () => {
             gemini: ["gemini/*.md"],
             opencode: ["opencode/*.md"],
             codex: ["codex/*.md"],
+            copilot: ["copilot/*.md"],
           },
         });
         const config = parseConfig(json);
@@ -158,6 +159,7 @@ describe("config", () => {
           "gemini",
           "opencode",
           "codex",
+          "copilot",
         ]);
       });
     });

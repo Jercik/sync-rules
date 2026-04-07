@@ -21,6 +21,7 @@ const SAMPLE_CONFIG = {
   globalOverrides: {
     claude: ["claude-specific/*.md"],
     codex: ["codex-specific/*.md"],
+    copilot: ["copilot-specific/*.md"],
   },
   projects: [
     {
