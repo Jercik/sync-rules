@@ -212,7 +212,7 @@ describe("sync-global", () => {
             },
           },
         ),
-      ).rejects.toThrowError(/Rule overlap for harness "claude"/u);
+      ).rejects.toThrow(/Rule overlap for harness "claude"/u);
     });
 
     it("allows same rule file across different harnesses", async () => {

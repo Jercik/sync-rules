@@ -4,51 +4,12 @@ import {
   DEFAULT_CONFIG_PATH,
   DEFAULT_RULES_SOURCE,
 } from "../config/constants.js";
-import { createSampleConfig, loadConfig } from "../config/loader.js";
-import { ConfigNotFoundError, ensureError } from "../utils/errors.js";
-import { normalizePath } from "../utils/paths.js";
+import { createSampleConfig } from "../config/loader.js";
+import { ensureError } from "../utils/errors.js";
+import type { RawCliInput } from "./resolve-cli-command.js";
+import { resolveCliCommand } from "./resolve-cli-command.js";
+import { printPaths, resolvePaths } from "./resolve-paths.js";
 import { runSyncCommand } from "./run-sync-command.js";
-
-type ResolvedPaths = {
-  configPath: string;
-  rulesSource: string;
-  error?: Error;
-};
-
-type CliOptions = {
-  config: string;
-  verbose?: boolean;
-  dryRun?: boolean;
-  porcelain?: boolean;
-  json?: boolean;
-  init?: boolean;
-  force?: boolean;
-  paths?: boolean;
-};
-
-async function resolvePaths(configPath: string): Promise<ResolvedPaths> {
-  const normalizedPath = normalizePath(configPath);
-  try {
-    const config = await loadConfig(normalizedPath);
-    return { configPath: normalizedPath, rulesSource: config.rulesSource };
-  } catch (error) {
-    const error_ = ensureError(error);
-    if (error_ instanceof ConfigNotFoundError) {
-      return { configPath: normalizedPath, rulesSource: DEFAULT_RULES_SOURCE };
-    }
-    return {
-      configPath: normalizedPath,
-      rulesSource: DEFAULT_RULES_SOURCE,
-      error: error_,
-    };
-  }
-}
-
-function printPaths(paths: ResolvedPaths): void {
-  console.log("NAME\tPATH");
-  console.log(`CONFIG\t${paths.configPath}`);
-  console.log(`RULES_SOURCE\t${paths.rulesSource}`);
-}
 
 /**
  * Entry point for the CLI application.
@@ -57,7 +18,7 @@ function printPaths(paths: ResolvedPaths): void {
  * @param argv - The raw argv array (typically `process.argv`)
  */
 export async function main(argv: string[]): Promise<number> {
-  const program = new Command<[], CliOptions>()
+  const program = new Command<[], RawCliInput>()
     .name(packageJson.name)
     .description(packageJson.description)
     .version(packageJson.version)
@@ -99,49 +60,27 @@ Examples:
   sync-rules --json | jq '.written[]'            # List files that would be written (JSON)
   sync-rules --porcelain | tail -n +2 | wc -l   # Count files that would be written`,
   );
-  program.action(async (options) => {
-    const configPath = normalizePath(options.config);
-    const wantsInit = options.init ?? false;
-    const wantsPaths = options.paths ?? false;
-    const wantsSyncFlags =
-      (options.dryRun ?? false) ||
-      (options.porcelain ?? false) ||
-      (options.json ?? false);
+  program.action(async (rawInput) => {
+    const command = resolveCliCommand(rawInput);
 
-    if (options.force && !wantsInit) {
-      throw new Error("--force can only be used with --init");
-    }
-    if (wantsInit && wantsPaths) {
-      throw new Error("Use only one of --init or --paths");
-    }
-    if ((wantsInit || wantsPaths) && wantsSyncFlags) {
-      throw new Error("--dry-run, --porcelain, and --json apply only to sync");
-    }
-    if (options.porcelain && options.json) {
-      throw new Error("--porcelain and --json are mutually exclusive");
-    }
-
-    if (wantsInit) {
-      await createSampleConfig(configPath, options.force ?? false);
-      return;
-    }
-
-    if (wantsPaths) {
-      const resolved = await resolvePaths(configPath);
-      printPaths(resolved);
-      if (resolved.error) {
-        throw resolved.error;
+    switch (command.kind) {
+      case "init": {
+        await createSampleConfig(command.configPath, command.force);
+        return;
       }
-      return;
+      case "paths": {
+        const resolved = await resolvePaths(command.configPath);
+        printPaths(resolved);
+        if (resolved.status === "error") {
+          throw resolved.error;
+        }
+        return;
+      }
+      case "sync": {
+        await runSyncCommand(command.options);
+        return;
+      }
     }
-
-    await runSyncCommand({
-      configPath,
-      verbose: options.verbose ?? false,
-      dryRun: options.dryRun ?? options.porcelain ?? options.json ?? false,
-      porcelain: options.porcelain ?? false,
-      json: options.json ?? false,
-    });
   });
 
   try {

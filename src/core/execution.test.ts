@@ -50,9 +50,9 @@ describe("executeActions - algorithm tests", () => {
         { path: "/test/file.txt", content: "Hello" },
       ];
 
-      await expect(
-        executeActions(actions, { dryRun: false }),
-      ).rejects.toThrowError(Error);
+      await expect(executeActions(actions, { dryRun: false })).rejects.toThrow(
+        Error,
+      );
     });
 
     it("stops on first write error", async () => {
@@ -65,9 +65,9 @@ describe("executeActions - algorithm tests", () => {
         { path: "/success/file.txt", content: "World" },
       ];
 
-      await expect(
-        executeActions(actions, { dryRun: false }),
-      ).rejects.toThrowError(Error);
+      await expect(executeActions(actions, { dryRun: false })).rejects.toThrow(
+        Error,
+      );
 
       expect(fsPromises.writeFile).toHaveBeenCalledTimes(1);
     });

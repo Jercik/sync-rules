@@ -1,22 +1,18 @@
 {
   "compilerOptions": {
-    /* Base Options */
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "target": "es2022",
-    "allowJs": true,
+    "target": "es2023",
     "resolveJsonModule": true,
     "moduleDetection": "force",
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-
-    /* Strictness */
     "strict": true,
+    "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "erasableSyntaxOnly": true,
-
-    /* Node ESM Module Resolution */
+    "allowImportingTsExtensions": true,
     "module": "NodeNext"
   }
 }

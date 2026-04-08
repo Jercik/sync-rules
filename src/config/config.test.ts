@@ -170,7 +170,7 @@ describe("config", () => {
           projects: [{ path: "./test", rules: ["!test/**", "!**/*.md"] }],
         });
 
-        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+        expect(() => parseConfig(json)).toThrow(z.ZodError);
 
         let zodError: z.ZodError | undefined;
         try {
@@ -186,7 +186,7 @@ describe("config", () => {
         ).toBe(true);
       });
       it("throws SyntaxError for invalid JSON syntax", () => {
-        expect(() => parseConfig("{invalid}")).toThrowError(SyntaxError);
+        expect(() => parseConfig("{invalid}")).toThrow(SyntaxError);
       });
 
       // Missing projects and non-array projects are covered by table-driven tests below
@@ -211,9 +211,7 @@ describe("config", () => {
           },
         },
       ])("should reject invalid project shapes: $name", ({ payload }) => {
-        expect(() => parseConfig(JSON.stringify(payload))).toThrowError(
-          z.ZodError,
-        );
+        expect(() => parseConfig(JSON.stringify(payload))).toThrow(z.ZodError);
       });
 
       // Nested errors are covered by the table-driven test and multi-error tests below
@@ -227,7 +225,7 @@ describe("config", () => {
           ],
         });
 
-        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+        expect(() => parseConfig(json)).toThrow(z.ZodError);
 
         let zodError: z.ZodError | undefined;
         try {
@@ -248,7 +246,7 @@ describe("config", () => {
             unknown_harness: ["some/*.md"],
           },
         });
-        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+        expect(() => parseConfig(json)).toThrow(z.ZodError);
 
         let zodError: z.ZodError | undefined;
         try {
@@ -271,7 +269,7 @@ describe("config", () => {
             claude: [],
           },
         });
-        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+        expect(() => parseConfig(json)).toThrow(z.ZodError);
       });
 
       it("rejects globalOverrides with only negative globs", () => {
@@ -281,14 +279,14 @@ describe("config", () => {
             gemini: ["!exclude/*.md"],
           },
         });
-        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+        expect(() => parseConfig(json)).toThrow(z.ZodError);
       });
 
       it("rejects config with no global, no globalOverrides, and no projects", () => {
         const json = JSON.stringify({
           rulesSource: "/path/to/rules",
         });
-        expect(() => parseConfig(json)).toThrowError(z.ZodError);
+        expect(() => parseConfig(json)).toThrow(z.ZodError);
       });
     });
 
@@ -448,7 +446,7 @@ describe("config", () => {
 
       const promise = loadConfig(DEFAULT_CONFIG_PATH);
 
-      await expect(promise).rejects.toThrowError(ConfigNotFoundError);
+      await expect(promise).rejects.toThrow(ConfigNotFoundError);
       await expect(promise).rejects.toMatchObject({
         path: DEFAULT_CONFIG_PATH,
         isDefault: true,
@@ -464,7 +462,7 @@ describe("config", () => {
         store: {},
       } as never);
 
-      await expect(loadConfig("/custom/config.json")).rejects.toThrowError(
+      await expect(loadConfig("/custom/config.json")).rejects.toThrow(
         ConfigNotFoundError,
       );
       expect(fs.stat).toHaveBeenCalledTimes(1);
@@ -480,7 +478,7 @@ describe("config", () => {
       } as never);
 
       const promise = loadConfig("/path/to/config.json");
-      await expect(promise).rejects.toThrowError(ConfigParseError);
+      await expect(promise).rejects.toThrow(ConfigParseError);
       await expect(promise).rejects.toMatchObject({
         path: "/path/to/config.json",
       });
@@ -495,7 +493,7 @@ describe("config", () => {
         store: {},
       } as never);
 
-      await expect(loadConfig("/path/to/config.json")).rejects.toThrowError(
+      await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
         ConfigAccessError,
       );
 
@@ -514,7 +512,7 @@ describe("config", () => {
       } as never);
 
       const promise = loadConfig("/path/to/config.json");
-      await expect(promise).rejects.toThrowError(ConfigAccessError);
+      await expect(promise).rejects.toThrow(ConfigAccessError);
       await expect(promise).rejects.toMatchObject({
         path: "/path/to/config.json",
       });
@@ -534,7 +532,7 @@ describe("config", () => {
         isFile: () => true,
       } as never);
 
-      await expect(loadConfig("/path/to/config.json")).rejects.toThrowError(
+      await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
         ConfigParseError,
       );
     });
