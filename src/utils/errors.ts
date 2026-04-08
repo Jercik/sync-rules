@@ -13,10 +13,10 @@ interface SyncErrorDetails {
 export class SyncError extends Error {
   readonly details: SyncErrorDetails;
 
-  constructor(message: string, details?: SyncErrorDetails, cause?: Error) {
+  constructor(message: string, details: SyncErrorDetails = {}, cause?: Error) {
     super(message, { cause });
     this.name = "SyncError";
-    this.details = details ?? {};
+    this.details = details;
   }
 }
 
@@ -46,7 +46,7 @@ export class ConfigNotFoundError extends Error {
  */
 export class ConfigAccessError extends Error {
   readonly path: string;
-  readonly originalError: Error | undefined;
+  readonly originalError?: Error;
 
   constructor(path: string, originalError?: Error) {
     const base = originalError
@@ -66,7 +66,7 @@ export class ConfigAccessError extends Error {
  */
 export class ConfigParseError extends Error {
   readonly path: string;
-  readonly originalError: Error | undefined;
+  readonly originalError?: Error;
 
   constructor(path: string, originalError?: Error) {
     const base = originalError
@@ -87,9 +87,9 @@ export class ConfigParseError extends Error {
  */
 export class SpawnError extends Error {
   readonly command: string;
-  readonly exitCode: number | undefined;
-  readonly code: string | undefined;
-  readonly signal: string | undefined;
+  readonly exitCode?: number;
+  readonly code?: string;
+  readonly signal?: string;
 
   constructor(
     command: string,
@@ -113,9 +113,9 @@ export class SpawnError extends Error {
    */
   static buildMessage(
     command: string,
-    code: string | undefined,
-    exitCode: number | undefined,
-    signal: string | undefined,
+    code?: string,
+    exitCode?: number,
+    signal?: string,
   ): string {
     // Command not found (ENOENT)
     if (code === "ENOENT") {

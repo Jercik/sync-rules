@@ -13,13 +13,13 @@ export type RawCliInput = {
 
 type CliCommandInput = {
   configPath: string;
-  verbose: boolean | undefined;
-  dryRun: boolean | undefined;
-  porcelain: boolean | undefined;
-  json: boolean | undefined;
-  init: boolean | undefined;
-  force: boolean | undefined;
-  paths: boolean | undefined;
+  verbose?: boolean;
+  dryRun?: boolean;
+  porcelain?: boolean;
+  json?: boolean;
+  init?: boolean;
+  force?: boolean;
+  paths?: boolean;
 };
 
 type CliCommand =

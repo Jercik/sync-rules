@@ -71,7 +71,7 @@ Examples:
       case "paths": {
         const resolved = await resolvePaths(command.configPath);
         printPaths(resolved);
-        if (resolved.status === "error") {
+        if (resolved.error) {
           throw resolved.error;
         }
         return;
