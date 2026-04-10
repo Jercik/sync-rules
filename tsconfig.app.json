@@ -7,6 +7,7 @@
     "composite": true,
     "declarationMap": true,
     "sourceMap": true,
+    "rewriteRelativeImportExtensions": true,
 
     /* Not running in the DOM */
     "lib": ["es2023"]
