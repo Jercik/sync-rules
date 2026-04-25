@@ -1,9 +1,6 @@
 import { Command, CommanderError } from "@commander-js/extra-typings";
 import packageJson from "../../package.json" with { type: "json" };
-import {
-  DEFAULT_CONFIG_PATH,
-  DEFAULT_RULES_SOURCE,
-} from "../config/constants.js";
+import { DEFAULT_CONFIG_PATH, DEFAULT_RULES_SOURCE } from "../config/constants.js";
 import { createSampleConfig } from "../config/loader.js";
 import { ensureError } from "../utils/errors.js";
 import type { RawCliInput } from "./resolve-cli-command.js";
@@ -24,11 +21,7 @@ export async function main(argv: string[]): Promise<number> {
     .version(packageJson.version)
     .helpCommand(false)
     .allowExcessArguments(false)
-    .option(
-      "-c, --config <path>",
-      "path to configuration file",
-      DEFAULT_CONFIG_PATH,
-    )
+    .option("-c, --config <path>", "path to configuration file", DEFAULT_CONFIG_PATH)
     .option("--init", "create a sample configuration file")
     .option("-f, --force", "overwrite existing config file (with --init)")
     .option(
@@ -78,7 +71,6 @@ Examples:
       }
       case "sync": {
         await runSyncCommand(command.options);
-        return;
       }
     }
   });
@@ -89,8 +81,7 @@ Examples:
     const error_ = ensureError(error);
 
     if (error_ instanceof CommanderError) {
-      const exitCode =
-        typeof error_.exitCode === "number" ? error_.exitCode : 1;
+      const exitCode = typeof error_.exitCode === "number" ? error_.exitCode : 1;
       if (exitCode !== 0) {
         console.error(error_.message);
       }

@@ -1,3 +1,4 @@
+/* oxlint-disable max-classes-per-file */
 /**
  * Type for SyncError details with specific fields for different error contexts
  */
@@ -32,9 +33,7 @@ export class ConfigNotFoundError extends Error {
     const hint = isDefault
       ? "Run 'sync-rules --init' to create one, or pass --config <path>."
       : "Check the path, or create one with 'sync-rules --init --config <path>'.";
-    super(
-      `${location} not found at ${path}.\n${hint}\nTry 'sync-rules --help' for details.`,
-    );
+    super(`${location} not found at ${path}.\n${hint}\nTry 'sync-rules --help' for details.`);
     this.name = "ConfigNotFoundError";
     this.path = path;
     this.isDefault = isDefault;
@@ -91,13 +90,7 @@ export class SpawnError extends Error {
   readonly code?: string;
   readonly signal?: string;
 
-  constructor(
-    command: string,
-    code?: string,
-    exitCode?: number,
-    signal?: string,
-    cause?: Error,
-  ) {
+  constructor(command: string, code?: string, exitCode?: number, signal?: string, cause?: Error) {
     const message = SpawnError.buildMessage(command, code, exitCode, signal);
     super(message, { cause });
     this.name = "SpawnError";
@@ -111,12 +104,7 @@ export class SpawnError extends Error {
    * Builds the appropriate error message based on the error conditions.
    * Centralizes all spawn error message strings in one place.
    */
-  static buildMessage(
-    command: string,
-    code?: string,
-    exitCode?: number,
-    signal?: string,
-  ): string {
+  static buildMessage(command: string, code?: string, exitCode?: number, signal?: string): string {
     // Command not found (ENOENT)
     if (code === "ENOENT") {
       return `"${command}" not found on PATH or cwd invalid. Install it or verify working directory.`;
@@ -151,7 +139,7 @@ export function ensureError(error: unknown): Error {
  */
 export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return (
-    !!error &&
+    error !== null &&
     typeof error === "object" &&
     "code" in error &&
     (typeof (error as { code: unknown }).code === "string" ||

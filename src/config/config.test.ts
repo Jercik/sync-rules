@@ -1,12 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, expectTypeOf } from "vitest";
 import { z } from "zod";
 import { parseConfig, findProjectForPath } from "./config.js";
 import { loadConfig } from "./loader.js";
-import {
-  ConfigAccessError,
-  ConfigNotFoundError,
-  ConfigParseError,
-} from "../utils/errors.js";
+import { ConfigAccessError, ConfigNotFoundError, ConfigParseError } from "../utils/errors.js";
 import * as fs from "node:fs/promises";
 import { createConfigStore } from "./constants.js";
 import type { Config } from "./config.js";
@@ -78,11 +74,7 @@ describe("config", () => {
 
         const config = parseConfig(json);
         const projects = config.projects ?? [];
-        expect(projects[0]?.rules).toEqual([
-          "**/*.md",
-          "frontend/**",
-          "!test/**",
-        ]);
+        expect(projects[0]?.rules).toEqual(["**/*.md", "frontend/**", "!test/**"]);
       });
 
       it("applies DEFAULT_RULES_SOURCE when rulesSource is omitted", () => {
@@ -320,10 +312,7 @@ describe("config", () => {
       const result = findProjectForPath("/etc/passwd", mockConfig);
       expect(result).toBeUndefined();
 
-      const result2 = findProjectForPath(
-        "/home/other-user/project",
-        mockConfig,
-      );
+      const result2 = findProjectForPath("/home/other-user/project", mockConfig);
       expect(result2).toBeUndefined();
     });
 
@@ -335,36 +324,24 @@ describe("config", () => {
     });
 
     it("should find parent project for nested path", () => {
-      const result = findProjectForPath(
-        "/home/user/projects/web-app/src/components",
-        mockConfig,
-      );
+      const result = findProjectForPath("/home/user/projects/web-app/src/components", mockConfig);
       expect(result).toBeDefined();
       expect(result?.path).toBe("/home/user/projects/web-app");
     });
 
     it("picks deepest matching project for nested paths", () => {
-      const result = findProjectForPath(
-        "/home/user/projects/web-app/frontend/src",
-        mockConfig,
-      );
+      const result = findProjectForPath("/home/user/projects/web-app/frontend/src", mockConfig);
       expect(result).toBeDefined();
       expect(result?.path).toBe("/home/user/projects/web-app/frontend");
     });
 
     it("does not match sibling paths (e.g., 'api' vs 'api-v2')", () => {
       // /home/user/projects/api-v2 should not match /home/user/projects/api
-      const result = findProjectForPath(
-        "/home/user/projects/api-v2",
-        mockConfig,
-      );
+      const result = findProjectForPath("/home/user/projects/api-v2", mockConfig);
       expect(result).toBeUndefined();
 
       // /home/user/documents-backup should not match /home/user/documents
-      const result2 = findProjectForPath(
-        "/home/user/documents-backup",
-        mockConfig,
-      );
+      const result2 = findProjectForPath("/home/user/documents-backup", mockConfig);
       expect(result2).toBeUndefined();
     });
 
@@ -395,10 +372,7 @@ describe("config", () => {
       const result2 = findProjectForPath("/app/frontend/pages", complexConfig);
       expect(result2?.path).toBe("/app/frontend");
 
-      const result3 = findProjectForPath(
-        "/app/frontend/components/Button",
-        complexConfig,
-      );
+      const result3 = findProjectForPath("/app/frontend/components/Button", complexConfig);
       expect(result3?.path).toBe("/app/frontend/components");
     });
   });
@@ -462,10 +436,8 @@ describe("config", () => {
         store: {},
       } as never);
 
-      await expect(loadConfig("/custom/config.json")).rejects.toThrow(
-        ConfigNotFoundError,
-      );
-      expect(fs.stat).toHaveBeenCalledTimes(1);
+      await expect(loadConfig("/custom/config.json")).rejects.toThrow(ConfigNotFoundError);
+      expect(vi.mocked(fs.stat).mock.calls).toHaveLength(1);
     });
 
     it("should throw ConfigParseError for invalid JSON", async () => {
@@ -493,9 +465,7 @@ describe("config", () => {
         store: {},
       } as never);
 
-      await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
-        ConfigAccessError,
-      );
+      await expect(loadConfig("/path/to/config.json")).rejects.toThrow(ConfigAccessError);
 
       await expect(loadConfig("/path/to/config.json")).rejects.toMatchObject({
         path: "/path/to/config.json",
@@ -532,9 +502,7 @@ describe("config", () => {
         isFile: () => true,
       } as never);
 
-      await expect(loadConfig("/path/to/config.json")).rejects.toThrow(
-        ConfigParseError,
-      );
+      await expect(loadConfig("/path/to/config.json")).rejects.toThrow(ConfigParseError);
     });
 
     it("should normalize config paths", async () => {

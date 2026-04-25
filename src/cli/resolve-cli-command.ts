@@ -1,6 +1,7 @@
 import { normalizePath } from "../utils/paths.js";
 
-export type RawCliInput = {
+export interface RawCliInput {
+  [key: string]: unknown;
   config: string;
   verbose?: boolean;
   dryRun?: boolean;
@@ -9,9 +10,9 @@ export type RawCliInput = {
   init?: boolean;
   force?: boolean;
   paths?: boolean;
-};
+}
 
-type CliCommandInput = {
+interface CliCommandInput {
   configPath: string;
   verbose?: boolean;
   dryRun?: boolean;
@@ -20,7 +21,7 @@ type CliCommandInput = {
   init?: boolean;
   force?: boolean;
   paths?: boolean;
-};
+}
 
 type CliCommand =
   | {

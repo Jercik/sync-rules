@@ -1,24 +1,14 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    /* Not transpiling with TypeScript */
-    "noEmit": true,
-
-    /* Not running in the DOM */
-    "lib": ["es2023"],
-
-    /* Test environment types */
+    "module": "NodeNext",
+    "lib": ["ES2025", "ESNext.Array", "ESNext.Error"],
     "types": ["vitest/globals", "node"],
-
-    /* Project References */
-    "composite": true
+    "jsx": "react-jsx",
+    "composite": true,
+    "noEmit": true
   },
-  "include": [
-    "src/**/*.test.ts",
-    "src/**/*.spec.ts",
-    "tests/**/*.ts",
-    "src/**/*.ts",
-    "types/**/*.d.ts"
-  ],
+  "files": ["package.json"],
+  "include": ["**/*.test.*", "**/*.spec.*", "types/**/*.d.ts", "src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist"]
 }

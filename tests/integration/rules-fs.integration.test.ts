@@ -1,15 +1,16 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import {
-  makeTemporaryDirectory,
-  cleanupDirectory,
-} from "../_helpers/test-utilities.js";
-import {
-  globRulePaths,
-  readRuleContents,
-  loadRules,
-} from "../../src/core/rules-fs.js";
+import { globRulePaths, readRuleContents, loadRules } from "../../src/core/rules-fs.js";
+
+async function makeTemporaryDirectory(prefix = "sync-rules-test-"): Promise<string> {
+  return mkdtemp(path.join(process.env.TEST_TMPDIR ?? tmpdir(), prefix));
+}
+
+async function cleanupDirectory(directory: string): Promise<void> {
+  await rm(directory, { recursive: true, force: true });
+}
 
 describe("filesystem operations", () => {
   let temporaryDirectory: string;
@@ -35,42 +36,15 @@ describe("filesystem operations", () => {
         recursive: true,
       });
 
-      await writeFile(
-        path.join(temporaryDirectory, "python.md"),
-        "# Python rules",
-      );
-      await writeFile(
-        path.join(temporaryDirectory, "javascript.md"),
-        "# JS rules",
-      );
-      await writeFile(
-        path.join(temporaryDirectory, "frontend", "react.md"),
-        "# React rules",
-      );
-      await writeFile(
-        path.join(temporaryDirectory, "frontend", "vue.md"),
-        "# Vue rules",
-      );
-      await writeFile(
-        path.join(temporaryDirectory, "backend", "node.md"),
-        "# Node rules",
-      );
-      await writeFile(
-        path.join(temporaryDirectory, "backend", "django.py"),
-        "# Python file",
-      );
-      await writeFile(
-        path.join(temporaryDirectory, "test", "test-rule.md"),
-        "# Test rule",
-      );
-      await writeFile(
-        path.join(temporaryDirectory, "deep", "nested", "deep.md"),
-        "# Deep rule",
-      );
-      await writeFile(
-        path.join(temporaryDirectory, "README.txt"),
-        "Not markdown",
-      );
+      await writeFile(path.join(temporaryDirectory, "python.md"), "# Python rules");
+      await writeFile(path.join(temporaryDirectory, "javascript.md"), "# JS rules");
+      await writeFile(path.join(temporaryDirectory, "frontend", "react.md"), "# React rules");
+      await writeFile(path.join(temporaryDirectory, "frontend", "vue.md"), "# Vue rules");
+      await writeFile(path.join(temporaryDirectory, "backend", "node.md"), "# Node rules");
+      await writeFile(path.join(temporaryDirectory, "backend", "django.py"), "# Python file");
+      await writeFile(path.join(temporaryDirectory, "test", "test-rule.md"), "# Test rule");
+      await writeFile(path.join(temporaryDirectory, "deep", "nested", "deep.md"), "# Deep rule");
+      await writeFile(path.join(temporaryDirectory, "README.txt"), "Not markdown");
       await writeFile(path.join(temporaryDirectory, "config.json"), "{}");
     });
 
@@ -122,10 +96,7 @@ describe("filesystem operations", () => {
         "test/test-rule.md",
       ]);
       // Should report the patterns that matched nothing
-      expect(result.unmatchedPatterns).toEqual([
-        "also-missing/**",
-        "nonexistent/*.md",
-      ]);
+      expect(result.unmatchedPatterns).toEqual(["also-missing/**", "nonexistent/*.md"]);
     });
 
     // Empty pattern test removed - config validation requires positive globs
@@ -138,10 +109,7 @@ describe("filesystem operations", () => {
       await writeFile(path.join(temporaryDirectory, "sub", "b.md"), "# B");
       await writeFile(path.join(temporaryDirectory, "sub", "c.txt"), "nope");
 
-      const result = await loadRules(temporaryDirectory, [
-        "**/*.md",
-        "!sub/**",
-      ]);
+      const result = await loadRules(temporaryDirectory, ["**/*.md", "!sub/**"]);
       expect(result.rules).toEqual([{ path: "a.md", content: "# A" }]);
       expect(result.unmatchedPatterns).toEqual([]);
     });
@@ -192,9 +160,9 @@ describe("filesystem operations", () => {
       const rulesDirectory = path.join(temporaryDirectory, "rules");
       const relativePaths = ["rule1.md", "nonexistent.md", "rule2.md"];
 
-      await expect(
-        readRuleContents(rulesDirectory, relativePaths),
-      ).rejects.toThrow(/Failed to read rule file.*nonexistent\.md/u);
+      await expect(readRuleContents(rulesDirectory, relativePaths)).rejects.toThrow(
+        /Failed to read rule file.*nonexistent\.md/u,
+      );
     });
   });
 });

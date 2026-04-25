@@ -14,10 +14,7 @@ export function concatenateRules(rules: Rule[]): string {
   let combinedContent = firstRule.content;
 
   for (const rule of remainingRules) {
-    const normalizedCombinedContent = combinedContent.replace(
-      /(?:\r?\n)+$/u,
-      "",
-    );
+    const normalizedCombinedContent = combinedContent.replace(/(?:\r?\n)+$/u, "");
     const normalizedRuleContent = rule.content.replace(/^(?:\r?\n)+/u, "");
 
     if (normalizedCombinedContent === "") {

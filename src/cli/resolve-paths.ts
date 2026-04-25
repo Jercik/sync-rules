@@ -3,11 +3,11 @@ import { loadConfig } from "../config/loader.js";
 import { ConfigNotFoundError, ensureError } from "../utils/errors.js";
 import { normalizePath } from "../utils/paths.js";
 
-type ResolvedPaths = {
+interface ResolvedPaths {
   configPath: string;
   rulesSource: string;
   error?: Error;
-};
+}
 
 export async function resolvePaths(configPath: string): Promise<ResolvedPaths> {
   const normalizedPath = normalizePath(configPath);

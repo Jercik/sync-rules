@@ -46,15 +46,11 @@ async function detectOverlap(
  * 3. Write the combined content to the harness target path
  * 4. Skip harnesses with no content (no writes, no errors)
  */
-export async function syncGlobal(
-  flags: RunFlags,
-  config: Config,
-): Promise<GlobalSyncResult> {
+export async function syncGlobal(flags: RunFlags, config: Config): Promise<GlobalSyncResult> {
   const globalPatterns = config.global;
   const overrides = config.globalOverrides;
   const hasGlobal = globalPatterns !== undefined && globalPatterns.length > 0;
-  const hasOverrides =
-    overrides !== undefined && Object.keys(overrides).length > 0;
+  const hasOverrides = overrides !== undefined && Object.keys(overrides).length > 0;
 
   if (!hasGlobal && !hasOverrides) {
     return { written: [], skipped: [], unmatchedPatterns: [] };
@@ -68,11 +64,7 @@ export async function syncGlobal(
     if (hasOverrides) {
       sharedResult = await globRulePaths(config.rulesSource, globalPatterns);
     }
-    const result = await loadRules(
-      config.rulesSource,
-      globalPatterns,
-      sharedResult,
-    );
+    const result = await loadRules(config.rulesSource, globalPatterns, sharedResult);
     sharedRules = result.rules;
     sharedUnmatched = result.unmatchedPatterns;
   }
@@ -119,15 +111,15 @@ export async function syncGlobal(
       overrideRules = result.rules;
       if (result.unmatchedPatterns.length > 0) {
         allUnmatched.push(
-          ...result.unmatchedPatterns.map(
-            (p) => `globalOverrides.${harnessName}: ${p}`,
-          ),
+          ...result.unmatchedPatterns.map((p) => `globalOverrides.${harnessName}: ${p}`),
         );
       }
     }
 
     const combinedRules = [...sharedRules, ...overrideRules];
-    if (combinedRules.length === 0) continue;
+    if (combinedRules.length === 0) {
+      continue;
+    }
 
     const content = concatenateRules(combinedRules);
     actions.push({ path: targetPath, content });

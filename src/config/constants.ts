@@ -7,10 +7,7 @@ import { normalizePath } from "../utils/paths.js";
  * Built-in default configuration file path, ignoring env overrides.
  */
 const configPaths = envPaths("sync-rules", { suffix: "" });
-export const BUILTIN_DEFAULT_CONFIG_PATH = path.resolve(
-  configPaths.config,
-  "config.json",
-);
+export const BUILTIN_DEFAULT_CONFIG_PATH = path.resolve(configPaths.config, "config.json");
 
 /**
  * Default configuration file path

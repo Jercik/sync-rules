@@ -24,9 +24,7 @@ describe("executeActions - algorithm tests", () => {
 
   describe("dry-run mode", () => {
     it("dry-run collects paths but does not write", async () => {
-      const actions: WriteAction[] = [
-        { path: "/test/file.txt", content: "Hello" },
-      ];
+      const actions: WriteAction[] = [{ path: "/test/file.txt", content: "Hello" }];
 
       const result = await executeActions(actions, {
         dryRun: true,
@@ -42,34 +40,24 @@ describe("executeActions - algorithm tests", () => {
 
   describe("error handling", () => {
     it("wraps first write failure in SyncError and aborts", async () => {
-      vi.mocked(fsPromises.writeFile).mockRejectedValueOnce(
-        new Error("Write failed"),
-      );
+      vi.mocked(fsPromises.writeFile).mockRejectedValueOnce(new Error("Write failed"));
 
-      const actions: WriteAction[] = [
-        { path: "/test/file.txt", content: "Hello" },
-      ];
+      const actions: WriteAction[] = [{ path: "/test/file.txt", content: "Hello" }];
 
-      await expect(executeActions(actions, { dryRun: false })).rejects.toThrow(
-        Error,
-      );
+      await expect(executeActions(actions, { dryRun: false })).rejects.toThrow(Error);
     });
 
     it("stops on first write error", async () => {
-      vi.mocked(fsPromises.writeFile).mockRejectedValueOnce(
-        new Error("Write failed"),
-      );
+      vi.mocked(fsPromises.writeFile).mockRejectedValueOnce(new Error("Write failed"));
 
       const actions: WriteAction[] = [
         { path: "/fail/file.txt", content: "Hello" },
         { path: "/success/file.txt", content: "World" },
       ];
 
-      await expect(executeActions(actions, { dryRun: false })).rejects.toThrow(
-        Error,
-      );
+      await expect(executeActions(actions, { dryRun: false })).rejects.toThrow(Error);
 
-      expect(fsPromises.writeFile).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(fsPromises.writeFile).mock.calls).toHaveLength(1);
     });
   });
 
@@ -96,16 +84,12 @@ describe("executeActions - algorithm tests", () => {
       });
       vi.mocked(fsPromises.stat).mockRejectedValueOnce(enoentError);
 
-      const actions: WriteAction[] = [
-        { path: "/nonexistent/file.txt", content: "Hello" },
-      ];
+      const actions: WriteAction[] = [{ path: "/nonexistent/file.txt", content: "Hello" }];
 
       const result = await executeActions(actions, { dryRun: false });
 
       expect(result.written).toEqual([]);
-      expect(result.skipped).toEqual([
-        { path: "/nonexistent/file.txt", reason: "parent_missing" },
-      ]);
+      expect(result.skipped).toEqual([{ path: "/nonexistent/file.txt", reason: "parent_missing" }]);
       expect(fsPromises.writeFile).not.toHaveBeenCalled();
     });
 
@@ -114,9 +98,7 @@ describe("executeActions - algorithm tests", () => {
         isDirectory: () => false,
       } as Awaited<ReturnType<typeof fsPromises.stat>>);
 
-      const actions: WriteAction[] = [
-        { path: "/not-a-dir/file.txt", content: "Hello" },
-      ];
+      const actions: WriteAction[] = [{ path: "/not-a-dir/file.txt", content: "Hello" }];
 
       const result = await executeActions(actions, { dryRun: false });
 
@@ -128,9 +110,7 @@ describe("executeActions - algorithm tests", () => {
     });
 
     it("writes file when parent directory exists", async () => {
-      const actions: WriteAction[] = [
-        { path: "/existing/file.txt", content: "Hello" },
-      ];
+      const actions: WriteAction[] = [{ path: "/existing/file.txt", content: "Hello" }];
 
       const result = await executeActions(actions, { dryRun: false });
 

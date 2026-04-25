@@ -38,10 +38,7 @@ const SAMPLE_CONFIG = {
  * @param force - If true, overwrites existing file. If false, fails if file exists.
  * @throws {Error} If the file cannot be created or already exists (when not forcing)
  */
-export async function createSampleConfig(
-  configPath: string,
-  force = false,
-): Promise<void> {
+export async function createSampleConfig(configPath: string, force = false): Promise<void> {
   const normalizedPath = normalizePath(configPath);
   const configDirectory = path.dirname(normalizedPath);
 
@@ -52,15 +49,10 @@ export async function createSampleConfig(
     await writeFile(normalizedPath, content, { flag });
   } catch (error) {
     const normalizedError = ensureError(error);
-    if (
-      isNodeError(normalizedError) &&
-      normalizedError.code === "EEXIST" &&
-      !force
-    ) {
-      throw new Error(
-        `Config file already exists at ${normalizedPath}. Use --force to overwrite`,
-        { cause: error },
-      );
+    if (isNodeError(normalizedError) && normalizedError.code === "EEXIST" && !force) {
+      throw new Error(`Config file already exists at ${normalizedPath}. Use --force to overwrite`, {
+        cause: error,
+      });
     }
     throw new Error(
       `Failed to create config file at ${normalizedPath}: ${normalizedError.message}`,
@@ -89,10 +81,7 @@ export async function loadConfig(configPath: string): Promise<ConfigShape> {
     if (isNodeError(error) && error.code === "ENOENT") {
       // Use path.relative for comparison - it's case-insensitive on Windows
       const isBuiltinDefault =
-        path.relative(
-          normalizedPath,
-          normalizePath(BUILTIN_DEFAULT_CONFIG_PATH),
-        ) === "";
+        path.relative(normalizedPath, normalizePath(BUILTIN_DEFAULT_CONFIG_PATH)) === "";
       throw new ConfigNotFoundError(normalizedPath, isBuiltinDefault);
     }
 

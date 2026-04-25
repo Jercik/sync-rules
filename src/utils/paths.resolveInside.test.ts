@@ -17,9 +17,7 @@ describe("resolveInside", () => {
   });
 
   it("rejects absolute paths outside base directory", () => {
-    expect(() => resolveInside(baseDirectory, "/etc/passwd")).toThrow(
-      /Refusing to write outside/u,
-    );
+    expect(() => resolveInside(baseDirectory, "/etc/passwd")).toThrow(/Refusing to write outside/u);
   });
 
   it("accepts paths with ./ segments", () => {
@@ -28,8 +26,8 @@ describe("resolveInside", () => {
   });
 
   it("rejects complex traversal attempts", () => {
-    expect(() =>
-      resolveInside(baseDirectory, "valid/../../../etc/passwd"),
-    ).toThrow(/Refusing to write outside/u);
+    expect(() => resolveInside(baseDirectory, "valid/../../../etc/passwd")).toThrow(
+      /Refusing to write outside/u,
+    );
   });
 });

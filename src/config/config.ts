@@ -11,10 +11,7 @@ import type { HarnessName } from "../core/harness-registry.js";
  */
 export const Project = z
   .object({
-    path: z
-      .string()
-      .nonempty("Project path cannot be empty")
-      .transform(normalizePath),
+    path: z.string().nonempty("Project path cannot be empty").transform(normalizePath),
     rules: z
       .array(z.string())
       .nonempty("At least one rule must be specified")
@@ -53,12 +50,13 @@ const GlobalOverrides = z
   .record(z.string(), z.array(z.string()))
   .optional()
   .superRefine((overrides, context) => {
-    if (overrides === undefined) return;
+    if (overrides === undefined) {
+      return;
+    }
     if (Object.keys(overrides).length === 0) {
       context.addIssue({
         code: "custom",
-        message:
-          "globalOverrides cannot be empty when provided; omit the field instead",
+        message: "globalOverrides cannot be empty when provided; omit the field instead",
       });
       return;
     }
@@ -89,9 +87,7 @@ const GlobalOverrides = z
       }
     }
   })
-  .describe(
-    "Optional per-harness override globs. Keys must be valid harness names.",
-  );
+  .describe("Optional per-harness override globs. Keys must be valid harness names.");
 
 /**
  * Main configuration schema.
@@ -124,8 +120,7 @@ export const Config = z
       .array(Project)
       .optional()
       .refine((projects) => projects === undefined || projects.length > 0, {
-        message:
-          "projects cannot be empty when provided; omit the field instead",
+        message: "projects cannot be empty when provided; omit the field instead",
       }),
   })
   .strip()
@@ -133,13 +128,11 @@ export const Config = z
     (config) => {
       const hasGlobal = config.global !== undefined;
       const hasOverrides = config.globalOverrides !== undefined;
-      const hasProjects =
-        config.projects !== undefined && config.projects.length > 0;
+      const hasProjects = config.projects !== undefined && config.projects.length > 0;
       return hasGlobal || hasOverrides || hasProjects;
     },
     {
-      message:
-        "Config must specify at least one of: global, globalOverrides, or projects",
+      message: "Config must specify at least one of: global, globalOverrides, or projects",
     },
   );
 
@@ -159,7 +152,9 @@ export type Config = z.infer<typeof Config>;
 export function parseConfig(jsonContent: string): Config {
   const data: unknown = JSON.parse(jsonContent);
   const result = Config.safeParse(data);
-  if (!result.success) throw result.error;
+  if (!result.success) {
+    throw result.error;
+  }
   return result.data;
 }
 
@@ -177,10 +172,7 @@ export function parseConfig(jsonContent: string): Config {
  * findProjectForPath("/app/frontend/src", config)
  * // Returns project with path "/app/frontend" (not "/app")
  */
-export function findProjectForPath(
-  currentPath: string,
-  config: Config,
-): Project | undefined {
+export function findProjectForPath(currentPath: string, config: Config): Project | undefined {
   const normalizedTarget = normalizePath(currentPath);
   const projects = config.projects ?? [];
 
@@ -191,10 +183,7 @@ export function findProjectForPath(
     const relative_ = path.relative(project.path, normalizedTarget);
     // Empty string means same path, otherwise check that it doesn't escape
     // Use isAbsolute to catch absolute results on Windows (different drive)
-    return (
-      relative_ === "" ||
-      (!relative_.startsWith("..") && !path.isAbsolute(relative_))
-    );
+    return relative_ === "" || (!relative_.startsWith("..") && !path.isAbsolute(relative_));
   });
 
   if (matches.length === 0) {

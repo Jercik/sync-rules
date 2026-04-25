@@ -3,20 +3,20 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { normalizePath } from "../utils/paths.js";
 import { SyncError, ensureError, isNodeError } from "../utils/errors.js";
-export type RunFlags = {
+export interface RunFlags {
   dryRun: boolean;
-};
-export type WriteAction = {
+}
+export interface WriteAction {
   readonly path: string;
   readonly content: string;
-};
+}
 
-export type SkipReason = "parent_missing" | "parent_not_directory";
+type SkipReason = "parent_missing" | "parent_not_directory";
 
-export type SkippedEntry = {
+export interface SkippedEntry {
   path: string;
   reason: SkipReason;
-};
+}
 
 export interface ExecutionReport {
   written: string[];

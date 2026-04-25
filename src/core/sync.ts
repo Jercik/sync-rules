@@ -12,8 +12,6 @@ export interface SyncResult {
   unmatchedPatterns: string[];
 }
 
-const DEFAULT_RUN_FLAGS: RunFlags = { dryRun: false };
-
 /**
  * Synchronize rules for a single project.
  *
@@ -30,15 +28,12 @@ const DEFAULT_RUN_FLAGS: RunFlags = { dryRun: false };
  */
 export async function syncProject(
   project: Project,
-  flags: RunFlags = DEFAULT_RUN_FLAGS,
+  flags: RunFlags,
   config: Config,
 ): Promise<SyncResult> {
   const rulesDirectory = config.rulesSource;
   // Load rules once
-  const { rules, unmatchedPatterns } = await loadRules(
-    rulesDirectory,
-    project.rules,
-  );
+  const { rules, unmatchedPatterns } = await loadRules(rulesDirectory, project.rules);
 
   // Plan writes
   const actions: WriteAction[] = [];

@@ -1,17 +1,18 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    /* Transpiling with TypeScript */
+    "module": "NodeNext",
+    "lib": ["ES2025", "ESNext.Array", "ESNext.Error"],
+    "types": ["node"],
+    "jsx": "react-jsx",
     "outDir": "./dist",
     "rootDir": "./src",
     "composite": true,
+    "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "rewriteRelativeImportExtensions": true,
-
-    /* Not running in the DOM */
-    "lib": ["es2023"]
+    "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/**/*.ts", "types/**/*.d.ts"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "types/**/*.d.ts"],
+  "exclude": ["node_modules", "dist", "**/*.test.*", "**/*.spec.*"]
 }

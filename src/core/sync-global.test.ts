@@ -70,32 +70,21 @@ describe("sync-global", () => {
       },
     );
 
-    expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
-    const callArguments = vi.mocked(executionModule.executeActions).mock
-      .calls[0];
+    expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
+    const callArguments = vi.mocked(executionModule.executeActions).mock.calls[0];
     const actionsArgument: WriteAction[] = callArguments?.[0] ?? [];
     const paths = actionsArgument.map((action) => action.path);
     expect(paths.some((p) => p.endsWith("/.claude/CLAUDE.md"))).toBe(true);
     expect(paths.some((p) => p.endsWith("/.codex/AGENTS.md"))).toBe(true);
-    expect(
-      paths.some((p) => p.endsWith("/.copilot/copilot-instructions.md")),
-    ).toBe(true);
-    expect(
-      actionsArgument.every(
-        (action) => action.content === "# G1\nA\n\n# G2\nB",
-      ),
-    ).toBe(true);
+    expect(paths.some((p) => p.endsWith("/.copilot/copilot-instructions.md"))).toBe(true);
+    expect(actionsArgument.every((action) => action.content === "# G1\nA\n\n# G2\nB")).toBe(true);
     expect(result.written).toHaveLength(2);
   });
 
   describe("per-harness overrides", () => {
     it("composes shared global + per-harness override content", async () => {
-      const sharedRules: Rule[] = [
-        { path: "shared.md", content: "# Shared\nContent" },
-      ];
-      const overrideRules: Rule[] = [
-        { path: "claude-extra.md", content: "# Claude Extra\nStuff" },
-      ];
+      const sharedRules: Rule[] = [{ path: "shared.md", content: "# Shared\nContent" }];
+      const overrideRules: Rule[] = [{ path: "claude-extra.md", content: "# Claude Extra\nStuff" }];
 
       // First call: loadRules for shared global
       // Second call: loadRules for claude override
@@ -128,31 +117,23 @@ describe("sync-global", () => {
         },
       );
 
-      expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
       const actionsArgument: WriteAction[] =
         vi.mocked(executionModule.executeActions).mock.calls[0]?.[0] ?? [];
 
       // Claude should have composed content (shared + override)
-      const claudeAction = actionsArgument.find((a) =>
-        a.path.endsWith("CLAUDE.md"),
-      );
+      const claudeAction = actionsArgument.find((a) => a.path.endsWith("CLAUDE.md"));
       expect(claudeAction).toBeDefined();
-      expect(claudeAction?.content).toBe(
-        "# Shared\nContent\n\n# Claude Extra\nStuff",
-      );
+      expect(claudeAction?.content).toBe("# Shared\nContent\n\n# Claude Extra\nStuff");
 
       // Other harnesses should have only shared content
-      const geminiAction = actionsArgument.find((a) =>
-        a.path.includes("gemini"),
-      );
+      const geminiAction = actionsArgument.find((a) => a.path.includes("gemini"));
       expect(geminiAction).toBeDefined();
       expect(geminiAction?.content).toBe("# Shared\nContent");
     });
 
     it("writes only to harnesses with override content when no global patterns", async () => {
-      const overrideRules: Rule[] = [
-        { path: "codex-only.md", content: "# Codex Only" },
-      ];
+      const overrideRules: Rule[] = [{ path: "codex-only.md", content: "# Codex Only" }];
 
       vi.mocked(filesystemModule.loadRules).mockResolvedValueOnce({
         rules: overrideRules,
@@ -174,7 +155,7 @@ describe("sync-global", () => {
         },
       );
 
-      expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
       const actionsArgument: WriteAction[] =
         vi.mocked(executionModule.executeActions).mock.calls[0]?.[0] ?? [];
 
@@ -249,7 +230,7 @@ describe("sync-global", () => {
         },
       );
 
-      expect(executionModule.executeActions).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
     });
 
     it("reports unmatched override patterns", async () => {
@@ -268,9 +249,7 @@ describe("sync-global", () => {
         },
       );
 
-      expect(result.unmatchedPatterns).toContainEqual(
-        "globalOverrides.claude: nonexistent/*.md",
-      );
+      expect(result.unmatchedPatterns).toContainEqual("globalOverrides.claude: nonexistent/*.md");
     });
 
     it("skips harnesses with no content", async () => {

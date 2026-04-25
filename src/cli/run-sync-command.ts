@@ -17,15 +17,11 @@ interface SyncCommandOptions {
   json: boolean;
 }
 
-function isFulfilled(
-  s: PromiseSettledResult<unknown>,
-): s is PromiseFulfilledResult<SyncResult> {
+function isFulfilled(s: PromiseSettledResult<unknown>): s is PromiseFulfilledResult<SyncResult> {
   return s.status === "fulfilled";
 }
 
-export async function runSyncCommand(
-  options: SyncCommandOptions,
-): Promise<void> {
+export async function runSyncCommand(options: SyncCommandOptions): Promise<void> {
   const { configPath, verbose, dryRun, porcelain, json } = options;
   const config = await loadConfig(configPath || DEFAULT_CONFIG_PATH);
 
@@ -43,12 +39,10 @@ export async function runSyncCommand(
       : [];
 
   const settlements = await Promise.allSettled(
-    projectsToSync.map(async (project: Project) => {
-      return await syncProject(project, { dryRun }, config);
-    }),
+    projectsToSync.map(async (project: Project) => syncProject(project, { dryRun }, config)),
   );
 
-  const failures: Array<{ project: Project; error: Error }> = [];
+  const failures: { project: Project; error: Error }[] = [];
 
   for (const [index, settlement] of settlements.entries()) {
     if (settlement.status === "rejected") {
@@ -76,10 +70,7 @@ export async function runSyncCommand(
   }
 
   // Collect all written and skipped paths
-  const allWritten = [
-    ...globalResult.written,
-    ...successes.flatMap((s) => s.value.report.written),
-  ];
+  const allWritten = [...globalResult.written, ...successes.flatMap((s) => s.value.report.written)];
   const allSkipped: SkippedEntry[] = [
     ...globalResult.skipped,
     ...successes.flatMap((s) => s.value.report.skipped),
@@ -92,9 +83,7 @@ export async function runSyncCommand(
       skipped: allSkipped.toSorted((a, b) => a.path.localeCompare(b.path)),
       warnings: patternWarnings
         .toSorted((a, b) => a.source.localeCompare(b.source))
-        .flatMap((w) =>
-          w.patterns.map((pattern) => ({ source: w.source, pattern })),
-        ),
+        .flatMap((w) => w.patterns.map((pattern) => ({ source: w.source, pattern }))),
     };
     console.log(JSON.stringify(output, undefined, 2));
     return;
@@ -107,15 +96,11 @@ export async function runSyncCommand(
     for (const path of allWritten.toSorted()) {
       console.log(`WRITE\t\t${path}`);
     }
-    for (const entry of allSkipped.toSorted((a, b) =>
-      a.path.localeCompare(b.path),
-    )) {
+    for (const entry of allSkipped.toSorted((a, b) => a.path.localeCompare(b.path))) {
       console.log(`SKIP\t${entry.reason}\t${entry.path}`);
     }
     // Sort warnings for deterministic output
-    for (const warning of patternWarnings.toSorted((a, b) =>
-      a.source.localeCompare(b.source),
-    )) {
+    for (const warning of patternWarnings.toSorted((a, b) => a.source.localeCompare(b.source))) {
       for (const pattern of warning.patterns) {
         console.log(`WARN\t${warning.source}\t${pattern}`);
       }
@@ -128,11 +113,8 @@ export async function runSyncCommand(
   if (patternWarnings.length > 0) {
     console.error("Warning: The following patterns did not match any rules:");
     // Sort warnings for deterministic output
-    for (const warning of patternWarnings.toSorted((a, b) =>
-      a.source.localeCompare(b.source),
-    )) {
-      const sourceLabel =
-        warning.source === "global" ? "global config" : warning.source;
+    for (const warning of patternWarnings.toSorted((a, b) => a.source.localeCompare(b.source))) {
+      const sourceLabel = warning.source === "global" ? "global config" : warning.source;
       for (const pattern of warning.patterns) {
         console.error(`  • ${pattern} (in ${sourceLabel})`);
       }
@@ -142,9 +124,7 @@ export async function runSyncCommand(
   // Always output skip warnings (regardless of verbose mode)
   if (allSkipped.length > 0) {
     console.error("Warning: The following paths were skipped:");
-    for (const entry of allSkipped.toSorted((a, b) =>
-      a.path.localeCompare(b.path),
-    )) {
+    for (const entry of allSkipped.toSorted((a, b) => a.path.localeCompare(b.path))) {
       const reasonLabel =
         entry.reason === "parent_missing"
           ? "parent directory does not exist"
@@ -171,15 +151,11 @@ export async function runSyncCommand(
     let projectInfo: string;
     if (projectsToSync.length === 1) {
       const [firstProject] = projectsToSync;
-      projectInfo = firstProject
-        ? `project (${firstProject.path})`
-        : "1 project(s)";
+      projectInfo = firstProject ? `project (${firstProject.path})` : "1 project(s)";
     } else {
       projectInfo = `${String(projectsToSync.length)} project(s)`;
     }
     const action = dryRun ? "Would write" : "Wrote";
-    console.error(
-      `Synchronized ${projectInfo}; ${action} ${String(totalWrites)} file(s).`,
-    );
+    console.error(`Synchronized ${projectInfo}; ${action} ${String(totalWrites)} file(s).`);
   }
 }

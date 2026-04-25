@@ -7,10 +7,10 @@ import { SyncError, ensureError } from "../utils/errors.js";
 /**
  * Result of glob matching with tracking of unmatched patterns.
  */
-export type GlobResult = {
+export interface GlobResult {
   paths: string[];
   unmatchedPatterns: string[];
-};
+}
 
 /**
  * Check if a pattern is a negation pattern (starts with `!`).
@@ -63,9 +63,7 @@ export async function globRulePaths(
     }),
   );
 
-  const unmatchedPatterns = patternResults
-    .filter((p): p is string => p !== undefined)
-    .toSorted();
+  const unmatchedPatterns = patternResults.filter((p): p is string => p !== undefined).toSorted();
 
   return {
     paths: paths.toSorted(),
@@ -76,7 +74,10 @@ export async function globRulePaths(
 /**
  * Represents a loaded rule file with its path and content.
  */
-export type Rule = { path: string; content: string };
+export interface Rule {
+  path: string;
+  content: string;
+}
 
 /**
  * Read contents of multiple rule files concurrently.
@@ -118,10 +119,10 @@ export async function readRuleContents(
 /**
  * Result of loading rules with tracking of unmatched patterns.
  */
-type LoadRulesResult = {
+interface LoadRulesResult {
   rules: Rule[];
   unmatchedPatterns: string[];
-};
+}
 
 /**
  * Load all rules matching the given patterns.

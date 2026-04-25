@@ -19,11 +19,9 @@ describe("createSampleConfig", () => {
     await createSampleConfig("/tmp/config.json", false);
 
     expect(fs.mkdir).toHaveBeenCalledWith("/tmp", { recursive: true });
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      "/tmp/config.json",
-      expect.any(String),
-      { flag: "wx" },
-    );
+    expect(fs.writeFile).toHaveBeenCalledWith("/tmp/config.json", expect.any(String), {
+      flag: "wx",
+    });
     const content = vi.mocked(fs.writeFile).mock.calls[0]?.[1] as string;
     expect(content).toContain('"rulesSource"');
     expect(content).toContain('"global-rules/*.md"');
@@ -41,11 +39,9 @@ describe("createSampleConfig", () => {
 
     await createSampleConfig("/tmp/config.json", true);
 
-    expect(fs.writeFile).toHaveBeenCalledWith(
-      "/tmp/config.json",
-      expect.any(String),
-      { flag: "w" },
-    );
+    expect(fs.writeFile).toHaveBeenCalledWith("/tmp/config.json", expect.any(String), {
+      flag: "w",
+    });
   });
 
   it("atomic create: EEXIST yields actionable 'use --force' hint", async () => {
@@ -76,9 +72,7 @@ describe("createSampleConfig", () => {
 
     expect(error).toBeInstanceOf(Error);
     const error_ = error as Error;
-    expect(error_.message).toMatch(
-      /Failed to create config file at \/tmp\/config\.json: EACCES/u,
-    );
+    expect(error_.message).toMatch(/Failed to create config file at \/tmp\/config\.json: EACCES/u);
     expect(error_.cause).toBe(eacces);
   });
 });

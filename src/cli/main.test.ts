@@ -2,13 +2,12 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { main } from "./main.js";
-import {
-  DEFAULT_CONFIG_PATH,
-  DEFAULT_RULES_SOURCE,
-} from "../config/constants.js";
+import { DEFAULT_CONFIG_PATH, DEFAULT_RULES_SOURCE } from "../config/constants.js";
 import { ConfigNotFoundError, ConfigParseError } from "../utils/errors.js";
+import * as loader from "../config/loader.js";
+import * as syncModule from "../core/sync.js";
+import * as syncGlobalModule from "../core/sync-global.js";
 
-// Mock the entire modules with dynamic imports support
 vi.mock("../config/loader.js", () => ({
   loadConfig: vi.fn(),
   createSampleConfig: vi.fn(),
@@ -19,14 +18,8 @@ vi.mock("../core/sync.js", () => ({
 }));
 
 vi.mock("../core/sync-global.js", () => ({
-  syncGlobal: vi
-    .fn()
-    .mockResolvedValue({ written: [], skipped: [], unmatchedPatterns: [] }),
+  syncGlobal: vi.fn().mockResolvedValue({ written: [], skipped: [], unmatchedPatterns: [] }),
 }));
-
-import * as loader from "../config/loader.js";
-import * as syncModule from "../core/sync.js";
-import * as syncGlobalModule from "../core/sync-global.js";
 
 describe("cli/main", () => {
   beforeEach(() => {
@@ -39,10 +32,7 @@ describe("cli/main", () => {
 
       const code = await main(["node", "sync-rules", "--init"]);
       expect(code).toBe(0);
-      expect(loader.createSampleConfig).toHaveBeenCalledWith(
-        DEFAULT_CONFIG_PATH,
-        false,
-      );
+      expect(loader.createSampleConfig).toHaveBeenCalledWith(DEFAULT_CONFIG_PATH, false);
     });
 
     it("honors --force flag", async () => {
@@ -50,16 +40,11 @@ describe("cli/main", () => {
 
       const code = await main(["node", "sync-rules", "--init", "--force"]);
       expect(code).toBe(0);
-      expect(loader.createSampleConfig).toHaveBeenCalledWith(
-        DEFAULT_CONFIG_PATH,
-        true,
-      );
+      expect(loader.createSampleConfig).toHaveBeenCalledWith(DEFAULT_CONFIG_PATH, true);
     });
 
     it("handles init errors gracefully", async () => {
-      vi.mocked(loader.createSampleConfig).mockRejectedValue(
-        new Error("Write failed"),
-      );
+      vi.mocked(loader.createSampleConfig).mockRejectedValue(new Error("Write failed"));
 
       const code = await main(["node", "sync-rules", "--init"]);
       expect(code).toBe(1);
@@ -94,9 +79,7 @@ describe("cli/main", () => {
       expect(code).toBe(0);
       expect(logSpy).toHaveBeenCalledWith("NAME\tPATH");
       expect(logSpy).toHaveBeenCalledWith(`CONFIG\t${DEFAULT_CONFIG_PATH}`);
-      expect(logSpy).toHaveBeenCalledWith(
-        `RULES_SOURCE\t${DEFAULT_RULES_SOURCE}`,
-      );
+      expect(logSpy).toHaveBeenCalledWith(`RULES_SOURCE\t${DEFAULT_RULES_SOURCE}`);
       logSpy.mockRestore();
     });
 
@@ -107,18 +90,10 @@ describe("cli/main", () => {
         projects: [],
       });
 
-      const code = await main([
-        "node",
-        "sync-rules",
-        "--config",
-        "./custom.json",
-        "--paths",
-      ]);
+      const code = await main(["node", "sync-rules", "--config", "./custom.json", "--paths"]);
 
       expect(code).toBe(0);
-      expect(logSpy).toHaveBeenCalledWith(
-        `CONFIG\t${path.resolve("./custom.json")}`,
-      );
+      expect(logSpy).toHaveBeenCalledWith(`CONFIG\t${path.resolve("./custom.json")}`);
       logSpy.mockRestore();
     });
 
@@ -155,9 +130,7 @@ describe("cli/main", () => {
 
       expect(code).toBe(1);
       expect(logSpy).toHaveBeenCalledWith("NAME\tPATH");
-      expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to load config"),
-      );
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Failed to load config"));
       logSpy.mockRestore();
       errorSpy.mockRestore();
     });
@@ -170,9 +143,7 @@ describe("cli/main", () => {
       const code = await main(["node", "sync-rules", "--force"]);
 
       expect(code).toBe(1);
-      expect(errorSpy).toHaveBeenCalledWith(
-        "--force can only be used with --init",
-      );
+      expect(errorSpy).toHaveBeenCalledWith("--force can only be used with --init");
       errorSpy.mockRestore();
     });
 
@@ -182,9 +153,7 @@ describe("cli/main", () => {
       const code = await main(["node", "sync-rules", "--init", "--paths"]);
 
       expect(code).toBe(1);
-      expect(errorSpy).toHaveBeenCalledWith(
-        "Use only one of --init or --paths",
-      );
+      expect(errorSpy).toHaveBeenCalledWith("Use only one of --init or --paths");
       errorSpy.mockRestore();
     });
 
@@ -222,9 +191,7 @@ describe("cli/main", () => {
       const code = await main(["node", "sync-rules", "--json", "--porcelain"]);
 
       expect(code).toBe(1);
-      expect(errorSpy).toHaveBeenCalledWith(
-        "--porcelain and --json are mutually exclusive",
-      );
+      expect(errorSpy).toHaveBeenCalledWith("--porcelain and --json are mutually exclusive");
       errorSpy.mockRestore();
     });
   });
@@ -392,12 +359,8 @@ describe("cli/main", () => {
       expect(errorSpy).toHaveBeenCalledWith(
         "Warning: The following patterns did not match any rules:",
       );
-      expect(errorSpy).toHaveBeenCalledWith(
-        "  • global/*.md (in global config)",
-      );
-      expect(errorSpy).toHaveBeenCalledWith(
-        "  • missing-pattern/*.md (in /home/user/project1)",
-      );
+      expect(errorSpy).toHaveBeenCalledWith("  • global/*.md (in global config)");
+      expect(errorSpy).toHaveBeenCalledWith("  • missing-pattern/*.md (in /home/user/project1)");
 
       errorSpy.mockRestore();
     });

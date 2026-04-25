@@ -95,8 +95,7 @@ describe("ConfigParseError", () => {
       title: "parse failure with original error",
       path: "/path/to/config.json",
       original: new Error("Invalid JSON"),
-      expectedMessage:
-        "Failed to load config from /path/to/config.json: Invalid JSON",
+      expectedMessage: "Failed to load config from /path/to/config.json: Invalid JSON",
     },
   ] as const;
 
@@ -109,9 +108,7 @@ describe("ConfigParseError", () => {
       expect(error.originalError).toBe(c.original);
       expect(error.message).toContain(c.expectedMessage);
       expect(error.message).toContain("Fix the JSON and glob patterns");
-      expect(error.message).toContain(
-        "Try 'sync-rules --help' for schema and examples.",
-      );
+      expect(error.message).toContain("Try 'sync-rules --help' for schema and examples.");
     });
   }
 });
@@ -163,12 +160,7 @@ describe("SpawnError", () => {
 
   for (const c of cases) {
     it(`should create error: ${c.title}`, () => {
-      const error = new SpawnError(
-        c.input.command,
-        c.input.code,
-        c.input.exitCode,
-        c.input.signal,
-      );
+      const error = new SpawnError(c.input.command, c.input.code, c.input.exitCode, c.input.signal);
       expect(error).toBeInstanceOf(Error);
       expect(error.name).toBe("SpawnError");
       expect(error.command).toBe(c.input.command);

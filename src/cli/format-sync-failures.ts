@@ -1,7 +1,10 @@
 import { SyncError } from "../utils/errors.js";
 import type { Project } from "../config/config.js";
 
-type SyncFailure = { project: Project; error: Error };
+interface SyncFailure {
+  project: Project;
+  error: Error;
+}
 
 export function formatSyncFailureMessage(failures: SyncFailure[]): string {
   const errorMessages = failures.map(({ project, error }) => {
@@ -11,9 +14,7 @@ export function formatSyncFailureMessage(failures: SyncFailure[]): string {
       message += `\n    Error: ${error.message}`;
       if (error.cause) {
         const causeMessage =
-          error.cause instanceof Error
-            ? error.cause.message
-            : JSON.stringify(error.cause);
+          error.cause instanceof Error ? error.cause.message : JSON.stringify(error.cause);
         message += `\n    Cause: ${causeMessage}`;
       }
     } else {

@@ -5,16 +5,11 @@
  * The registry is the single source of truth for valid harness names and target paths.
  */
 
-export type HarnessName =
-  | "claude"
-  | "gemini"
-  | "opencode"
-  | "codex"
-  | "copilot";
+export type HarnessName = "claude" | "gemini" | "opencode" | "codex" | "copilot";
 
-type HarnessEntry = {
+interface HarnessEntry {
   readonly target: string;
-};
+}
 
 export const HARNESS_REGISTRY: Record<HarnessName, HarnessEntry> = {
   claude: { target: "~/.claude/CLAUDE.md" },
