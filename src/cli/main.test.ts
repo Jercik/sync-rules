@@ -389,7 +389,7 @@ describe("cli/main", () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const code = await main(["node", "sync-rules", "unknown"]);
       expect(code).toBe(1);
-      expect(errorSpy).toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalledWith(expect.any(String));
       errorSpy.mockRestore();
     });
 

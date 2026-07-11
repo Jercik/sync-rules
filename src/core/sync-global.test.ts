@@ -31,7 +31,7 @@ describe("sync-global", () => {
         rulesSource: "/rules",
       },
     );
-    expect(result.written).toEqual([]);
+    expect(result.written).toStrictEqual([]);
   });
 
   it("returns no writes when no rules match", async () => {
@@ -46,9 +46,13 @@ describe("sync-global", () => {
         global: ["global-rules/*.md"],
       },
     );
-    expect(filesystemModule.loadRules).toHaveBeenCalled();
-    expect(result.written).toEqual([]);
-    expect(result.unmatchedPatterns).toEqual(["global-rules/*.md"]);
+    expect(filesystemModule.loadRules).toHaveBeenCalledWith(
+      "/rules",
+      ["global-rules/*.md"],
+      undefined,
+    );
+    expect(result.written).toStrictEqual([]);
+    expect(result.unmatchedPatterns).toStrictEqual(["global-rules/*.md"]);
   });
 
   it("writes combined content to all global targets", async () => {
@@ -70,13 +74,15 @@ describe("sync-global", () => {
       },
     );
 
-    expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
+    expect(vi.mocked(executionModule.executeActions)).toHaveBeenCalledTimes(1);
     const callArguments = vi.mocked(executionModule.executeActions).mock.calls[0];
     const actionsArgument: WriteAction[] = callArguments?.[0] ?? [];
     const paths = actionsArgument.map((action) => action.path);
-    expect(paths.some((p) => p.endsWith("/.claude/CLAUDE.md"))).toBe(true);
-    expect(paths.some((p) => p.endsWith("/.codex/AGENTS.md"))).toBe(true);
-    expect(paths.some((p) => p.endsWith("/.copilot/copilot-instructions.md"))).toBe(true);
+    expect({
+      claude: paths.some((p) => p.endsWith("/.claude/CLAUDE.md")),
+      codex: paths.some((p) => p.endsWith("/.codex/AGENTS.md")),
+      copilot: paths.some((p) => p.endsWith("/.copilot/copilot-instructions.md")),
+    }).toStrictEqual({ claude: true, codex: true, copilot: true });
     expect(actionsArgument.every((action) => action.content === "# G1\nA\n\n# G2\nB")).toBe(true);
     expect(result.written).toHaveLength(2);
   });
@@ -117,7 +123,7 @@ describe("sync-global", () => {
         },
       );
 
-      expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
+      expect(vi.mocked(executionModule.executeActions)).toHaveBeenCalledTimes(1);
       const actionsArgument: WriteAction[] =
         vi.mocked(executionModule.executeActions).mock.calls[0]?.[0] ?? [];
 
@@ -155,7 +161,7 @@ describe("sync-global", () => {
         },
       );
 
-      expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
+      expect(vi.mocked(executionModule.executeActions)).toHaveBeenCalledTimes(1);
       const actionsArgument: WriteAction[] =
         vi.mocked(executionModule.executeActions).mock.calls[0]?.[0] ?? [];
 
@@ -230,7 +236,7 @@ describe("sync-global", () => {
         },
       );
 
-      expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
+      expect(vi.mocked(executionModule.executeActions)).toHaveBeenCalledTimes(1);
     });
 
     it("reports unmatched override patterns", async () => {
@@ -272,7 +278,7 @@ describe("sync-global", () => {
       );
 
       // No writes when all rules are empty
-      expect(result.written).toEqual([]);
+      expect(result.written).toStrictEqual([]);
     });
   });
 });

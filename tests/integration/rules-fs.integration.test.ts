@@ -52,7 +52,7 @@ describe("filesystem operations", () => {
       const patterns = ["**/*.md"];
       const result = await globRulePaths(temporaryDirectory, patterns);
 
-      expect(result.paths).toEqual([
+      expect(result.paths).toStrictEqual([
         "backend/node.md",
         "deep/nested/deep.md",
         "frontend/react.md",
@@ -61,7 +61,7 @@ describe("filesystem operations", () => {
         "python.md",
         "test/test-rule.md",
       ]);
-      expect(result.unmatchedPatterns).toEqual([]);
+      expect(result.unmatchedPatterns).toStrictEqual([]);
     });
 
     // Exact name matching covered by wildcard and exclusion tests
@@ -70,7 +70,7 @@ describe("filesystem operations", () => {
       const patterns = ["**/*.md", "!test/**"];
       const result = await globRulePaths(temporaryDirectory, patterns);
 
-      expect(result.paths).toEqual([
+      expect(result.paths).toStrictEqual([
         "backend/node.md",
         "deep/nested/deep.md",
         "frontend/react.md",
@@ -78,7 +78,7 @@ describe("filesystem operations", () => {
         "javascript.md",
         "python.md",
       ]);
-      expect(result.unmatchedPatterns).toEqual([]);
+      expect(result.unmatchedPatterns).toStrictEqual([]);
     });
 
     it("reports unmatched patterns", async () => {
@@ -86,7 +86,7 @@ describe("filesystem operations", () => {
       const result = await globRulePaths(temporaryDirectory, patterns);
 
       // Should still return matches from the first pattern
-      expect(result.paths).toEqual([
+      expect(result.paths).toStrictEqual([
         "backend/node.md",
         "deep/nested/deep.md",
         "frontend/react.md",
@@ -96,7 +96,7 @@ describe("filesystem operations", () => {
         "test/test-rule.md",
       ]);
       // Should report the patterns that matched nothing
-      expect(result.unmatchedPatterns).toEqual(["also-missing/**", "nonexistent/*.md"]);
+      expect(result.unmatchedPatterns).toStrictEqual(["also-missing/**", "nonexistent/*.md"]);
     });
 
     // Empty pattern test removed - config validation requires positive globs
@@ -110,8 +110,8 @@ describe("filesystem operations", () => {
       await writeFile(path.join(temporaryDirectory, "sub", "c.txt"), "nope");
 
       const result = await loadRules(temporaryDirectory, ["**/*.md", "!sub/**"]);
-      expect(result.rules).toEqual([{ path: "a.md", content: "# A" }]);
-      expect(result.unmatchedPatterns).toEqual([]);
+      expect(result.rules).toStrictEqual([{ path: "a.md", content: "# A" }]);
+      expect(result.unmatchedPatterns).toStrictEqual([]);
     });
   });
 

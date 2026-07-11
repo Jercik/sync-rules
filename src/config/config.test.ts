@@ -37,7 +37,7 @@ describe("config", () => {
         const projects = config.projects ?? [];
         // normalizePath will expand ~ to full home directory
         expect(projects[0]?.path).toMatch(/\/Developer\/project$/u);
-        expect(projects[0]?.rules).toEqual(["python.md"]);
+        expect(projects[0]?.rules).toStrictEqual(["python.md"]);
       });
 
       it("parses multiple projects", () => {
@@ -58,7 +58,7 @@ describe("config", () => {
         const config = parseConfig(json);
         expect(config.projects).toHaveLength(2);
         const projects = config.projects ?? [];
-        expect(projects[1]?.rules).toEqual(["frontend/**/*.md"]);
+        expect(projects[1]?.rules).toStrictEqual(["frontend/**/*.md"]);
       });
 
       it("accepts positive and negative POSIX globs in 'rules'", () => {
@@ -74,7 +74,7 @@ describe("config", () => {
 
         const config = parseConfig(json);
         const projects = config.projects ?? [];
-        expect(projects[0]?.rules).toEqual(["**/*.md", "frontend/**", "!test/**"]);
+        expect(projects[0]?.rules).toStrictEqual(["**/*.md", "frontend/**", "!test/**"]);
       });
 
       it("applies DEFAULT_RULES_SOURCE when rulesSource is omitted", () => {
@@ -87,7 +87,7 @@ describe("config", () => {
         expect(config.projects).toHaveLength(1);
         const projects = config.projects ?? [];
         expect(projects[0]?.path).toMatch(/\//u);
-        expect(projects[0]?.rules).toEqual(["test.md"]);
+        expect(projects[0]?.rules).toStrictEqual(["test.md"]);
       });
 
       it("accepts config with only global (no projects)", () => {
@@ -96,7 +96,7 @@ describe("config", () => {
           global: ["global-rules/*.md"],
         });
         const config = parseConfig(json);
-        expect(config.global).toEqual(["global-rules/*.md"]);
+        expect(config.global).toStrictEqual(["global-rules/*.md"]);
         expect(config.projects).toBeUndefined();
       });
 
@@ -108,7 +108,7 @@ describe("config", () => {
           },
         });
         const config = parseConfig(json);
-        expect(config.globalOverrides).toEqual({
+        expect(config.globalOverrides).toStrictEqual({
           claude: ["claude-specific/*.md"],
         });
         expect(config.projects).toBeUndefined();
@@ -126,8 +126,8 @@ describe("config", () => {
           projects: [{ path: "./app", rules: ["**/*.md"] }],
         });
         const config = parseConfig(json);
-        expect(config.global).toEqual(["shared/*.md"]);
-        expect(config.globalOverrides).toEqual({
+        expect(config.global).toStrictEqual(["shared/*.md"]);
+        expect(config.globalOverrides).toStrictEqual({
           gemini: ["gemini/*.md"],
           codex: ["codex/*.md"],
         });
@@ -146,7 +146,7 @@ describe("config", () => {
           },
         });
         const config = parseConfig(json);
-        expect(Object.keys(config.globalOverrides ?? {})).toEqual([
+        expect(Object.keys(config.globalOverrides ?? {})).toStrictEqual([
           "claude",
           "gemini",
           "opencode",
@@ -320,7 +320,7 @@ describe("config", () => {
       const result = findProjectForPath("/home/user/projects/api", mockConfig);
       expect(result).toBeDefined();
       expect(result?.path).toBe("/home/user/projects/api");
-      expect(result?.rules).toEqual(["**/*.md"]);
+      expect(result?.rules).toStrictEqual(["**/*.md"]);
     });
 
     it("should find parent project for nested path", () => {
@@ -437,7 +437,7 @@ describe("config", () => {
       } as never);
 
       await expect(loadConfig("/custom/config.json")).rejects.toThrow(ConfigNotFoundError);
-      expect(vi.mocked(fs.stat).mock.calls).toHaveLength(1);
+      expect(vi.mocked(fs.stat)).toHaveBeenCalledTimes(1);
     });
 
     it("should throw ConfigParseError for invalid JSON", async () => {

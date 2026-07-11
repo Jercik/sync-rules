@@ -19,7 +19,7 @@ describe("executeActions - algorithm tests", () => {
 
   it("returns immediately when there are no actions", async () => {
     const result = await executeActions([], { dryRun: false });
-    expect(result).toEqual({ written: [], skipped: [] });
+    expect(result).toStrictEqual({ written: [], skipped: [] });
   });
 
   describe("dry-run mode", () => {
@@ -31,7 +31,7 @@ describe("executeActions - algorithm tests", () => {
       });
 
       expect(result.written).toContain("/test/file.txt");
-      expect(result.skipped).toEqual([]);
+      expect(result.skipped).toStrictEqual([]);
 
       expect(fsPromises.stat).not.toHaveBeenCalled();
       expect(fsPromises.writeFile).not.toHaveBeenCalled();
@@ -57,7 +57,7 @@ describe("executeActions - algorithm tests", () => {
 
       await expect(executeActions(actions, { dryRun: false })).rejects.toThrow(Error);
 
-      expect(vi.mocked(fsPromises.writeFile).mock.calls).toHaveLength(1);
+      expect(vi.mocked(fsPromises.writeFile)).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -72,8 +72,8 @@ describe("executeActions - algorithm tests", () => {
         dryRun: false,
       });
 
-      expect(result.written).toEqual(["/test/file1.txt", "/test/file2.txt"]);
-      expect(result.skipped).toEqual([]);
+      expect(result.written).toStrictEqual(["/test/file1.txt", "/test/file2.txt"]);
+      expect(result.skipped).toStrictEqual([]);
     });
   });
 
@@ -88,8 +88,10 @@ describe("executeActions - algorithm tests", () => {
 
       const result = await executeActions(actions, { dryRun: false });
 
-      expect(result.written).toEqual([]);
-      expect(result.skipped).toEqual([{ path: "/nonexistent/file.txt", reason: "parent_missing" }]);
+      expect(result.written).toStrictEqual([]);
+      expect(result.skipped).toStrictEqual([
+        { path: "/nonexistent/file.txt", reason: "parent_missing" },
+      ]);
       expect(fsPromises.writeFile).not.toHaveBeenCalled();
     });
 
@@ -102,8 +104,8 @@ describe("executeActions - algorithm tests", () => {
 
       const result = await executeActions(actions, { dryRun: false });
 
-      expect(result.written).toEqual([]);
-      expect(result.skipped).toEqual([
+      expect(result.written).toStrictEqual([]);
+      expect(result.skipped).toStrictEqual([
         { path: "/not-a-dir/file.txt", reason: "parent_not_directory" },
       ]);
       expect(fsPromises.writeFile).not.toHaveBeenCalled();
@@ -114,10 +116,10 @@ describe("executeActions - algorithm tests", () => {
 
       const result = await executeActions(actions, { dryRun: false });
 
-      expect(result.written).toEqual(["/existing/file.txt"]);
-      expect(result.skipped).toEqual([]);
+      expect(result.written).toStrictEqual(["/existing/file.txt"]);
+      expect(result.skipped).toStrictEqual([]);
       expect(fsPromises.stat).toHaveBeenCalledWith("/existing");
-      expect(fsPromises.writeFile).toHaveBeenCalled();
+      expect(fsPromises.writeFile).toHaveBeenCalledWith(expect.any(String), "Hello", "utf8");
     });
   });
 });

@@ -56,12 +56,13 @@ describe("sync", () => {
       );
 
       expect(filesystemModule.loadRules).toHaveBeenCalledWith(expect.any(String), ["**/*.md"]);
-      expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
+      expect(vi.mocked(executionModule.executeActions)).toHaveBeenCalledTimes(1);
       const callArguments = vi.mocked(executionModule.executeActions).mock.calls[0];
       const actionsArgument: WriteAction[] = callArguments?.[0] ?? [];
       const paths = actionsArgument.map((action) => action.path);
-      expect(paths).toContain("/home/user/project/AGENTS.md");
-      expect(paths).toContain("/home/user/project/CLAUDE.md");
+      expect(paths).toStrictEqual(
+        expect.arrayContaining(["/home/user/project/AGENTS.md", "/home/user/project/CLAUDE.md"]),
+      );
       const agents = actionsArgument.find((action) => action.path.endsWith("AGENTS.md"));
       expect(agents?.content).toBe("# Rule 1\nContent\n\n# Rule 2\nContent");
       const claude = actionsArgument.find((action) => action.path.endsWith("CLAUDE.md"));
@@ -84,7 +85,7 @@ describe("sync", () => {
         { rulesSource: "/path/to/rules", projects: [] },
       );
 
-      expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
+      expect(vi.mocked(executionModule.executeActions)).toHaveBeenCalledTimes(1);
       const callArguments = vi.mocked(executionModule.executeActions).mock.calls[0];
       const actionsArgument: WriteAction[] = callArguments?.[0] ?? [];
       const claude = actionsArgument.find((action) => action.path.endsWith("CLAUDE.md"));
@@ -107,7 +108,7 @@ describe("sync", () => {
         { rulesSource: "/path/to/rules", projects: [] },
       );
 
-      expect(vi.mocked(executionModule.executeActions).mock.calls).toHaveLength(1);
+      expect(vi.mocked(executionModule.executeActions)).toHaveBeenCalledTimes(1);
       const callArguments = vi.mocked(executionModule.executeActions).mock.calls[0];
       const actionsArgument: WriteAction[] = callArguments?.[0] ?? [];
       const paths = actionsArgument.map((action) => action.path);
@@ -140,7 +141,7 @@ describe("sync", () => {
       const secondCallArguments = vi.mocked(executionModule.executeActions).mock.calls[1];
       const secondActions: WriteAction[] = secondCallArguments?.[0] ?? [];
       const paths = secondActions.map((action) => action.path);
-      expect(paths).toEqual(["/home/user/project/CLAUDE.md"]);
+      expect(paths).toStrictEqual(["/home/user/project/CLAUDE.md"]);
       const [claude] = secondActions;
       expect(claude?.content).toBe("@AGENTS.md");
     });
