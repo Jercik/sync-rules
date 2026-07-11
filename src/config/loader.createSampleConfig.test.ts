@@ -23,13 +23,16 @@ describe("createSampleConfig", () => {
       flag: "wx",
     });
     const content = vi.mocked(fs.writeFile).mock.calls[0]?.[1] as string;
-    expect(content).toContain('"rulesSource"');
-    expect(content).toContain('"global-rules/*.md"');
-    expect(content).toContain('"globalOverrides"');
-    expect(content).toContain('"claude"');
-    expect(content).toContain('"codex"');
-    expect(content).toContain('"copilot"');
-    expect(content).toContain('"projects"');
+    expect(JSON.parse(content)).toStrictEqual({
+      rulesSource: "/path/to/rules",
+      global: ["global-rules/*.md"],
+      globalOverrides: {
+        claude: ["claude-specific/*.md"],
+        codex: ["codex-specific/*.md"],
+        copilot: ["copilot-specific/*.md"],
+      },
+      projects: [{ path: "/path/to/project", rules: ["**/*.md"] }],
+    });
   });
 
   it("overwrites file when force=true", async () => {

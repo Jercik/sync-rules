@@ -3,7 +3,7 @@ export interface PatternWarning {
   patterns: string[];
 }
 
-const GLOBAL_OVERRIDE_PATTERN = /^globalOverrides\.([^:]+): (.+)$/u;
+const GLOBAL_OVERRIDE_PATTERN = /^globalOverrides\.(?<harness>[^:]+): (?<pattern>.+)$/u;
 
 function addPatternWarning(warnings: PatternWarning[], source: string, pattern: string): void {
   const existing = warnings.find((warning) => warning.source === source);
@@ -25,8 +25,10 @@ export function collectGlobalPatternWarnings(unmatchedPatterns: string[]): Patte
   const warnings: PatternWarning[] = [];
   for (const pattern of unmatchedPatterns) {
     const match = GLOBAL_OVERRIDE_PATTERN.exec(pattern);
-    if (match?.[1] && match[2]) {
-      addPatternWarning(warnings, `globalOverrides.${match[1]}`, match[2]);
+    const harness = match?.groups?.harness;
+    const overridePattern = match?.groups?.pattern;
+    if (harness && overridePattern) {
+      addPatternWarning(warnings, `globalOverrides.${harness}`, overridePattern);
       continue;
     }
     addPatternWarning(warnings, "global", pattern);

@@ -32,8 +32,8 @@ describe("executeActions - integration tests", () => {
 
       const result = await executeActions(actions, { dryRun: false });
 
-      expect(result.skipped).toEqual([{ path: nestedPath, reason: "parent_missing" }]);
-      expect(result.written).toEqual([]);
+      expect(result.skipped).toStrictEqual([{ path: nestedPath, reason: "parent_missing" }]);
+      expect(result.written).toStrictEqual([]);
     });
 
     it("should overwrite existing files", async () => {

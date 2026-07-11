@@ -7,8 +7,8 @@ import {
   ensureError,
 } from "./errors.js";
 
-describe("SyncError class", () => {
-  it("SyncError sets name/message and optionally stores details and cause", () => {
+describe("syncError class", () => {
+  it("syncError sets name/message and optionally stores details and cause", () => {
     const cases = [
       {
         title: "basic error with message only",
@@ -42,17 +42,16 @@ describe("SyncError class", () => {
 
     for (const c of cases) {
       const error = new SyncError(c.message, c.details, c.cause);
-      expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(SyncError);
       expect(error.name).toBe("SyncError");
       expect(error.message).toBe(c.message);
-      expect(error.details).toEqual(c.expectedDetails);
+      expect(error.details).toStrictEqual(c.expectedDetails);
       expect(error.cause).toBe(c.cause);
     }
   });
 });
 
-describe("ConfigNotFoundError", () => {
+describe("configNotFoundError", () => {
   const cases = [
     {
       title: "missing non-default config",
@@ -70,20 +69,20 @@ describe("ConfigNotFoundError", () => {
     },
   ] as const;
 
-  for (const c of cases) {
-    it(`should create error for ${c.title}`, () => {
-      const error = new ConfigNotFoundError(c.path, c.isDefault);
-      expect(error.name).toBe("ConfigNotFoundError");
-      expect(error.path).toBe(c.path);
-      expect(error.isDefault).toBe(c.isDefault);
-      expect(error.message).toContain(c.message);
-      expect(error.message).toContain("Try 'sync-rules --help' for details.");
-      expect(error.message).toContain(c.hintContains);
+  it.each(cases)("should create error for $title", (c) => {
+    const error = new ConfigNotFoundError(c.path, c.isDefault);
+    expect({ name: error.name, path: error.path, isDefault: error.isDefault }).toStrictEqual({
+      name: "ConfigNotFoundError",
+      path: c.path,
+      isDefault: c.isDefault,
     });
-  }
+    expect(error.message).toContain(c.message);
+    expect(error.message).toContain("Try 'sync-rules --help' for details.");
+    expect(error.message).toContain(c.hintContains);
+  });
 });
 
-describe("ConfigParseError", () => {
+describe("configParseError", () => {
   const cases = [
     {
       title: "parse failure without original error",
@@ -99,21 +98,25 @@ describe("ConfigParseError", () => {
     },
   ] as const;
 
-  for (const c of cases) {
-    it(`should create error for ${c.title}`, () => {
-      const error = new ConfigParseError(c.path, c.original);
-      expect(error).toBeInstanceOf(Error);
-      expect(error.name).toBe("ConfigParseError");
-      expect(error.path).toBe(c.path);
-      expect(error.originalError).toBe(c.original);
-      expect(error.message).toContain(c.expectedMessage);
-      expect(error.message).toContain("Fix the JSON and glob patterns");
-      expect(error.message).toContain("Try 'sync-rules --help' for schema and examples.");
+  it.each(cases)("should create error for $title", (c) => {
+    const error = new ConfigParseError(c.path, c.original);
+    expect(error).toBeInstanceOf(Error);
+    expect({
+      name: error.name,
+      path: error.path,
+      originalError: error.originalError,
+    }).toStrictEqual({
+      name: "ConfigParseError",
+      path: c.path,
+      originalError: c.original,
     });
-  }
+    expect(error.message).toContain(c.expectedMessage);
+    expect(error.message).toContain("Fix the JSON and glob patterns");
+    expect(error.message).toContain("Try 'sync-rules --help' for schema and examples.");
+  });
 });
 
-describe("SpawnError", () => {
+describe("spawnError", () => {
   const cases = [
     {
       title: "command not found (ENOENT)",
@@ -158,18 +161,25 @@ describe("SpawnError", () => {
     },
   ] as const;
 
-  for (const c of cases) {
-    it(`should create error: ${c.title}`, () => {
-      const error = new SpawnError(c.input.command, c.input.code, c.input.exitCode, c.input.signal);
-      expect(error).toBeInstanceOf(Error);
-      expect(error.name).toBe("SpawnError");
-      expect(error.command).toBe(c.input.command);
-      expect(error.code).toBe(c.input.code);
-      expect(error.exitCode).toBe(c.input.exitCode);
-      expect(error.signal).toBe(c.input.signal);
-      expect(error.message).toBe(c.expectedMessage);
+  it.each(cases)("should create error: $title", (c) => {
+    const error = new SpawnError(c.input.command, c.input.code, c.input.exitCode, c.input.signal);
+    expect(error).toBeInstanceOf(Error);
+    expect({
+      name: error.name,
+      command: error.command,
+      code: error.code,
+      exitCode: error.exitCode,
+      signal: error.signal,
+      message: error.message,
+    }).toStrictEqual({
+      name: "SpawnError",
+      command: c.input.command,
+      code: c.input.code,
+      exitCode: c.input.exitCode,
+      signal: c.input.signal,
+      message: c.expectedMessage,
     });
-  }
+  });
 
   it("preserves cause on SpawnError for error chaining", () => {
     const cause = new Error("Original error");
